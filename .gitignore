@@ -1,0 +1,7 @@
+.codex/*
+!.codex/skills/
+.codex/skills/*
+!.codex/skills/prettifer-commit/
+!.codex/skills/prettifer-commit/**
+!.codex/skills/prettifer-pr/
+!.codex/skills/prettifer-pr/**
