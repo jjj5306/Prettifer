@@ -40,4 +40,8 @@ export default tseslint.config(
       "@typescript-eslint/no-unsafe-assignment": "off",
     },
   },
+  {
+    files: ["examples/**/*.mjs"],
+    ...tseslint.configs.disableTypeChecked,
+  },
 );
