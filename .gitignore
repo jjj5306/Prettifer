@@ -5,3 +5,8 @@
 !.codex/skills/prettifer-commit/**
 !.codex/skills/prettifer-pr/
 !.codex/skills/prettifer-pr/**
+
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
