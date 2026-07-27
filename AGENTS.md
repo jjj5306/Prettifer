@@ -158,6 +158,34 @@ Java와 같은 객체지향 언어에서는 다음 원칙을 준수한다.
 - 공개 동작을 변경하면 명세, 테스트와 사용자 문서를 함께 갱신한다.
 - 실패와 부분 성공 상태를 명시적으로 표현하고 진단 가능한 정보를 제공한다.
 
+### 6.1 React 코드 규칙
+
+- 컴포넌트와 Hook은 같은 props와 state에 같은 JSX를 반환하는 순수한 렌더링을 유지한다.
+- props, state, context와 ref 값을 직접 변경하지 않는다.
+- Hook은 React 컴포넌트 또는 사용자 Hook의 최상위에서 같은 순서로 호출한다.
+- 화면 계산값은 기존 상태에서 구하고 같은 의미의 값을 별도 state로 중복 저장하지 않는다.
+- Effect는 Electron 구독, Monaco model, 포커스 복원처럼 외부 시스템과 동기화할 때만 사용한다.
+- 사용자 동작은 이벤트 처리 함수에서 시작하고 모든 구독, model과 취소 가능한 작업은 종료 시 정리한다.
+- 관련 화면 상태는 구분된 상태와 reducer로 관리하며 서로 모순되는 boolean 조합을 만들지 않는다.
+- 커밋과 파일 목록의 key에는 전체 커밋 ID와 저장소 상대 경로처럼 안정적인 식별자를 사용한다.
+- Git 출력, 경로와 진단 문구는 텍스트로 렌더링하고 `dangerouslySetInnerHTML`을 사용하지 않는다.
+- 컴포넌트 props와 전달 자료는 읽기 전용 타입으로 선언한다.
+- 컴포넌트는 PascalCase, 사용자 Hook은 `use`, 이벤트 props는 `on`, 내부 이벤트 처리 함수는 `handle` 접두사를 사용한다.
+- `useMemo`, `useCallback`과 `memo`는 측정된 병목 또는 외부 계약의 안정적인 참조가 필요한 경우에 사용한다.
+- 기본 HTML 컨트롤, 보이는 이름, 키보드 조작, 포커스 표시와 보조 기술 상태 알림을 제공한다.
+- React 파일은 기능별로 컴포넌트, 상태, Hook, 스타일과 테스트를 함께 둔다.
+
+### 6.2 Electron 코드 규칙
+
+- Git, 파일 시스템, 폴더 선택과 통합 결과 계산은 main 프로세스에서 실행한다.
+- renderer는 Node.js와 Electron 모듈을 사용하지 않고 preload가 공개한 typed API만 호출한다.
+- preload는 사용자 동작별 함수를 공개하고 `ipcRenderer`, 임의 채널과 Electron 이벤트 객체를 노출하지 않는다.
+- main은 모든 프로세스 간 요청의 자료형, 저장소 세션, 요청 세대와 발신 화면을 실행 시점에 검증한다.
+- main, preload, renderer와 shared 계약의 의존성 방향은 lint와 별도 TypeScript 설정으로 보호한다.
+- `contextIsolation`과 renderer sandbox를 켜고 `nodeIntegration`을 끈다.
+- 로컬 앱 주소 밖의 탐색, 새 창, 권한 요청과 외부 콘텐츠 실행을 차단한다.
+- lint 비활성화 주석에는 규칙 이름, 필요한 이유와 연결된 이슈를 기록하며 파일 전체 비활성화는 사용하지 않는다.
+
 ## 7. 검증
 
 작업 완료 전 다음 항목을 확인한다.

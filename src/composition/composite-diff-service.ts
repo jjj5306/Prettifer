@@ -136,9 +136,9 @@ export class CompositeDiffService {
 
 function parseNameStatus(
   output: string,
-): Array<Pick<CompositeFileChange, "path" | "status">> {
+): Pick<CompositeFileChange, "path" | "status">[] {
   const tokens = output.split("\0").filter((token) => token.length > 0);
-  const changes: Array<Pick<CompositeFileChange, "path" | "status">> = [];
+  const changes: Pick<CompositeFileChange, "path" | "status">[] = [];
 
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index];
@@ -164,6 +164,7 @@ function parseStatus(status: string): CompositeFileStatus {
       return "modified";
     case "D":
       return "deleted";
+    case undefined:
     default:
       throw new Error(`지원하지 않는 파일 변경 상태입니다: ${status}`);
   }

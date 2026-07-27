@@ -1,0 +1,111 @@
+.panel {
+  composes: surface from "../PanelSurface.module.css";
+}
+
+.panel p,
+.panel h2,
+.panel h3 {
+  margin: 0;
+}
+
+.headingRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.hint,
+.metadata {
+  color: var(--color-muted);
+}
+
+.commitList {
+  display: grid;
+  max-height: 32rem;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.commitRow,
+.inspectedRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+}
+
+.inspectedRow {
+  border-width: 2px;
+  border-color: var(--color-accent);
+}
+
+.selection {
+  display: grid;
+  place-content: center;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border-right: 1px solid var(--color-border);
+  font-size: 0.75rem;
+}
+
+.commitButton {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.75rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.commitTitle {
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.merge {
+  color: var(--color-warning);
+  font-size: 0.75rem;
+}
+
+.details {
+  display: grid;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.details dl {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.details dl div {
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.details dt {
+  color: var(--color-muted);
+}
+
+.details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

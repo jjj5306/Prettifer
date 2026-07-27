@@ -1,0 +1,44 @@
+.panel {
+  composes: surface from "../PanelSurface.module.css";
+}
+
+.panel h2,
+.panel p {
+  margin: 0;
+}
+
+.fileList {
+  display: grid;
+  max-height: 22rem;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.file,
+.selectedFile {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr);
+  width: 100%;
+  gap: 0.5rem;
+  text-align: left;
+}
+
+.selectedFile {
+  border-width: 2px;
+  border-color: var(--color-accent);
+}
+
+.file span:last-child,
+.selectedFile span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status {
+  color: var(--color-accent);
+  font-weight: 700;
+}

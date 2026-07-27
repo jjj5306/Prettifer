@@ -7,6 +7,9 @@
 !.codex/skills/prettifer-pr/**
 
 node_modules/
+.webpack/
+out/
 dist/
 coverage/
+test-results/
 *.tsbuildinfo

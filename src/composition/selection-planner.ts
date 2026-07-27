@@ -1,6 +1,6 @@
 import {
   GitCommandError,
-  GitCommandRunner,
+  type GitCommandRunner,
 } from "../git/git-command-runner.js";
 
 export interface ComparisonBaseRequest {

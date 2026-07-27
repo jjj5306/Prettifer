@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
-  SelectionError,
   SelectionPlanner,
+  type SelectionError,
 } from "../../src/composition/selection-planner.js";
 import { GitCommandRunner } from "../../src/git/git-command-runner.js";
 import {
