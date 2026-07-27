@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   GitCommandAbortedError,
-  GitCommandError,
   GitCommandRunner,
   NodeProcessExecutor,
+  type GitCommandError,
   type ProcessExecutor,
   type ProcessRequest,
 } from "../../src/git/git-command-runner.js";

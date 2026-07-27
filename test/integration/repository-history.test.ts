@@ -1,0 +1,210 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+
+import {
+  RepositoryHistoryError,
+  RepositoryHistoryService,
+  type RepositoryRange,
+} from "../../src/history/repository-history-service.js";
+import { GitCommandRunner, type ProcessExecutor } from "../../src/git/git-command-runner.js";
+import { createHistoryFixture, type HistoryFixture } from "../support/history-fixture.js";
+
+describe("RepositoryHistoryService", () => {
+  let fixture: HistoryFixture;
+  let mutableFixture: HistoryFixture | undefined;
+  let temporaryPath: string | undefined;
+
+  beforeAll(async () => {
+    fixture = await createHistoryFixture();
+  });
+
+  afterEach(async () => {
+    if (temporaryPath !== undefined) {
+      await rm(temporaryPath, { force: true, recursive: true });
+      temporaryPath = undefined;
+    }
+  });
+
+  afterAll(async () => {
+    await fixture.dispose();
+    await mutableFixture?.dispose();
+  });
+
+  it("identifies a repository, current branch, and sorted local branches", async () => {
+    const service = new RepositoryHistoryService();
+
+    const repository = await service.getRepository(fixture.path);
+
+    expect(repository.rootPath).toBe(resolve(fixture.path));
+    expect(repository.currentBranch).toBe(fixture.headRef);
+    expect(repository.branches.map((branch) => branch.name)).toEqual([
+      "feature/desktop-history",
+      "feature/history-side",
+      "main",
+    ]);
+    expect(repository.branches.find((branch) => branch.isCurrent)?.name).toBe(fixture.headRef);
+  });
+
+  it("explains how to recover when the selected folder is not a Git repository", async () => {
+    temporaryPath = await mkdtemp(join(tmpdir(), "prettifer-not-repository-"));
+    const service = new RepositoryHistoryService();
+
+    await expect(service.getRepository(temporaryPath)).rejects.toEqual(
+      expect.objectContaining<Partial<RepositoryHistoryError>>({
+        code: "INVALID_REPOSITORY",
+        subject: resolve(temporaryPath),
+        nextAction: "다른 Git 저장소 폴더를 선택해 주세요.",
+      }),
+    );
+  });
+
+  it("explains how to configure Git when the executable cannot run", async () => {
+    const executor: ProcessExecutor = {
+      execute: () => Promise.reject(new Error("spawn git ENOENT")),
+    };
+    const service = new RepositoryHistoryService(new GitCommandRunner({ executor }));
+
+    await expect(service.getRepository(process.cwd())).rejects.toEqual(
+      expect.objectContaining<Partial<RepositoryHistoryError>>({
+        code: "GIT_UNAVAILABLE",
+        nextAction: "Git을 설치하거나 실행 경로를 확인한 뒤 다시 시도해 주세요.",
+      }),
+    );
+  });
+
+  it("resolves local branch commits and their common ancestor", async () => {
+    const service = new RepositoryHistoryService();
+
+    const range = await service.createRange({
+      repositoryPath: fixture.path,
+      baseRef: fixture.baseRef,
+      headRef: fixture.headRef,
+    });
+
+    expect(range).toMatchObject({
+      baseRef: fixture.baseRef,
+      headRef: fixture.headRef,
+      baseCommit: fixture.baseCommit,
+      headCommit: fixture.initialHeadCommit,
+    });
+    expect(range.revision).toContain(fixture.initialHeadCommit);
+  });
+
+  it("rejects a branch that is not in the repository", async () => {
+    const service = new RepositoryHistoryService();
+
+    await expect(
+      service.createRange({
+        repositoryPath: fixture.path,
+        baseRef: fixture.baseRef,
+        headRef: "feature/missing",
+      }),
+    ).rejects.toEqual(
+      expect.objectContaining<Partial<RepositoryHistoryError>>({
+        code: "BRANCH_NOT_FOUND",
+        subject: "feature/missing",
+      }),
+    );
+  });
+
+  it("returns first-parent commits newest-first in stable pages and marks merges", async () => {
+    const service = new RepositoryHistoryService();
+    const range = await createRange(service, fixture);
+
+    const firstPage = await service.listCommits({
+      repositoryPath: fixture.path,
+      range,
+    });
+    const secondPage = await service.listCommits({
+      repositoryPath: fixture.path,
+      range,
+      offset: firstPage.nextOffset ?? 0,
+    });
+
+    expect(firstPage.commits).toHaveLength(100);
+    expect(firstPage.nextOffset).toBe(100);
+    expect(firstPage.commits[0]).toMatchObject({
+      id: fixture.mergeCommit,
+      isMerge: true,
+      selectable: false,
+      title: "merge: include history side branch",
+    });
+    expect(secondPage.commits).toHaveLength(5);
+    expect(secondPage.nextOffset).toBeNull();
+    expect(secondPage.commits.at(-1)?.id).toBe(fixture.firstFeatureCommit);
+  });
+
+  it("rejects pages and composition inputs after the head branch moves", async () => {
+    mutableFixture = await createHistoryFixture();
+    const service = new RepositoryHistoryService();
+    const range = await createRange(service, mutableFixture);
+    await mutableFixture.advanceHead();
+
+    await expect(
+      service.listCommits({ repositoryPath: mutableFixture.path, range }),
+    ).rejects.toEqual(
+      expect.objectContaining<Partial<RepositoryHistoryError>>({
+        code: "RANGE_STALE",
+        subject: mutableFixture.headRef,
+        nextAction: "브랜치 이력을 새로 불러온 뒤 다시 선택해 주세요.",
+      }),
+    );
+    await expect(
+      service.assertRangeCurrent({ repositoryPath: mutableFixture.path, range }),
+    ).rejects.toBeInstanceOf(RepositoryHistoryError);
+  });
+
+  it("rejects a range whose common ancestor was replaced by renderer input", async () => {
+    const service = new RepositoryHistoryService();
+    const range = await createRange(service, fixture);
+    const tampered = {
+      ...range,
+      baseCommit: fixture.firstFeatureCommit,
+      revision: `${range.baseRefCommit}:${range.headCommit}:${fixture.firstFeatureCommit}`,
+    };
+
+    await expect(service.assertRangeCurrent({
+      repositoryPath: fixture.path,
+      range: tampered,
+    })).rejects.toMatchObject({ code: "RANGE_STALE" });
+  });
+
+  it("accepts only non-merge commits from the displayed first-parent history", async () => {
+    const service = new RepositoryHistoryService();
+    const range = await createRange(service, fixture);
+    const sideCommit = fixture.git(["rev-parse", "feature/history-side"]).trim();
+
+    await expect(service.assertCompositionInput({
+      repositoryPath: fixture.path,
+      range,
+      selectedCommits: [fixture.firstFeatureCommit],
+    })).resolves.toBeUndefined();
+    await expect(service.assertCompositionInput({
+      repositoryPath: fixture.path,
+      range,
+      selectedCommits: [sideCommit],
+    })).rejects.toMatchObject({ code: "COMMIT_NOT_SELECTABLE", subject: sideCommit });
+    await expect(service.assertCompositionInput({
+      repositoryPath: fixture.path,
+      range,
+      selectedCommits: [fixture.mergeCommit],
+    })).rejects.toMatchObject({
+      code: "COMMIT_NOT_SELECTABLE",
+      subject: fixture.mergeCommit,
+    });
+  });
+});
+
+async function createRange(
+  service: RepositoryHistoryService,
+  fixture: HistoryFixture,
+): Promise<RepositoryRange> {
+  return service.createRange({
+    repositoryPath: fixture.path,
+    baseRef: fixture.baseRef,
+    headRef: fixture.headRef,
+  });
+}

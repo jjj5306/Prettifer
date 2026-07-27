@@ -25,7 +25,7 @@ untracked 파일을 그대로 유지합니다.
 
 ### 1. 준비 사항
 
-- Node.js `20.19+`, `22.13+` 또는 `24+`
+- Node.js `22.13+` 또는 `24+`
 - Git `2.30+`
 - 분석할 로컬 Git 저장소
 
@@ -177,7 +177,7 @@ diff --git a/src/example.ts b/src/example.ts
 - 충돌 파일의 부분 결과와 자동 복구
 - rename 추론
 - binary 파일 내용 표현
-- 공개 CLI, 패키지 배포와 사용자 화면
+- 공개 CLI, 설치 프로그램, 코드 서명, 자동 업데이트와 배포 채널
 
 ## Troubleshooting
 
@@ -226,6 +226,29 @@ git -C $TargetRepo branch --contains $FirstCommit
 작업을 종료한 뒤 다시 실행합니다.
 
 ## Development
+
+### Desktop UI
+
+`npm ci`는 `package-lock.json`에 기록된 버전으로 의존성을 새로 설치합니다. 설치 후
+Electron 개발 앱을 실행합니다.
+
+```powershell
+npm ci
+npm run desktop:start
+```
+
+데스크톱 단위 테스트와 Playwright 사용자 흐름을 실행하고 Windows 산출물을
+만듭니다.
+
+```powershell
+npm run test:desktop
+npm run desktop:package
+npm run desktop:make
+```
+
+실행 가능한 앱은 `out/desktop/prettifer-win32-x64/`, ZIP은 `out/desktop/make/zip/win32/x64/` 아래에 생성됩니다.
+
+### 전체 검증
 
 전체 프로젝트를 검증합니다.
 

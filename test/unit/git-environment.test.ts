@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  GitEnvironmentError,
   verifyGitEnvironment,
+  type GitEnvironmentError,
   type GitVersionReader,
 } from "../../src/git/git-environment.js";
 

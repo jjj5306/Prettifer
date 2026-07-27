@@ -1,0 +1,46 @@
+.panel {
+  composes: surface from "../PanelSurface.module.css";
+}
+
+.panel h2,
+.panel p {
+  margin: 0;
+}
+
+.headingRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.headingRow p {
+  color: var(--color-muted);
+}
+
+.editorHost {
+  min-height: 28rem;
+  border: 1px solid var(--color-border);
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--color-danger);
+  border-radius: 0.5rem;
+}
+
+@media (max-width: 48rem) {
+  .headingRow,
+  .error {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .editorHost {
+    min-height: 20rem;
+  }
+}

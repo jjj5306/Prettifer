@@ -1,0 +1,152 @@
+.app :global(*) {
+  box-sizing: border-box;
+}
+
+:global(html),
+:global(body),
+:global(#root) {
+  min-width: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
+.app {
+  --color-background: #08101d;
+  --color-panel: #101a2a;
+  --color-border: #31415d;
+  --color-text: #e8eef9;
+  --color-muted: #afbdd3;
+  --color-accent: #77a7ff;
+  --color-danger: #ff8b93;
+  --color-warning: #ffd479;
+
+  box-sizing: border-box;
+  display: grid;
+  min-height: 100vh;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family:
+    Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.app *::before,
+.app *::after {
+  box-sizing: border-box;
+}
+
+.app button,
+.app select,
+.app input {
+  min-height: 2.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.4rem;
+  background: #152239;
+  color: var(--color-text);
+  font: inherit;
+}
+
+.app button {
+  padding: 0.5rem 0.8rem;
+  cursor: pointer;
+}
+
+.app button:focus-visible,
+.app select:focus-visible,
+.app input:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.app button:disabled,
+.app input:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.appHeader {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.eyebrow,
+.title,
+.description {
+  margin: 0;
+}
+
+.eyebrow {
+  color: var(--color-accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.title {
+  font-size: clamp(1.75rem, 4vw, 2.75rem);
+}
+
+.description {
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+
+.workspaceGrid {
+  display: grid;
+  grid-template-columns: minmax(18rem, 0.85fr) minmax(22rem, 1.4fr);
+  gap: 1rem;
+  min-width: 0;
+}
+
+.placeholder {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  background: var(--color-panel);
+}
+
+.reviewArea {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 1rem;
+}
+
+.resultGrid {
+  display: grid;
+  grid-template-columns: minmax(14rem, 0.55fr) minmax(22rem, 1.45fr);
+  min-width: 0;
+  gap: 1rem;
+}
+
+.placeholder h2,
+.placeholder p {
+  margin-top: 0;
+}
+
+@media (max-width: 64rem) {
+  .workspaceGrid,
+  .resultGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (forced-colors: active) {
+  .app button:focus-visible,
+  .app select:focus-visible,
+  .app input:focus-visible {
+    outline-color: Highlight;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app *,
+  .app *::before,
+  .app *::after {
+    scroll-behavior: auto;
+    transition-duration: 0.01ms;
+  }
+}

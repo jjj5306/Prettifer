@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { GitCommandRunner } from "../git/git-command-runner.js";
+import type { GitCommandRunner } from "../git/git-command-runner.js";
 
 export interface CompositionWorkspace {
   path: string;

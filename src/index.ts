@@ -4,3 +4,4 @@ export * from "./composition/composition-workspace.js";
 export * from "./composition/selection-planner.js";
 export * from "./git/git-command-runner.js";
 export * from "./git/git-environment.js";
+export * from "./history/repository-history-service.js";
