@@ -173,8 +173,8 @@ function assertRangeBelongsToSession(
     throw new RequestBoundaryError(
       "RANGE_EXPIRED",
       range.headRef,
-      "브랜치 이력을 새로 불러온 뒤 다시 선택해 주세요.",
-      "비교 범위가 현재 저장소 세션과 일치하지 않습니다.",
+      "Reload the branch history, then select the commits again.",
+      "The comparison range does not match the current repository session.",
     );
   }
 }
@@ -236,8 +236,8 @@ function assertTrustedSender(
     throw new RequestBoundaryError(
       "UNTRUSTED_SENDER",
       event.frameUrl,
-      "현재 Prettifer 창에서 다시 시도해 주세요.",
-      "허용되지 않은 화면에서 요청했습니다.",
+      "Try again from the current Prettifer window.",
+      "The request came from an untrusted view.",
     );
   }
 }
@@ -249,8 +249,8 @@ function parseRequest<T>(schema: { parse(input: unknown): T }, input: unknown): 
     throw new RequestBoundaryError(
       "INVALID_REQUEST",
       "request",
-      "화면을 새로 연 뒤 다시 시도해 주세요.",
-      "요청 자료가 올바르지 않습니다.",
+      "Reopen the window, then try again.",
+      "The request data is invalid.",
       { cause: error },
     );
   }
@@ -284,7 +284,7 @@ function toDiagnostic(error: unknown): Diagnostic {
   }
   return {
     code: "REQUEST_FAILED",
-    message: "요청을 처리할 수 없습니다.",
-    nextAction: "저장소 상태를 확인한 뒤 다시 시도해 주세요.",
+    message: "The request could not be processed.",
+    nextAction: "Check the repository state, then try again.",
   };
 }

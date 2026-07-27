@@ -294,8 +294,8 @@ function connectionDiagnostic(_error: unknown): Diagnostic {
   void _error;
   return {
     code: "DESKTOP_CONNECTION_FAILED",
-    message: "데스크톱 기능에 연결할 수 없습니다.",
-    nextAction: "앱 창을 다시 연 뒤 시도해 주세요.",
+    message: "Desktop features are unavailable.",
+    nextAction: "Reopen the app window and try again.",
   };
 }
 

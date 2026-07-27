@@ -130,7 +130,7 @@ describe("removeDirectoryWithRetries", () => {
       }),
     ).rejects.toMatchObject({
       path: "C:\\still-locked",
-      message: expect.stringContaining("정리하지 못했습니다"),
+      message: expect.stringContaining("could not be removed"),
     });
   });
 });

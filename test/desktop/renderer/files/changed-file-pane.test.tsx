@@ -13,27 +13,59 @@ const result = {
   files: [
     { path: "src/z.ts", status: "deleted" as const, beforeContent: "z", afterContent: null },
     { path: "src/a.ts", status: "added" as const, beforeContent: null, afterContent: "a" },
-    { path: "src/m.ts", status: "modified" as const, beforeContent: "m1", afterContent: "m2" },
+    { path: "src/nested/m.ts", status: "modified" as const, beforeContent: "m1", afterContent: "m2" },
   ],
   unifiedDiff: "diff",
 };
 
 describe("ChangedFilePane", () => {
-  it("preserves the main-process order and names file states", () => {
+  it("shows the main-process order and English file states in List View", () => {
     render(
       <StrictMode>
         <ChangedFilePane result={result} selectedFilePath="src/a.ts" onSelectFile={vi.fn()} />
       </StrictMode>,
     );
 
-    const buttons = screen.getAllByRole("button", { name: /파일 보기/u });
-    expect(buttons.map((button) => button.textContent)).toEqual([
-      "삭제src/z.ts",
-      "추가src/a.ts",
-      "수정src/m.ts",
+    expect(screen.getByRole("button", { name: "List View" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    const files = screen.getAllByRole("button", { name: /file: /iu });
+    expect(files.map((button) => button.textContent)).toEqual([
+      "Dsrc/z.ts",
+      "Asrc/a.ts",
+      "Msrc/nested/m.ts",
     ]);
-    expect(screen.getByRole("button", { name: "현재 파일 보기: src/a.ts (추가)" }))
-      .toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", {
+      name: "Currently viewing file: src/a.ts (Added)",
+    })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("switches between List View and Tree View without changing the selected file", async () => {
+    const user = userEvent.setup();
+    const onSelectFile = vi.fn();
+    render(
+      <StrictMode>
+        <ChangedFilePane
+          result={result}
+          selectedFilePath="src/nested/m.ts"
+          onSelectFile={onSelectFile}
+        />
+      </StrictMode>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Tree View" }));
+
+    expect(screen.getByRole("button", { name: "Tree View" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByText("src")).toBeVisible();
+    expect(screen.getByText("nested")).toBeVisible();
+    expect(screen.getByRole("button", {
+      name: "Currently viewing file: src/nested/m.ts (Modified)",
+    })).toHaveAttribute("aria-pressed", "true");
+    expect(onSelectFile).not.toHaveBeenCalled();
   });
 
   it("changes the selected file with keyboard activation", async () => {
@@ -45,18 +77,65 @@ describe("ChangedFilePane", () => {
       </StrictMode>,
     );
 
-    const modified = screen.getByRole("button", { name: "파일 보기: src/m.ts (수정)" });
+    const modified = screen.getByRole("button", {
+      name: "View file: src/nested/m.ts (Modified)",
+    });
     modified.focus();
     await user.keyboard("{Enter}");
-    expect(onSelectFile).toHaveBeenCalledWith("src/m.ts");
+    expect(onSelectFile).toHaveBeenCalledWith("src/nested/m.ts");
   });
 
-  it("shows an explicit empty result", () => {
+  it("activates view toggles with the keyboard", async () => {
+    const user = userEvent.setup();
     render(
       <StrictMode>
-        <ChangedFilePane result={{ ...result, files: [] }} selectedFilePath={null} onSelectFile={vi.fn()} />
+        <ChangedFilePane result={result} selectedFilePath="src/a.ts" onSelectFile={vi.fn()} />
       </StrictMode>,
     );
-    expect(screen.getByText("변경 파일이 없습니다.")).toBeVisible();
+
+    const tree = screen.getByRole("button", { name: "Tree View" });
+    tree.focus();
+    await user.keyboard(" ");
+    expect(tree).toHaveAttribute("aria-pressed", "true");
+    expect(tree).toHaveFocus();
+  });
+
+  it("shows an explicit empty result in either view", async () => {
+    const user = userEvent.setup();
+    render(
+      <StrictMode>
+        <ChangedFilePane
+          result={{ ...result, files: [] }}
+          selectedFilePath={null}
+          onSelectFile={vi.fn()}
+        />
+      </StrictMode>,
+    );
+
+    expect(screen.getByText("No changed files in this result.")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Tree View" }));
+    expect(screen.getByText("No changed files in this result.")).toBeVisible();
+  });
+
+  it("renders markup-shaped paths as text", () => {
+    const markupPath = "src/<img src=x onerror=alert(1)>.ts";
+    const { container } = render(
+      <ChangedFilePane
+        result={{
+          ...result,
+          files: [{
+            path: markupPath,
+            status: "added",
+            beforeContent: null,
+            afterContent: "safe",
+          }],
+        }}
+        selectedFilePath={markupPath}
+        onSelectFile={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(markupPath)).toBeVisible();
+    expect(container.querySelector("img")).toBeNull();
   });
 });

@@ -21,6 +21,28 @@ Prettifer 데스크톱 앱은 graphite 계열의 어두운 배경과 보라색 �
 
 ![Prettifer desktop workbench list view](docs/assets/prettifer-desktop-workbench-list-view.png)
 
+## Desktop Quick Start
+
+Prettifer 저장소 루트에서 의존성을 설치하고 데스크톱 앱을 실행합니다.
+
+```powershell
+npm ci
+npm run desktop:start
+```
+
+앱에서 다음 순서로 선택 결과를 검토합니다.
+
+1. `Open Repository`에서 로컬 Git 저장소를 선택합니다.
+2. `Base branch`와 `Working branch`를 확인하고 `Load Commit Range`를 실행합니다.
+3. `Commit Timeline`에서 결과에 포함할 커밋을 선택합니다.
+4. `Build Selected Result`로 선택 결과를 계산합니다.
+5. `Changed Files`의 Tree View 또는 List View에서 파일을 선택합니다.
+6. `Side-by-side Diff`에서 기준 파일과 선택 결과를 검토합니다.
+
+계산은 별도 Git 작업 공간에서 실행됩니다. 현재 branch, HEAD, staged 변경,
+unstaged 변경과 untracked 파일은 유지됩니다. merge commit은 현재 선택할 수
+없으며 `Merge commit · unavailable`로 표시됩니다.
+
 ## Core
 
 현재 코어는 하나의 선형 브랜치 이력에서 서로 떨어진 커밋을 선택하고, 선택한
@@ -31,7 +53,7 @@ untracked 파일을 그대로 유지합니다.
 현재 실행 방법은 빌드 결과의 코어 클래스를 불러오는 개발자용 예제입니다.
 공개 API의 호환성과 CLI 형식은 아직 보장되지 않습니다.
 
-## Quick Start
+## Core Quick Start
 
 ### 1. 준비 사항
 

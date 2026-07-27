@@ -49,7 +49,7 @@ export class GitCommandError extends Error {
 
 export class GitCommandAbortedError extends Error {
   constructor(options?: ErrorOptions) {
-    super("Git 작업이 취소되었습니다.", options);
+    super("The Git operation was cancelled.", options);
     this.name = "GitCommandAbortedError";
   }
 }

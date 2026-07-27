@@ -65,7 +65,7 @@ export class MonacoDiffAdapter {
         renderSideBySide: true,
         renderIndicators: true,
         accessibilitySupport: "on",
-        ariaLabel: "원본과 통합 결과 읽기 전용 diff",
+        ariaLabel: "Read-only diff between base and selected result",
       });
       editor.setModel({ original: originalModel, modified: resultModel });
       this.originalModel = originalModel;

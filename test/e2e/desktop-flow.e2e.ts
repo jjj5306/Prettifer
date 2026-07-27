@@ -34,8 +34,13 @@ interface RunningApplication {
 
 const fixtures: { dispose(): Promise<void> }[] = [];
 const applications: ElectronApplication[] = [];
+const observations: RunningApplication[] = [];
 
 test.afterEach(async () => {
+  for (const running of observations.splice(0)) {
+    expect.soft(running.consoleErrors, "renderer console errors").toEqual([]);
+    expect.soft(running.pageErrors, "unhandled renderer errors").toEqual([]);
+  }
   for (const application of applications.splice(0)) {
     await application.close();
   }
@@ -47,34 +52,83 @@ test.afterEach(async () => {
 test("opens a repository, selects non-contiguous commits and reviews file diff", async () => {
   const fixture = await createFixture();
   const running = await launch([fixture.path]);
+  const browserWindow = await running.application.browserWindow(running.page) as JSHandle<BrowserWindow>;
+  const baselineZoom = await normalizeDisplayScale(browserWindow);
+  await setViewportSize(running.page, 1280, 720);
 
   await openRepository(running.page, fixture.path);
-  await running.page.getByRole("button", { name: "커밋 범위 불러오기" }).click();
+  await running.page.getByRole("button", { name: "Load Commit Range" }).click();
   await running.page.getByRole("checkbox", {
-    name: "통합에 포함: docs(auth): explain session lifecycle",
+    name: "Include in selected result: docs(auth): explain session lifecycle",
   }).check();
   await running.page.getByRole("checkbox", {
-    name: "통합에 포함: feat(auth): validate login request",
+    name: "Include in selected result: feat(auth): validate login request",
   }).check();
-  await expect(running.page.getByText("통합 선택 2개")).toBeVisible();
+  await expect(
+    running.page.getByRole("region", { name: "Commit Timeline" }).getByText("2 selected"),
+  ).toBeVisible();
 
-  await running.page.getByRole("button", { name: "통합 결과 만들기" }).click();
-  await expect(running.page.getByText(/계산 완료 · 변경 파일/u)).toBeVisible();
-  await running.page.getByRole("button", { name: /파일 보기: docs\/auth\.md/u }).click();
+  await running.page.getByRole("button", { name: "Build Selected Result" }).click();
+  await expect(running.page.getByText(/Result ready · \d+ changed files/u)).toBeVisible();
+  await running.page.getByRole("button", {
+    name: /View file: src\/auth\/login\.ts/u,
+  }).click();
   await expect(running.page.getByRole("textbox", {
-    name: "읽기 전용 diff: docs/auth.md · 원본과 통합 결과",
+    name: "Read-only diff: src/auth/login.ts · base and selected result",
   })).toBeVisible();
-  await expect(running.page.getByText("왼쪽 원본 · 오른쪽 통합 결과")).toBeVisible();
+  await running.page.getByRole("button", { name: /View file: docs\/auth\.md/u }).click();
+  await expect(running.page.getByRole("textbox", {
+    name: "Read-only diff: docs/auth.md · base and selected result",
+  })).toBeVisible();
+  await expect(running.page.getByText(
+    "Base on the left · selected result on the right",
+  )).toBeVisible();
+  const selectedFile = running.page.getByRole("button", {
+    name: /Currently viewing file: docs\/auth\.md/u,
+  });
+  await expect(selectedFile).toHaveAttribute("aria-pressed", "true");
   await running.page.screenshot({
-    path: test.info().outputPath("composite-diff.png"),
+    path: test.info().outputPath("list-view-1280x720.png"),
     fullPage: true,
+    scale: "css",
   });
 
-  const browserWindow = await running.application.browserWindow(running.page) as JSHandle<BrowserWindow>;
-  await browserWindow.evaluate((window) => { window.webContents.setZoomFactor(2); });
+  await running.page.getByRole("button", { name: "Tree View" }).click();
+  await expect(running.page.getByRole("button", { name: "Tree View" }))
+    .toHaveAttribute("aria-pressed", "true");
+  await expect(selectedFile).toHaveAttribute("aria-pressed", "true");
+  await expect(running.page.getByRole("textbox", {
+    name: "Read-only diff: docs/auth.md · base and selected result",
+  })).toBeVisible();
+  await running.page.screenshot({
+    path: test.info().outputPath("tree-view-1280x720.png"),
+    fullPage: true,
+    scale: "css",
+  });
+
+  await setViewportSize(running.page, 1920, 1080);
+  await running.page.screenshot({
+    path: test.info().outputPath("tree-view-1920x1080.png"),
+    fullPage: true,
+    scale: "css",
+  });
+  await running.page.getByRole("button", { name: "List View" }).click();
+  await expect(running.page.getByRole("button", { name: "List View" }))
+    .toHaveAttribute("aria-pressed", "true");
+  await expect(selectedFile).toHaveAttribute("aria-pressed", "true");
+  await running.page.screenshot({
+    path: test.info().outputPath("list-view-1920x1080.png"),
+    fullPage: true,
+    scale: "css",
+  });
+
+  await browserWindow.evaluate(
+    (window, zoomFactor) => { window.webContents.setZoomFactor(zoomFactor); },
+    baselineZoom * 2,
+  );
   await expect.poll(() => browserWindow.evaluate((window) =>
     window.webContents.getZoomFactor(),
-  )).toBe(2);
+  )).toBeCloseTo(baselineZoom * 2);
   await expect.poll(() => running.page.evaluate(() =>
     document.documentElement.scrollWidth <= document.documentElement.clientWidth,
   )).toBe(true);
@@ -89,8 +143,9 @@ test("opens a repository, selects non-contiguous commits and reviews file diff",
   );
   expect(clippedControls).toEqual([]);
   await running.page.screenshot({
-    path: test.info().outputPath("composite-diff-200-percent.png"),
+    path: test.info().outputPath("list-view-200-percent.png"),
     fullPage: true,
+    scale: "css",
   });
 
   expect(await running.page.evaluate(() => typeof process)).toBe("undefined");
@@ -104,18 +159,18 @@ test("cancels a calculation and can start it again", async () => {
     PRETTIFER_E2E_COMPOSITION_DELAY_MS: "500",
   });
   await openRepository(running.page, fixture.path);
-  await running.page.getByRole("button", { name: "커밋 범위 불러오기" }).click();
+  await running.page.getByRole("button", { name: "Load Commit Range" }).click();
   await running.page.getByRole("checkbox", {
-    name: "통합에 포함: feat(auth): validate login request",
+    name: "Include in selected result: feat(auth): validate login request",
   }).check();
 
-  await running.page.getByRole("button", { name: "통합 결과 만들기" }).click();
-  await running.page.getByRole("button", { name: "계산 취소" }).click();
+  await running.page.getByRole("button", { name: "Build Selected Result" }).click();
+  await running.page.getByRole("button", { name: "Cancel" }).click();
   await expect(running.page.getByText(
-    "계산을 취소했습니다. 선택한 커밋으로 다시 계산할 수 있습니다.",
+    "Calculation cancelled. You can rebuild with the current selection.",
   )).toBeVisible();
-  await running.page.getByRole("button", { name: "통합 결과 다시 만들기" }).click();
-  await expect(running.page.getByText(/계산 완료 · 변경 파일/u)).toBeVisible();
+  await running.page.getByRole("button", { name: "Rebuild Selected Result" }).click();
+  await expect(running.page.getByText(/Result ready · \d+ changed files/u)).toBeVisible();
 });
 
 test("shows an actionable Git executable error", async () => {
@@ -124,12 +179,12 @@ test("shows an actionable Git executable error", async () => {
     PRETTIFER_E2E_GIT_PATH: "C:\\prettifer-e2e-missing\\git.exe",
   });
 
-  await running.page.getByRole("button", { name: "저장소 폴더 선택" }).click();
+  await running.page.getByRole("button", { name: "Open Repository" }).click();
   await expect(running.page.getByRole("alert")).toContainText(
-    "Git 실행 파일을 사용할 수 없습니다.",
+    "The Git executable is unavailable.",
   );
   await expect(running.page.getByRole("alert")).toContainText(
-    "Git을 설치하거나 실행 경로를 확인한 뒤 다시 시도해 주세요.",
+    "Install Git or check its executable path, then try again.",
   );
 });
 
@@ -138,17 +193,17 @@ test("explains unsupported merge commits and recovers after an invalid repositor
   const invalidRepository = await createInvalidRepositoryFixture();
   const running = await launch([invalidRepository, fixture.path]);
 
-  await running.page.getByRole("button", { name: "저장소 폴더 선택" }).click();
+  await running.page.getByRole("button", { name: "Open Repository" }).click();
   await expect(running.page.getByRole("alert")).toContainText(
-    "Git 저장소를 열 수 없습니다",
+    "The Git repository could not be opened",
   );
-  await running.page.getByRole("button", { name: "저장소 폴더 선택" }).click();
-  await expect(running.page.getByText(fixture.path)).toBeVisible();
-  await running.page.getByRole("button", { name: "커밋 범위 불러오기" }).click();
+  await running.page.getByRole("button", { name: "Open Repository" }).click();
+  await expect(repositoryPanel(running.page).getByText(fixture.path)).toBeVisible();
+  await running.page.getByRole("button", { name: "Load Commit Range" }).click();
 
-  await expect(running.page.getByText("병합 커밋 · 선택할 수 없음")).toBeVisible();
+  await expect(running.page.getByText("Merge commit · unavailable")).toBeVisible();
   await expect(running.page.getByRole("checkbox", {
-    name: "통합에 포함할 수 없음: merge: include history side branch",
+    name: "Cannot include in selected result: merge: include history side branch",
   })).toBeDisabled();
 });
 
@@ -160,18 +215,18 @@ test("replaces repository state without showing the previous repository", async 
   });
 
   await openRepository(running.page, first.path);
-  await running.page.getByRole("button", { name: "커밋 범위 불러오기" }).click();
+  await running.page.getByRole("button", { name: "Load Commit Range" }).click();
   await running.page.getByRole("checkbox", {
-    name: "통합에 포함: feat(auth): validate login request",
+    name: "Include in selected result: feat(auth): validate login request",
   }).check();
-  await running.page.getByRole("button", { name: "통합 결과 만들기" }).click();
-  await running.page.getByRole("button", { name: "다른 저장소 선택" }).click();
-  await expect(running.page.getByText(second.path)).toBeVisible();
-  await expect(running.page.getByText(first.path)).not.toBeVisible();
-  await expect(running.page.getByText("브랜치 범위를 먼저 불러와 주세요.")).toBeVisible();
+  await running.page.getByRole("button", { name: "Build Selected Result" }).click();
+  await running.page.getByRole("button", { name: "Change Repository" }).click();
+  await expect(repositoryPanel(running.page).getByText(second.path)).toBeVisible();
+  await expect(repositoryPanel(running.page).getByText(first.path)).not.toBeVisible();
+  await expect(running.page.getByText("Load a comparison range to view commits.")).toBeVisible();
   await running.page.waitForTimeout(600);
-  await expect(running.page.getByText("브랜치 범위를 먼저 불러와 주세요.")).toBeVisible();
-  await expect(running.page.getByText(/계산 완료 · 변경 파일/u)).not.toBeVisible();
+  await expect(running.page.getByText("Load a comparison range to view commits.")).toBeVisible();
+  await expect(running.page.getByText(/Result ready · \d+ changed files/u)).not.toBeVisible();
 });
 
 async function createFixture(): Promise<GitFixture> {
@@ -226,22 +281,56 @@ async function launch(
   const page = await application.firstWindow();
   observeWindow(page);
   await page.waitForLoadState("domcontentloaded");
-  if (await page.getByRole("heading", { name: "앱 화면을 표시할 수 없습니다" }).isVisible()) {
-    await page.getByRole("button", { name: "앱 화면 다시 열기" }).click();
+  if (await page.getByRole("heading", { name: "The app could not be displayed" }).isVisible()) {
+    await page.getByRole("button", { name: "Reload App" }).click();
     await page.waitForTimeout(100);
     await page.screenshot({ path: test.info().outputPath("renderer-startup-error.png") });
     throw new Error([
-      "렌더러가 시작 오류 화면으로 전환되었습니다.",
-      `console: ${consoleErrors.join(" | ") || "없음"}`,
-      `pageerror: ${pageErrors.join(" | ") || "없음"}`,
+      "The renderer entered its startup error screen.",
+      `console: ${consoleErrors.join(" | ") || "none"}`,
+      `pageerror: ${pageErrors.join(" | ") || "none"}`,
       `preload API: ${await page.evaluate(() => typeof window.prettifer)}`,
     ].join("\n"));
   }
-  return { application, consoleErrors, page, pageErrors };
+  const running = { application, consoleErrors, page, pageErrors };
+  observations.push(running);
+  return running;
 }
 
 async function openRepository(page: Page, repositoryPath: string): Promise<void> {
-  await page.getByRole("button", { name: "저장소 폴더 선택" }).click();
-  await expect(page.getByText(repositoryPath)).toBeVisible();
-  await expect(page.getByText("현재 브랜치: feature/auth-session")).toBeVisible();
+  await page.getByRole("button", { name: "Open Repository" }).click();
+  await expect(repositoryPanel(page).getByText(repositoryPath)).toBeVisible();
+  await expect(page.getByText("Current branch: feature/auth-session")).toBeVisible();
+}
+
+function repositoryPanel(page: Page) {
+  return page.getByRole("region", { name: "Repository and comparison range" });
+}
+
+async function setViewportSize(
+  page: Page,
+  width: number,
+  height: number,
+): Promise<void> {
+  const displayScale = await page.evaluate(() => window.devicePixelRatio);
+  await page.setViewportSize({
+    width: Math.round(width * displayScale),
+    height: Math.round(height * displayScale),
+  });
+  await expect.poll(() => page.evaluate(() => [window.innerWidth, window.innerHeight]))
+    .toEqual([width, height]);
+}
+
+async function normalizeDisplayScale(
+  browserWindow: JSHandle<BrowserWindow>,
+): Promise<number> {
+  const baselineZoom = 1;
+  await browserWindow.evaluate(
+    (window, zoomFactor) => { window.webContents.setZoomFactor(zoomFactor); },
+    baselineZoom,
+  );
+  await expect.poll(() => browserWindow.evaluate((window) =>
+    window.webContents.getZoomFactor(),
+  )).toBeCloseTo(baselineZoom);
+  return baselineZoom;
 }

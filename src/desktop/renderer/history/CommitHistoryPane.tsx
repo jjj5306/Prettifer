@@ -38,10 +38,10 @@ export const CommitHistoryPane = ({
   }, [range]);
 
   if (range.status === "idle") {
-    return <section className={styles.panel}><p>브랜치 범위를 먼저 불러와 주세요.</p></section>;
+    return <section className={styles.panel}><p>Load a comparison range to view commits.</p></section>;
   }
   if (range.status === "loading") {
-    return <section className={styles.panel} aria-live="polite"><p>커밋 이력을 불러오는 중입니다.</p></section>;
+    return <section className={styles.panel} aria-live="polite"><p>Loading commit history…</p></section>;
   }
   if (range.status === "error" || range.status === "stale") {
     return (
@@ -62,16 +62,16 @@ export const CommitHistoryPane = ({
   return (
     <section className={styles.panel} aria-labelledby="commit-history-heading">
       <div className={styles.headingRow}>
-        <h2 id="commit-history-heading">커밋 이력</h2>
-        <strong>통합 선택 {selectedCommitIds.length}개</strong>
+        <h2 id="commit-history-heading">Commit Timeline</h2>
+        <strong>{selectedCommitIds.length} selected</strong>
       </div>
       {selectedCommitIds.length === 0 ? (
-        <p className={styles.hint}>통합 결과를 만들려면 하나 이상의 커밋을 선택해 주세요.</p>
+        <p className={styles.hint}>Select at least one supported commit to build a result.</p>
       ) : null}
       {range.commits.length === 0 ? (
-        <p>선택한 브랜치 범위에 표시할 커밋이 없습니다. 다른 브랜치 범위를 선택해 주세요.</p>
+        <p>No commits are available in this range. Choose another branch range.</p>
       ) : (
-        <ol className={styles.commitList} aria-label="최신순 first-parent 커밋">
+        <ol className={styles.commitList} aria-label="First-parent commits, newest first">
           {range.commits.map((commit, index) => {
             const isInspected = inspectedCommitId === commit.id;
             return (
@@ -86,19 +86,19 @@ export const CommitHistoryPane = ({
                     checked={selected.has(commit.id)}
                     disabled={!commit.selectable}
                     aria-label={commit.selectable
-                      ? `통합에 포함: ${commit.title}`
-                      : `통합에 포함할 수 없음: ${commit.title}`}
+                      ? `Include in selected result: ${commit.title}`
+                      : `Cannot include in selected result: ${commit.title}`}
                     onChange={() => { onToggleCommit(commit.id); }}
                   />
-                  <span aria-hidden="true">통합</span>
+                  <span aria-hidden="true">Select</span>
                 </label>
                 <button
                   type="button"
                   className={styles.commitButton}
                   aria-current={isInspected ? "true" : undefined}
                   aria-label={isInspected
-                    ? `현재 탐색: ${commit.title}`
-                    : `커밋 자세히 보기: ${commit.title}`}
+                    ? `Currently inspecting: ${commit.title}`
+                    : `Inspect commit: ${commit.title}`}
                   onClick={() => { onInspectCommit(commit.id); }}
                 >
                   <span className={styles.commitTitle}>{commit.title}</span>
@@ -108,7 +108,7 @@ export const CommitHistoryPane = ({
                     <time dateTime={commit.authoredAt}>{commit.authoredAt}</time>
                   </span>
                   {commit.isMerge ? (
-                    <span className={styles.merge}>병합 커밋 · 선택할 수 없음</span>
+                    <span className={styles.merge}>Merge commit · unavailable</span>
                   ) : null}
                 </button>
               </li>
@@ -124,8 +124,8 @@ export const CommitHistoryPane = ({
           onClick={handleLoadMore}
         >
           {range.pagination.status === "loading"
-            ? "이전 커밋 불러오는 중"
-            : "이전 커밋 100개 더 불러오기"}
+            ? "Loading older commits…"
+            : "Load 100 older commits"}
         </button>
       )}
       {range.pagination.status === "error" ? (

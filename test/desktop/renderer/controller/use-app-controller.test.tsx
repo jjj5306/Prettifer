@@ -20,13 +20,13 @@ function createApi(overrides: Partial<DesktopApi> = {}): DesktopApi {
     selectRepository: vi.fn().mockResolvedValue({ status: "cancelled" }),
     loadRange: vi.fn().mockResolvedValue({ status: "error", diagnostic: {
       code: "NO_RANGE",
-      message: "범위가 없습니다.",
-      nextAction: "브랜치를 선택해 주세요.",
+      message: "No comparison range is available.",
+      nextAction: "Choose a branch range.",
     } }),
     listCommits: vi.fn().mockResolvedValue({ status: "error", diagnostic: {
       code: "NO_PAGE",
-      message: "페이지가 없습니다.",
-      nextAction: "범위를 다시 불러와 주세요.",
+      message: "No commit page is available.",
+      nextAction: "Reload the comparison range.",
     } }),
     composeSelection: vi.fn().mockResolvedValue({ status: "cancelled" }),
     cancelComposition: vi.fn().mockResolvedValue({ status: "success", data: null }),
@@ -58,9 +58,9 @@ describe("useAppController", () => {
       .mockResolvedValueOnce({ status: "cancelled" })
       .mockResolvedValueOnce({ status: "error", diagnostic: {
         code: "INVALID_REPOSITORY",
-        message: "Git 저장소를 열 수 없습니다.",
+        message: "The Git repository could not be opened.",
         subject: "C:\\work\\plain",
-        nextAction: "다른 폴더를 선택해 주세요.",
+        nextAction: "Choose another folder.",
       } });
     const api = createApi({ selectRepository });
     let request = 0;
@@ -94,7 +94,7 @@ describe("useAppController", () => {
       status: "error",
       diagnostic: {
         code: "DESKTOP_CONNECTION_FAILED",
-        nextAction: "앱 창을 다시 연 뒤 시도해 주세요.",
+        nextAction: "Reopen the app window and try again.",
       },
     });
   });

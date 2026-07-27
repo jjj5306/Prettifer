@@ -37,7 +37,7 @@ export class CompositeDiffCoordinator {
   private activeController: AbortController | undefined;
   private state: CompositeDiffState = {
     status: "idle",
-    message: "결과를 만들려면 하나 이상의 커밋을 선택해 주세요.",
+    message: "Select at least one commit to build a result.",
   };
 
   constructor(private readonly calculator: CompositeDiffCalculator) {}
@@ -57,7 +57,7 @@ export class CompositeDiffCoordinator {
       this.activeController = undefined;
       this.state = {
         status: "idle",
-        message: "결과를 만들려면 하나 이상의 커밋을 선택해 주세요.",
+        message: "Select at least one commit to build a result.",
       };
       return this.state;
     }
@@ -89,7 +89,7 @@ export class CompositeDiffCoordinator {
       }
       this.activeController = undefined;
       if (error instanceof GitCommandAbortedError) {
-        this.state = { status: "idle", message: "계산이 취소되었습니다." };
+        this.state = { status: "idle", message: "The calculation was cancelled." };
         return this.state;
       }
       this.state = {
@@ -105,7 +105,7 @@ export class CompositeDiffCoordinator {
     this.generation += 1;
     this.activeController?.abort();
     this.activeController = undefined;
-    this.state = { status: "idle", message: "계산이 취소되었습니다." };
+    this.state = { status: "idle", message: "The calculation was cancelled." };
   }
 }
 
@@ -121,6 +121,6 @@ function createDiagnostic(error: unknown): CompositionDiagnostic {
   return {
     code: "COMPOSITION_FAILED",
     message: error instanceof Error ? error.message : String(error),
-    nextAction: "저장소 상태와 선택을 확인한 뒤 다시 계산해 주세요.",
+    nextAction: "Check the repository and selection, then try again.",
   };
 }

@@ -149,7 +149,7 @@ function parseNameStatus(
     const statusCode = tab === -1 ? token : token.slice(0, tab);
     const path = tab === -1 ? tokens[++index] : token.slice(tab + 1);
     if (path === undefined) {
-      throw new Error("Git 변경 파일 목록을 해석할 수 없습니다.");
+      throw new Error("The Git changed-file list could not be parsed.");
     }
     changes.push({ path, status: parseStatus(statusCode) });
   }
@@ -166,7 +166,7 @@ function parseStatus(status: string): CompositeFileStatus {
       return "deleted";
     case undefined:
     default:
-      throw new Error(`지원하지 않는 파일 변경 상태입니다: ${status}`);
+      throw new Error(`Unsupported file change status: ${status}`);
   }
 }
 

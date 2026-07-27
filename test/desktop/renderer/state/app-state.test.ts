@@ -304,8 +304,8 @@ describe("app reducer", () => {
       rangeRevision: range.rangeRevision,
       diagnostic: {
         code: "RANGE_STALE",
-        message: "브랜치 이력이 변경되었습니다.",
-        nextAction: "브랜치 이력을 새로 불러와 주세요.",
+        message: "The branch history has changed.",
+        nextAction: "Reload the branch history.",
       },
     });
 

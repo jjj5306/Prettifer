@@ -106,9 +106,9 @@ export class DesktopCompositionController {
         status: "error",
         diagnostic: {
           code: "REQUEST_EXPIRED",
-          message: "취소할 계산 요청이 현재 요청과 일치하지 않습니다.",
+          message: "The calculation to cancel is no longer active.",
           subject: request.requestId,
-          nextAction: "현재 화면 상태를 확인한 뒤 필요한 계산을 다시 시작해 주세요.",
+          nextAction: "Review the current selection, then start a new calculation.",
         },
       };
     }
@@ -135,8 +135,8 @@ function createRequestIdentity(request: CompositionRequest): string {
 function calculationDiagnostic(): Diagnostic {
   return {
     code: "COMPOSITION_INCOMPLETE",
-    message: "통합 결과 계산이 완료되지 않았습니다.",
-    nextAction: "잠시 후 다시 계산해 주세요.",
+    message: "The selected result calculation did not complete.",
+    nextAction: "Try the calculation again.",
   };
 }
 
@@ -151,8 +151,8 @@ function toCompositionDiagnostic(error: unknown): Diagnostic {
   }
   return {
     code: "COMPOSITION_FAILED",
-    message: "통합 결과를 계산할 수 없습니다.",
-    nextAction: "저장소 상태와 선택 커밋을 확인한 뒤 다시 계산해 주세요.",
+    message: "The selected result could not be calculated.",
+    nextAction: "Check the repository and selected commits, then try again.",
   };
 }
 
@@ -176,7 +176,7 @@ function publicCompositionDiagnostic(diagnostic: {
   }
   return {
     code: "COMPOSITION_FAILED",
-    message: "통합 결과를 계산할 수 없습니다.",
-    nextAction: "저장소 상태와 선택 커밋을 확인한 뒤 다시 계산해 주세요.",
+    message: "The selected result could not be calculated.",
+    nextAction: "Check the repository and selected commits, then try again.",
   };
 }

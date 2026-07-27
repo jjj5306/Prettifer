@@ -1,5 +1,6 @@
 .panel {
   composes: surface from "../PanelSurface.module.css";
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 .panel h2,
@@ -11,7 +12,7 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--space-2);
 }
 
 .headingRow p {
@@ -19,7 +20,8 @@
 }
 
 .editorHost {
-  min-height: 28rem;
+  min-width: 0;
+  min-height: 20rem;
   border: 1px solid var(--color-border);
 }
 
@@ -27,8 +29,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.75rem;
+  gap: var(--space-2);
+  padding: var(--space-2);
   border: 1px solid var(--color-danger);
   border-radius: 0.5rem;
 }
@@ -41,6 +43,6 @@
   }
 
   .editorHost {
-    min-height: 20rem;
+    min-height: 22rem;
   }
 }

@@ -24,7 +24,7 @@ export class WorkspaceCleanupError extends Error {
     readonly path: string,
     options?: ErrorOptions,
   ) {
-    super(`임시 작업 공간을 정리하지 못했습니다: ${path}`, options);
+    super(`The temporary workspace could not be removed: ${path}`, options);
     this.name = "WorkspaceCleanupError";
   }
 }
@@ -119,7 +119,7 @@ export class CompositionWorkspaceManager {
     if (directoryError !== undefined || pruneError !== undefined) {
       throw new AggregateError(
         [directoryError, pruneError].filter((error) => error !== undefined),
-        `임시 작업 공간 정리에 실패했습니다: ${path}`,
+        `Failed to remove the temporary workspace: ${path}`,
       );
     }
   }

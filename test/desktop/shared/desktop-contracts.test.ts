@@ -95,13 +95,13 @@ describe("desktop shared contracts", () => {
   it("requires actionable diagnostics", () => {
     expect(diagnosticSchema.parse({
       code: "INVALID_REPOSITORY",
-      message: "Git 저장소를 열 수 없습니다.",
+      message: "The Git repository could not be opened.",
       subject: "C:\\work\\plain-folder",
-      nextAction: "다른 Git 저장소 폴더를 선택해 주세요.",
+      nextAction: "Choose another Git repository folder.",
     })).toBeDefined();
     expect(() => diagnosticSchema.parse({
       code: "INVALID_REPOSITORY",
-      message: "Git 저장소를 열 수 없습니다.",
+      message: "The Git repository could not be opened.",
     })).toThrow();
   });
 });

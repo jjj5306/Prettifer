@@ -1,13 +1,15 @@
 .toolbar {
   composes: surface from "../PanelSurface.module.css";
-  gap: 1rem;
+  grid-template-columns: minmax(15rem, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  padding-block: var(--space-2);
 }
 
 .headingRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  gap: var(--space-3);
 }
 
 .headingRow h2,
@@ -19,7 +21,7 @@
 
 .eyebrow {
   color: var(--color-accent);
-  font-size: 0.75rem;
+  font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -33,14 +35,15 @@
 
 .repositorySummary {
   display: grid;
-  gap: 0.5rem;
+  grid-template-columns: minmax(0, 2fr) minmax(10rem, 1fr);
+  gap: var(--space-2);
   margin: 0;
 }
 
 .repositorySummary div {
   display: grid;
-  grid-template-columns: 8rem minmax(0, 1fr);
-  gap: 0.75rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
 }
 
 .repositorySummary dt {
@@ -53,8 +56,9 @@
 
 .rangeForm {
   display: grid;
+  grid-column: 1 / -1;
   grid-template-columns: repeat(2, minmax(10rem, 1fr)) auto;
-  gap: 0.75rem;
+  gap: var(--space-2);
   align-items: end;
 }
 
@@ -70,20 +74,30 @@
 }
 
 .diagnostic {
+  grid-column: 1 / -1;
   margin: 0;
-  padding: 0.75rem;
+  padding: var(--space-2);
   border: 1px solid var(--color-danger);
   border-radius: 0.5rem;
 }
 
-@media (max-width: 48rem) {
+@media (max-width: 64rem) {
+  .toolbar,
   .headingRow,
   .rangeForm {
     grid-template-columns: 1fr;
   }
 
+  .toolbar {
+    align-items: stretch;
+  }
+
   .headingRow {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .repositorySummary {
+    grid-template-columns: 1fr;
   }
 }

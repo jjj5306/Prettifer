@@ -41,7 +41,7 @@ void app.whenReady().then(() => {
   configureSessionSecurity();
   return startApplicationWindow();
 }).catch((error: unknown) => {
-  console.error("Prettifer 시작에 실패했습니다.", error);
+  console.error("Prettifer failed to start.", error);
   app.quit();
 });
 
@@ -92,7 +92,7 @@ async function startApplicationWindow(): Promise<void> {
     show: async () => {
       const result = await dialog.showOpenDialog(window, {
         properties: ["openDirectory"],
-        title: "Prettifer에서 열 Git 저장소 선택",
+        title: "Select a Git repository to open in Prettifer",
       });
       return result;
     },

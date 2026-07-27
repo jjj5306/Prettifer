@@ -6,7 +6,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--space-3);
 }
 
 .headingRow h2,
@@ -18,7 +18,7 @@
 
 .eyebrow {
   color: var(--color-accent);
-  font-size: 0.75rem;
+  font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -29,21 +29,21 @@
 }
 
 .error {
-  padding: 0.75rem;
+  padding: var(--space-2);
   border: 1px solid var(--color-danger);
   border-radius: 0.5rem;
 }
 
 .summary {
   display: grid;
-  gap: 0.35rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-2);
   margin: 0;
 }
 
 .summary div {
   display: grid;
-  grid-template-columns: 6rem minmax(0, 1fr);
-  gap: 0.5rem;
+  gap: var(--space-1);
 }
 
 .summary dt {
@@ -53,4 +53,21 @@
 .summary dd {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+@media (max-width: 64rem) {
+  .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 48rem) {
+  .headingRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .summary {
+    grid-template-columns: 1fr;
+  }
 }

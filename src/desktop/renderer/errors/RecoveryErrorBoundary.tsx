@@ -23,7 +23,7 @@ export class RecoveryErrorBoundary extends Component<
   }
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.error("Prettifer 렌더러 화면을 표시하지 못했습니다.", error, info.componentStack);
+    console.error("The Prettifer renderer could not display the workspace.", error, info.componentStack);
   }
 
   override render(): ReactNode {

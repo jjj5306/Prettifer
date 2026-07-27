@@ -1,9 +1,10 @@
 .surface {
   display: grid;
   min-width: 0;
-  gap: 0.75rem;
-  padding: 1rem;
+  min-height: 0;
+  gap: var(--space-2);
+  padding: var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: 0.75rem;
   background: var(--color-panel);
+  overflow: hidden;
 }

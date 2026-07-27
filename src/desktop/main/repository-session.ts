@@ -17,10 +17,10 @@ interface FolderSelector {
 
 export class RepositorySessionError extends Error {
   readonly code = "SESSION_EXPIRED";
-  readonly nextAction = "저장소와 브랜치 이력을 다시 불러와 주세요.";
+  readonly nextAction = "Reload the repository and its branch history.";
 
   constructor(readonly subject: string) {
-    super("저장소 세션이 만료되었습니다.");
+    super("The repository session has expired.");
     this.name = "RepositorySessionError";
   }
 }
@@ -105,7 +105,7 @@ function toSessionDiagnostic(error: unknown) {
   }
   return {
     code: "REPOSITORY_OPEN_FAILED",
-    message: "저장소를 열 수 없습니다.",
-    nextAction: "폴더와 Git 상태를 확인한 뒤 다시 시도해 주세요.",
+    message: "The repository could not be opened.",
+    nextAction: "Check the folder and Git state, then try again.",
   };
 }

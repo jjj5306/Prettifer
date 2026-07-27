@@ -79,7 +79,7 @@ describe("DesktopCompositionController", () => {
       assertCompositionInput: vi.fn().mockRejectedValue(new RepositoryHistoryError(
         "RANGE_STALE",
         "feature/ui",
-        "브랜치 이력을 새로 불러온 뒤 다시 선택해 주세요.",
+        "Reload the branch history, then select the commits again.",
       )),
     };
     const coordinator = { update: vi.fn(), cancel: vi.fn() };
@@ -101,9 +101,9 @@ describe("DesktopCompositionController", () => {
           selectedCommits: [selectedCommit],
           diagnostic: {
             code: "INVALID_COMMIT",
-            message: "커밋을 찾을 수 없습니다.",
+            message: "The commit could not be found.",
             commit: selectedCommit,
-            nextAction: "선택을 확인해 주세요.",
+            nextAction: "Review the selection.",
           },
         }),
         cancel: vi.fn(),
@@ -135,8 +135,8 @@ describe("DesktopCompositionController", () => {
       status: "error",
       diagnostic: {
         code: "COMPOSITION_FAILED",
-        message: "통합 결과를 계산할 수 없습니다.",
-        nextAction: "저장소 상태와 선택 커밋을 확인한 뒤 다시 계산해 주세요.",
+        message: "The selected result could not be calculated.",
+        nextAction: "Check the repository and selected commits, then try again.",
       },
     });
     expect(JSON.stringify(result)).not.toContain(secret);

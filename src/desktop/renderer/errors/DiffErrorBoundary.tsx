@@ -9,9 +9,9 @@ interface DiffErrorBoundaryProps {
 
 export const DiffErrorBoundary = ({ children, onRecover }: DiffErrorBoundaryProps) => (
   <RecoveryErrorBoundary
-    title="diff를 표시할 수 없습니다"
-    message="현재 파일의 diff 영역을 다시 열어 주세요."
-    actionLabel="diff 다시 열기"
+    title="The diff could not be displayed"
+    message="Reload the diff area for the current file."
+    actionLabel="Reload Diff"
     onRecover={onRecover}
   >
     {children}

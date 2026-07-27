@@ -28,21 +28,21 @@ describe("DiffPane", () => {
       </StrictMode>,
     );
     expect(loadAdapter).not.toHaveBeenCalled();
-    expect(screen.getByText("표시할 변경 파일을 선택해 주세요.")).toBeVisible();
+    expect(screen.getByText("Select a changed file to review.")).toBeVisible();
 
     rerender(
       <StrictMode>
         <DiffPane identity={identity} file={file} loadAdapter={loadAdapter} />
       </StrictMode>,
     );
-    expect(screen.getByText("diff 편집기를 불러오는 중입니다.")).toBeVisible();
+    expect(screen.getByText("Loading diff editor…")).toBeVisible();
     await waitFor(() => {
       expect(adapter.show).toHaveBeenCalledWith(expect.any(HTMLElement), identity, file);
     });
     expect(screen.getByRole("textbox", {
-      name: "읽기 전용 diff: src/app.ts · 원본과 통합 결과",
+      name: "Read-only diff: src/app.ts · base and selected result",
     })).toBeVisible();
-    expect(screen.getByText("왼쪽 원본 · 오른쪽 통합 결과")).toBeVisible();
+    expect(screen.getByText("Base on the left · selected result on the right")).toBeVisible();
   });
 
   it("disposes Monaco resources when the file changes and the pane unmounts", async () => {
@@ -85,14 +85,14 @@ describe("DiffPane", () => {
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "diff 편집기를 열 수 없습니다. 현재 파일의 diff를 다시 열어 주세요.",
+      "The diff editor could not open. Retry the current file.",
     );
-    const retry = screen.getByRole("button", { name: "diff 다시 열기" });
+    const retry = screen.getByRole("button", { name: "Retry Diff" });
     await user.click(retry);
     await waitFor(() => { expect(adapter.show).toHaveBeenCalledOnce(); });
     expect(retry).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", {
-      name: "읽기 전용 diff: src/app.ts · 원본과 통합 결과",
+      name: "Read-only diff: src/app.ts · base and selected result",
     })).toHaveFocus();
   });
 });

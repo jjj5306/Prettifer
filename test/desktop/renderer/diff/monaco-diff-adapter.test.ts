@@ -68,7 +68,7 @@ describe("MonacoDiffAdapter", () => {
       automaticLayout: true,
       renderSideBySide: true,
       accessibilitySupport: "on",
-      ariaLabel: "원본과 통합 결과 읽기 전용 diff",
+      ariaLabel: "Read-only diff between base and selected result",
     });
     expect(fixture.editors[0]?.setModel).toHaveBeenCalledWith({
       original: fixture.models[0],

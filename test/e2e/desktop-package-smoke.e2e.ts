@@ -62,14 +62,17 @@ test("runs the packaged Windows app through its main flow and exits normally", a
   page.on("pageerror", (error) => { pageErrors.push(error.message); });
   await page.reload({ waitUntil: "domcontentloaded" });
 
-  await page.getByRole("button", { name: "저장소 폴더 선택" }).click();
-  await expect(page.getByText(fixture.path)).toBeVisible();
-  await page.getByRole("button", { name: "커밋 범위 불러오기" }).click();
+  await page.getByRole("button", { name: "Open Repository" }).click();
+  await expect(
+    page.getByRole("region", { name: "Repository and comparison range" })
+      .getByText(fixture.path),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Load Commit Range" }).click();
   await page.getByRole("checkbox", {
-    name: "통합에 포함: feat(auth): validate login request",
+    name: "Include in selected result: feat(auth): validate login request",
   }).check();
-  await page.getByRole("button", { name: "통합 결과 만들기" }).click();
-  await expect(page.getByText(/계산 완료 · 변경 파일/u)).toBeVisible();
+  await page.getByRole("button", { name: "Build Selected Result" }).click();
+  await expect(page.getByText(/Result ready · \d+ changed files/u)).toBeVisible();
   await page.screenshot({
     path: test.info().outputPath("packaged-composite-diff.png"),
     fullPage: true,

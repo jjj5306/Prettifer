@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { StrictMode } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -89,24 +89,28 @@ describe("desktop workspace accessibility", () => {
     render(<StrictMode><DesktopWorkspace controller={createController()} /></StrictMode>);
 
     await user.tab();
-    expect(screen.getByRole("button", { name: "다른 저장소 선택" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Change Repository" })).toHaveFocus();
     await user.tab();
-    expect(screen.getByRole("combobox", { name: "비교 기준 브랜치" })).toHaveFocus();
+    expect(screen.getByRole("combobox", { name: "Base branch" })).toHaveFocus();
     await user.tab();
-    expect(screen.getByRole("combobox", { name: "작업 브랜치" })).toHaveFocus();
+    expect(screen.getByRole("combobox", { name: "Working branch" })).toHaveFocus();
     await user.tab();
-    expect(screen.getByRole("button", { name: "커밋 범위 불러오기" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Load Commit Range" })).toHaveFocus();
     await user.tab();
-    expect(screen.getByRole("checkbox", { name: `통합에 포함: ${firstCommit.title}` })).toHaveFocus();
+    expect(screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` })).toHaveFocus();
   });
 
   it("provides named regions and status-independent selection labels", () => {
     render(<StrictMode><DesktopWorkspace controller={createController()} /></StrictMode>);
 
     expect(screen.getByRole("heading", { level: 1, name: "Prettifer" })).toBeVisible();
-    expect(screen.getByRole("heading", { level: 2, name: "저장소와 비교 범위" })).toBeVisible();
-    expect(screen.getByRole("heading", { level: 2, name: "커밋 이력" })).toBeVisible();
-    expect(screen.getByText("통합 선택 0개")).toBeVisible();
+    expect(screen.getByRole("heading", { level: 2, name: "Repository and comparison range" })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 2, name: "Commit Timeline" })).toBeVisible();
+    expect(
+      within(screen.getByRole("region", { name: "Commit Timeline" })).getByText(
+        "0 selected",
+      ),
+    ).toBeVisible();
   });
 
   it("continues keyboard order through calculation, files and accessible diff", async () => {
@@ -114,15 +118,17 @@ describe("desktop workspace accessibility", () => {
     render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
 
     const expected = [
-      screen.getByRole("button", { name: "다른 저장소 선택" }),
-      screen.getByRole("combobox", { name: "비교 기준 브랜치" }),
-      screen.getByRole("combobox", { name: "작업 브랜치" }),
-      screen.getByRole("button", { name: "커밋 범위 불러오기" }),
-      screen.getByRole("checkbox", { name: `통합에 포함: ${firstCommit.title}` }),
-      screen.getByRole("button", { name: `커밋 자세히 보기: ${firstCommit.title}` }),
-      screen.getByRole("button", { name: "통합 결과 다시 만들기" }),
-      screen.getByRole("button", { name: "현재 파일 보기: src/app.ts (수정)" }),
-      screen.getByRole("textbox", { name: "읽기 전용 diff: src/app.ts · 원본과 통합 결과" }),
+      screen.getByRole("button", { name: "Change Repository" }),
+      screen.getByRole("combobox", { name: "Base branch" }),
+      screen.getByRole("combobox", { name: "Working branch" }),
+      screen.getByRole("button", { name: "Load Commit Range" }),
+      screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` }),
+      screen.getByRole("button", { name: `Inspect commit: ${firstCommit.title}` }),
+      screen.getByRole("button", { name: "Rebuild Selected Result" }),
+      screen.getByRole("button", { name: "Tree View" }),
+      screen.getByRole("button", { name: "List View" }),
+      screen.getByRole("button", { name: "Currently viewing file: src/app.ts (Modified)" }),
+      screen.getByRole("textbox", { name: "Read-only diff: src/app.ts · base and selected result" }),
     ];
     for (const element of expected) {
       await user.tab();

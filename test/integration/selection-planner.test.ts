@@ -77,7 +77,7 @@ describe("SelectionPlanner", () => {
       expect.objectContaining<Partial<SelectionError>>({
         code: "COMMIT_OUTSIDE_COMPARISON",
         commit: fixture.commits.base,
-        nextAction: expect.stringContaining("비교 기준이나 선택"),
+        nextAction: expect.stringContaining("comparison range or selection"),
       }),
     );
   });

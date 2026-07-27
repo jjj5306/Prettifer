@@ -65,10 +65,10 @@ describe("CommitHistoryPane", () => {
 
     expect(screen.getByText(firstCommit.shortId)).toBeVisible();
     expect(screen.getAllByText(firstCommit.authorName)).toHaveLength(2);
-    expect(screen.getByRole("checkbox", { name: `통합에 포함: ${firstCommit.title}` })).toBeEnabled();
-    expect(screen.getByRole("checkbox", { name: `통합에 포함할 수 없음: ${mergeCommit.title}` })).toBeDisabled();
-    expect(screen.getByText("병합 커밋 · 선택할 수 없음")).toBeVisible();
-    expect(screen.getByRole("button", { name: "이전 커밋 100개 더 불러오기" })).toBeVisible();
+    expect(screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` })).toBeEnabled();
+    expect(screen.getByRole("checkbox", { name: `Cannot include in selected result: ${mergeCommit.title}` })).toBeDisabled();
+    expect(screen.getByText("Merge commit · unavailable")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Load 100 older commits" })).toBeVisible();
   });
 
   it("keeps non-contiguous composition selection separate from inspection", async () => {
@@ -88,13 +88,13 @@ describe("CommitHistoryPane", () => {
       </StrictMode>,
     );
 
-    expect(screen.getByText("통합 선택 1개")).toBeVisible();
-    expect(screen.getByRole("checkbox", { name: `통합에 포함: ${firstCommit.title}` })).toBeChecked();
-    expect(screen.getByRole("button", { name: `현재 탐색: ${mergeCommit.title}` })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByText("1 selected")).toBeVisible();
+    expect(screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` })).toBeChecked();
+    expect(screen.getByRole("button", { name: `Currently inspecting: ${mergeCommit.title}` })).toHaveAttribute("aria-current", "true");
     expect(screen.getByText(mergeCommit.id)).toBeVisible();
 
-    await user.click(screen.getByRole("checkbox", { name: `통합에 포함: ${firstCommit.title}` }));
-    await user.click(screen.getByRole("button", { name: `커밋 자세히 보기: ${firstCommit.title}` }));
+    await user.click(screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` }));
+    await user.click(screen.getByRole("button", { name: `Inspect commit: ${firstCommit.title}` }));
     expect(onToggleCommit).toHaveBeenCalledWith(firstCommit.id);
     expect(onInspectCommit).toHaveBeenCalledWith(firstCommit.id);
   });
@@ -112,7 +112,7 @@ describe("CommitHistoryPane", () => {
         />
       </StrictMode>,
     );
-    expect(screen.getByText("통합 결과를 만들려면 하나 이상의 커밋을 선택해 주세요.")).toBeVisible();
+    expect(screen.getByText("Select at least one supported commit to build a result.")).toBeVisible();
   });
 
   it("explains an empty branch range", () => {
@@ -130,7 +130,7 @@ describe("CommitHistoryPane", () => {
     );
 
     expect(screen.getByText(
-      "선택한 브랜치 범위에 표시할 커밋이 없습니다. 다른 브랜치 범위를 선택해 주세요.",
+      "No commits are available in this range. Choose another branch range.",
     )).toBeVisible();
   });
 
@@ -150,7 +150,7 @@ describe("CommitHistoryPane", () => {
       </StrictMode>,
     );
 
-    screen.getByRole("checkbox", { name: `통합에 포함: ${firstCommit.title}` }).focus();
+    screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` }).focus();
     await user.keyboard("[Space]");
 
     expect(onToggleCommit).toHaveBeenCalledWith(firstCommit.id);
@@ -171,7 +171,7 @@ describe("CommitHistoryPane", () => {
         />
       </StrictMode>,
     );
-    await user.click(screen.getByRole("button", { name: "이전 커밋 100개 더 불러오기" }));
+    await user.click(screen.getByRole("button", { name: "Load 100 older commits" }));
     expect(onLoadMore).toHaveBeenCalledOnce();
 
     rerender(
@@ -186,6 +186,6 @@ describe("CommitHistoryPane", () => {
         />
       </StrictMode>,
     );
-    expect(screen.getByRole("checkbox", { name: `통합에 포함: ${firstCommit.title}` })).toHaveFocus();
+    expect(screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` })).toHaveFocus();
   });
 });

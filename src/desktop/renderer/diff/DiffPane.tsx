@@ -76,8 +76,8 @@ export const DiffPane = ({
   if (file === null) {
     return (
       <section className={styles.panel} aria-labelledby="diff-heading">
-        <h2 id="diff-heading">좌우 diff</h2>
-        <p>표시할 변경 파일을 선택해 주세요.</p>
+        <h2 id="diff-heading">Side-by-side Diff</h2>
+        <p>Select a changed file to review.</p>
       </section>
     );
   }
@@ -86,17 +86,17 @@ export const DiffPane = ({
   return (
     <section className={styles.panel} aria-labelledby="diff-heading">
       <div className={styles.headingRow}>
-        <h2 id="diff-heading">좌우 diff</h2>
-        <p>왼쪽 원본 · 오른쪽 통합 결과</p>
+        <h2 id="diff-heading">Side-by-side Diff</h2>
+        <p>Base on the left · selected result on the right</p>
       </div>
       {status === "loading" ? (
-        <p aria-live="polite">diff 편집기를 불러오는 중입니다.</p>
+        <p aria-live="polite">Loading diff editor…</p>
       ) : null}
       {status === "error" ? (
         <div role="alert" className={styles.error}>
-          <p>diff 편집기를 열 수 없습니다. 현재 파일의 diff를 다시 열어 주세요.</p>
+          <p>The diff editor could not open. Retry the current file.</p>
           <button type="button" onClick={() => { setRetry((current) => current + 1); }}>
-            diff 다시 열기
+            Retry Diff
           </button>
         </div>
       ) : null}
@@ -107,7 +107,7 @@ export const DiffPane = ({
         aria-multiline="true"
         aria-readonly="true"
         tabIndex={0}
-        aria-label={`읽기 전용 diff: ${file.path} · 원본과 통합 결과`}
+        aria-label={`Read-only diff: ${file.path} · base and selected result`}
       />
     </section>
   );

@@ -45,7 +45,7 @@ export const repositoryRangeSchema = z.object({
   if (range.rangeRevision !== expected) {
     context.addIssue({
       code: "custom",
-      message: "비교 범위 revision이 브랜치 커밋과 일치하지 않습니다.",
+      message: "The comparison revision does not match the branch commits.",
       path: ["rangeRevision"],
     });
   }

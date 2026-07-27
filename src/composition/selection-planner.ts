@@ -76,7 +76,7 @@ export class SelectionPlanner {
         throw new SelectionError(
           "COMMIT_OUTSIDE_COMPARISON",
           commit,
-          "비교 기준이나 선택을 변경한 뒤 다시 계산해 주세요.",
+          "Change the comparison range or selection, then try again.",
         );
       }
     }
@@ -106,7 +106,7 @@ export class SelectionPlanner {
       throw new SelectionError(
         "INVALID_COMMIT",
         commit,
-        "커밋이 존재하는지 확인하고 다시 선택해 주세요.",
+        "Check that the commit exists, then select it again.",
         { cause: error },
       );
     }
@@ -120,7 +120,7 @@ export class SelectionPlanner {
       const ancestor = commits.at(index - 1);
       const descendant = commits.at(index);
       if (ancestor === undefined || descendant === undefined) {
-        throw new Error("선택 커밋 순서를 확인할 수 없습니다.");
+        throw new Error("The selected commit order could not be determined.");
       }
       const result = await this.git.run(
         ["merge-base", "--is-ancestor", ancestor, descendant],
@@ -133,7 +133,7 @@ export class SelectionPlanner {
         throw new SelectionError(
           "AMBIGUOUS_SELECTION",
           descendant,
-          "하나의 브랜치 흐름에 있는 커밋만 선택해 주세요.",
+          "Select commits from a single branch history.",
         );
       }
     }
@@ -143,7 +143,7 @@ export class SelectionPlanner {
 function getPosition(positions: ReadonlyMap<string, number>, commit: string): number {
   const position = positions.get(commit);
   if (position === undefined) {
-    throw new Error(`커밋 순서를 찾을 수 없습니다: ${commit}`);
+    throw new Error(`The commit order could not be found: ${commit}`);
   }
   return position;
 }
@@ -161,10 +161,10 @@ function createSelectionErrorMessage(
 ): string {
   switch (code) {
     case "INVALID_COMMIT":
-      return `커밋을 찾을 수 없습니다: ${commit}`;
+      return `The commit could not be found: ${commit}`;
     case "COMMIT_OUTSIDE_COMPARISON":
-      return `커밋이 현재 비교 범위에 포함되지 않습니다: ${commit}`;
+      return `The commit is outside the current comparison range: ${commit}`;
     case "AMBIGUOUS_SELECTION":
-      return `선택 커밋의 적용 순서를 결정할 수 없습니다: ${commit}`;
+      return `The selected commit order is ambiguous: ${commit}`;
   }
 }

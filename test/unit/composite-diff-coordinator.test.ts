@@ -58,7 +58,7 @@ describe("CompositeDiffCoordinator", () => {
 
     expect(coordinator.current).toEqual({
       status: "idle",
-      message: "결과를 만들려면 하나 이상의 커밋을 선택해 주세요.",
+      message: "Select at least one commit to build a result.",
     });
   });
 
@@ -69,7 +69,7 @@ describe("CompositeDiffCoordinator", () => {
           new SelectionError(
             "COMMIT_OUTSIDE_COMPARISON",
             "outside",
-            "비교 기준이나 선택을 변경한 뒤 다시 계산해 주세요.",
+            "Change the comparison range or selection, then try again.",
           ),
         ),
     };
@@ -84,7 +84,7 @@ describe("CompositeDiffCoordinator", () => {
         code: "COMMIT_OUTSIDE_COMPARISON",
         message: expect.stringContaining("outside"),
         commit: "outside",
-        nextAction: "비교 기준이나 선택을 변경한 뒤 다시 계산해 주세요.",
+        nextAction: "Change the comparison range or selection, then try again.",
       },
     });
   });
