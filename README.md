@@ -3,13 +3,23 @@
 사람과 AI 에이전트가 선택한 Git 변경을 검토할 수 있도록 최종 파일 상태와
 통합 diff를 만드는 도구입니다.
 
-## Initial UX Mockup
+## Desktop UI Direction
 
-이 목업은 Git 그래프에서 커밋을 선택하고, 변경 파일을 묶어 최종 결과를
-좌우 diff로 검토하는 초기 제품 방향을 보여 줍니다. 화면 구성은 명세와 구현이
-진행되면서 달라질 수 있습니다.
+Prettifer 데스크톱 앱은 graphite 계열의 어두운 배경과 보라색 강조색을 사용합니다.
+화면 문구는 영어로 제공하며, Git 변경을 오래 검토할 때 필요한 정보 밀도와
+가독성을 유지합니다. 아래 목업은 색상, 시각적 밀도와 전반적인 UI 톤의 기준입니다.
+패널 구성과 세부 상호작용은 실제 사용 흐름을 검증하면서 조정할 수 있습니다.
 
-![Prettifer initial UX mockup](docs/assets/prettifer-initial-ux-mockup.png)
+`Changed Files` 패널은 폴더 구조를 유지하는 Tree View와 전체 상대 경로를
+표시하는 List View를 전환할 수 있습니다.
+
+### Tree View
+
+![Prettifer desktop workbench tree view](docs/assets/prettifer-desktop-workbench-tree-view.png)
+
+### List View
+
+![Prettifer desktop workbench list view](docs/assets/prettifer-desktop-workbench-list-view.png)
 
 ## Core
 
