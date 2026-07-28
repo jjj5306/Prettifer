@@ -86,6 +86,7 @@ export const cancelCompositionRequestSchema = sessionIdentitySchema.extend({
 export const compositeFileChangeSchema = z.object({
   path: z.string().min(1),
   status: z.enum(["added", "modified", "deleted"]),
+  binary: z.literal(true).optional(),
   beforeContent: z.string().nullable(),
   afterContent: z.string().nullable(),
 }).strict();

@@ -57,11 +57,14 @@ export async function removeDirectoryWithRetries(
 }
 
 export class CompositionWorkspaceManager {
+  private sparseInitialization: Promise<void> = Promise.resolve();
+
   constructor(private readonly git: GitCommandRunner) {}
 
   async withWorkspace<T>(
     repositoryPath: string,
     baseCommit: string,
+    changedPaths: readonly string[],
     operation: (workspace: CompositionWorkspace) => Promise<T>,
     signal?: AbortSignal,
   ): Promise<T> {
@@ -70,15 +73,51 @@ export class CompositionWorkspaceManager {
     let registered = false;
 
     try {
-      await this.git.run(["worktree", "add", "--detach", path, baseCommit], {
+      await this.git.run(["worktree", "add", "--detach", "--no-checkout", path, baseCommit], {
         cwd: repositoryPath,
         ...(signal === undefined ? {} : { signal }),
       });
       registered = true;
+      await this.prepareSelectedPaths(path, changedPaths, signal);
       return await operation({ path, baseCommit });
     } finally {
       await this.cleanup(repositoryPath, root, path, registered);
     }
+  }
+
+  private async prepareSelectedPaths(
+    workspacePath: string,
+    changedPaths: readonly string[],
+    signal: AbortSignal | undefined,
+  ): Promise<void> {
+    const options = {
+      cwd: workspacePath,
+      ...(signal === undefined ? {} : { signal }),
+    };
+    await this.git.run(["reset", "--mixed", "--quiet", "HEAD"], options);
+    await this.initializeSparseCheckout(options);
+    await this.git.run(
+      [
+        "sparse-checkout",
+        "set",
+        "--no-cone",
+        ...(changedPaths.length === 0
+          ? ["/.prettifer-empty-selection"]
+          : changedPaths.map(toSparsePattern)),
+      ],
+      options,
+    );
+  }
+
+  private initializeSparseCheckout(options: {
+    cwd: string;
+    signal?: AbortSignal;
+  }): Promise<void> {
+    const initialization = this.sparseInitialization.then(async () => {
+      await this.git.run(["sparse-checkout", "init", "--no-cone"], options);
+    });
+    this.sparseInitialization = initialization.catch(() => undefined);
+    return initialization;
   }
 
   private async cleanup(
@@ -109,7 +148,7 @@ export class CompositionWorkspaceManager {
 
     let pruneError: unknown;
     try {
-      await this.git.run(["worktree", "prune"], {
+      await this.git.run(["worktree", "prune", "--expire", "now"], {
         cwd: repositoryPath,
       });
     } catch (error) {
@@ -123,6 +162,10 @@ export class CompositionWorkspaceManager {
       );
     }
   }
+}
+
+function toSparsePattern(path: string): string {
+  return `/${path.replaceAll(/([\\*?[\]])/gu, "\\$1")}`;
 }
 
 function isRetryableFileSystemError(error: unknown): boolean {

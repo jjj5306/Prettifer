@@ -142,6 +142,35 @@ describe("DesktopCompositionController", () => {
     expect(JSON.stringify(result)).not.toContain(secret);
   });
 
+  it("publishes an actionable prerequisite diagnostic without Git internals", async () => {
+    const controller = new DesktopCompositionController(
+      { assertCompositionInput: vi.fn().mockResolvedValue(undefined) },
+      {
+        update: vi.fn().mockResolvedValue({
+          status: "error",
+          selectedCommits: [selectedCommit],
+          diagnostic: {
+            code: "COMMIT_APPLY_CONFLICT",
+            message: "The commit cannot be applied independently.",
+            commit: selectedCommit,
+            nextAction: "Select its earlier prerequisite commits, then try again.",
+          },
+        }),
+        cancel: vi.fn(),
+      },
+    );
+
+    await expect(controller.compose(request, "C:\\work\\repo")).resolves.toEqual({
+      status: "error",
+      diagnostic: {
+        code: "COMMIT_APPLY_CONFLICT",
+        message: "The commit cannot be applied independently.",
+        subject: selectedCommit,
+        nextAction: "Select its earlier prerequisite commits, then try again.",
+      },
+    });
+  });
+
   it("publishes only the newest request when an older validation finishes late", async () => {
     const validation = deferredSignal();
     const history = {

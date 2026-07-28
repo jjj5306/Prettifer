@@ -31,6 +31,7 @@ describe("CompositionWorkspaceManager", () => {
     const head = await manager.withWorkspace(
       fixture.path,
       fixture.commits.base,
+      [],
       async (workspace) => {
         workspacePath = workspace.path;
         return new GitCommandRunner().run(["rev-parse", "HEAD"], {
@@ -55,6 +56,7 @@ describe("CompositionWorkspaceManager", () => {
     const first = manager.withWorkspace(
       fixture.path,
       fixture.commits.base,
+      [],
       async (workspace) => {
         firstPath = workspace.path;
         paths.push(workspace.path);
@@ -65,6 +67,7 @@ describe("CompositionWorkspaceManager", () => {
     const second = manager.withWorkspace(
       fixture.path,
       fixture.commits.base,
+      [],
       (workspace) => {
         paths.push(workspace.path);
         return Promise.reject(new Error("apply failed"));
@@ -87,6 +90,7 @@ describe("CompositionWorkspaceManager", () => {
     const operation = manager.withWorkspace(
       fixture.path,
       fixture.commits.base,
+      [],
       (workspace) => {
         workspacePath = workspace.path;
         return Promise.reject(new GitCommandAbortedError());
@@ -95,6 +99,25 @@ describe("CompositionWorkspaceManager", () => {
 
     await expect(operation).rejects.toBeInstanceOf(GitCommandAbortedError);
     await expect(access(workspacePath)).rejects.toThrow();
+  });
+
+  it("materializes only selected paths in the temporary worktree", async () => {
+    fixture = await createAuthHistoryFixture();
+    const manager = new CompositionWorkspaceManager(new GitCommandRunner());
+
+    await manager.withWorkspace(
+      fixture.path,
+      fixture.commits.base,
+      ["src/auth/login.ts"],
+      async (workspace) => {
+        await expect(access(`${workspace.path}/src/auth/login.ts`)).resolves.toBeUndefined();
+        await expect(access(`${workspace.path}/docs/auth.md`)).rejects.toThrow();
+      },
+    );
+
+    expect(fixture.git(["worktree", "list", "--porcelain"])).not.toContain(
+      "prettifer-composition-",
+    );
   });
 });
 

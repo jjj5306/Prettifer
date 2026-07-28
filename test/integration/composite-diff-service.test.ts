@@ -1,3 +1,5 @@
+import { writeFile } from "node:fs/promises";
+
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -117,5 +119,68 @@ describe("CompositeDiffService", () => {
     const second = await service.compose(request);
 
     expect(second).toEqual(first);
+  });
+
+  it("identifies a commit that depends on an unselected file-creating commit", async () => {
+    fixture = await createAuthHistoryFixture();
+    const dependentPath = `${fixture.path}/src/dependent.ts`;
+    await writeFile(dependentPath, "export const value = 1;\n", "utf8");
+    fixture.git(["add", "src/dependent.ts"]);
+    fixture.git(["commit", "-m", "feat: add dependent file"]);
+    const prerequisite = fixture.git(["rev-parse", "HEAD"]).trim();
+    await writeFile(dependentPath, "export const value = 2;\n", "utf8");
+    fixture.git(["add", "src/dependent.ts"]);
+    fixture.git(["commit", "-m", "fix: update dependent file"]);
+    const dependent = fixture.git(["rev-parse", "HEAD"]).trim();
+    const service = new CompositeDiffService();
+
+    await expect(service.compose({
+      repositoryPath: fixture.path,
+      baseRef: fixture.baseRef,
+      headRef: fixture.headRef,
+      selectedCommits: [dependent],
+    })).rejects.toMatchObject({
+      code: "COMMIT_APPLY_CONFLICT",
+      commit: dependent,
+    });
+
+    await expect(service.compose({
+      repositoryPath: fixture.path,
+      baseRef: fixture.baseRef,
+      headRef: fixture.headRef,
+      selectedCommits: [prerequisite, dependent],
+    })).resolves.toMatchObject({
+      selectedCommits: [prerequisite, dependent],
+      files: [
+        expect.objectContaining({
+          path: "src/dependent.ts",
+          afterContent: "export const value = 2;\n",
+        }),
+      ],
+    });
+  });
+
+  it("marks binary files without decoding their contents", async () => {
+    fixture = await createAuthHistoryFixture();
+    const binaryPath = `${fixture.path}/src/sample.bin`;
+    await writeFile(binaryPath, Uint8Array.from([0, 1, 2, 3, 255]));
+    fixture.git(["add", "src/sample.bin"]);
+    fixture.git(["commit", "-m", "test: add binary fixture"]);
+    const binaryCommit = fixture.git(["rev-parse", "HEAD"]).trim();
+
+    const result = await new CompositeDiffService().compose({
+      repositoryPath: fixture.path,
+      baseRef: fixture.baseRef,
+      headRef: fixture.headRef,
+      selectedCommits: [binaryCommit],
+    });
+
+    expect(result.files).toContainEqual({
+      path: "src/sample.bin",
+      status: "added",
+      binary: true,
+      beforeContent: null,
+      afterContent: null,
+    });
   });
 });

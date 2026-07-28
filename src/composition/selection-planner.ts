@@ -26,7 +26,8 @@ export interface SelectionPlan {
 export type SelectionErrorCode =
   | "INVALID_COMMIT"
   | "COMMIT_OUTSIDE_COMPARISON"
-  | "AMBIGUOUS_SELECTION";
+  | "AMBIGUOUS_SELECTION"
+  | "COMMIT_APPLY_CONFLICT";
 
 export class SelectionError extends Error {
   constructor(
@@ -166,5 +167,7 @@ function createSelectionErrorMessage(
       return `The commit is outside the current comparison range: ${commit}`;
     case "AMBIGUOUS_SELECTION":
       return `The selected commit order is ambiguous: ${commit}`;
+    case "COMMIT_APPLY_CONFLICT":
+      return `The commit cannot be applied independently: ${commit}`;
   }
 }
