@@ -382,10 +382,11 @@ test("resizes the base and result sides inside the diff", async () => {
   expect(running.pageErrors).toEqual([]);
 });
 
-test("cancels a calculation and can start it again", async () => {
+test("shows progress and cancels a calculation that runs past one second", async () => {
   const fixture = await createFixture();
+  // Past the one second the spec uses as the progress threshold.
   const running = await launch([fixture.path], {
-    PRETTIFER_E2E_COMPOSITION_DELAY_MS: "500",
+    PRETTIFER_E2E_COMPOSITION_DELAY_MS: "1200",
   });
   await openRepository(running.page, fixture.path);
   await running.page.getByRole("button", { name: "Load Commit Range" }).click();
@@ -394,6 +395,10 @@ test("cancels a calculation and can start it again", async () => {
   }).check();
 
   await running.page.getByRole("button", { name: "Build Selected Result" }).click();
+  await expect(
+    running.page.getByRole("region", { name: "Selected Result" })
+      .getByText("Building selected result…"),
+  ).toBeVisible();
   await running.page.getByRole("button", { name: "Cancel" }).click();
   await expect(running.page.getByText(
     "Calculation cancelled. You can rebuild with the current selection.",

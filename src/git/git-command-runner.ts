@@ -24,6 +24,22 @@ export interface GitRunOptions {
   acceptedExitCodes?: readonly number[];
 }
 
+/**
+ * Builds run options that omit `signal` entirely when there is none, which
+ * `exactOptionalPropertyTypes` requires.
+ */
+export function gitRunOptions(
+  cwd: string,
+  signal: AbortSignal | undefined,
+  acceptedExitCodes?: readonly number[],
+): GitRunOptions {
+  return {
+    cwd,
+    ...(signal === undefined ? {} : { signal }),
+    ...(acceptedExitCodes === undefined ? {} : { acceptedExitCodes }),
+  };
+}
+
 export interface GitCommandRunnerOptions {
   executor?: ProcessExecutor;
   gitPath?: string;
