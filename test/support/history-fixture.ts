@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -17,7 +17,8 @@ export interface HistoryFixture {
 }
 
 export async function createHistoryFixture(): Promise<HistoryFixture> {
-  const path = await mkdtemp(join(tmpdir(), "prettifer-history-"));
+  // realpath resolves 8.3 short names so fixture paths match what Git reports.
+  const path = await realpath(await mkdtemp(join(tmpdir(), "prettifer-history-")));
   const git = (args: readonly string[]): string =>
     execFileSync("git", args, {
       cwd: path,
