@@ -1,4 +1,5 @@
 import {
+  gitRunOptions,
   GitCommandError,
   type GitCommandRunner,
 } from "../git/git-command-runner.js";
@@ -47,7 +48,7 @@ export class SelectionPlanner {
   async resolveComparisonBase(request: ComparisonBaseRequest): Promise<string> {
     const result = await this.git.run(
       ["merge-base", request.baseRef, request.headRef],
-      runOptions(request.repositoryPath, request.signal),
+      gitRunOptions(request.repositoryPath, request.signal),
     );
     return result.stdout.trim();
   }
@@ -60,7 +61,7 @@ export class SelectionPlanner {
         "--topo-order",
         `${request.baseCommit}..${request.headRef}`,
       ],
-      runOptions(request.repositoryPath, request.signal),
+      gitRunOptions(request.repositoryPath, request.signal),
     );
     const history = historyResult.stdout
       .trim()
@@ -97,7 +98,7 @@ export class SelectionPlanner {
     try {
       const result = await this.git.run(
         ["rev-parse", "--verify", `${commit}^{commit}`],
-        runOptions(request.repositoryPath, request.signal),
+        gitRunOptions(request.repositoryPath, request.signal),
       );
       return result.stdout.trim();
     } catch (error) {
@@ -125,10 +126,7 @@ export class SelectionPlanner {
       }
       const result = await this.git.run(
         ["merge-base", "--is-ancestor", ancestor, descendant],
-        {
-          ...runOptions(request.repositoryPath, request.signal),
-          acceptedExitCodes: [0, 1],
-        },
+        gitRunOptions(request.repositoryPath, request.signal, [0, 1]),
       );
       if (result.exitCode === 1) {
         throw new SelectionError(
@@ -149,12 +147,6 @@ function getPosition(positions: ReadonlyMap<string, number>, commit: string): nu
   return position;
 }
 
-function runOptions(
-  cwd: string,
-  signal: AbortSignal | undefined,
-): { cwd: string; signal?: AbortSignal } {
-  return signal === undefined ? { cwd } : { cwd, signal };
-}
 
 function createSelectionErrorMessage(
   code: SelectionErrorCode,

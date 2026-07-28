@@ -2,7 +2,10 @@ import { copyFile, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import type { GitCommandRunner } from "../git/git-command-runner.js";
+import {
+  gitRunOptions,
+  type GitCommandRunner,
+} from "../git/git-command-runner.js";
 
 export interface CompositionWorkspace {
   path: string;
@@ -100,10 +103,7 @@ export class CompositionWorkspaceManager {
           repositoryPath,
           path,
         ],
-        {
-          cwd: root,
-          ...(signal === undefined ? {} : { signal }),
-        },
+        gitRunOptions(root, signal),
       );
       await this.copyRepositoryAttributes(repositoryPath, path, signal);
       const requiresFullCheckout = await this.applyContentConfiguration(
@@ -115,10 +115,7 @@ export class CompositionWorkspaceManager {
       await mkdir(disabledHooksPath);
       await this.git.run(
         ["config", "--local", "--replace-all", "core.hooksPath", disabledHooksPath],
-        {
-          cwd: path,
-          ...(signal === undefined ? {} : { signal }),
-        },
+        gitRunOptions(path, signal),
       );
       await this.prepareSelectedPaths(
         path,
@@ -142,11 +139,7 @@ export class CompositionWorkspaceManager {
   ): Promise<readonly RepositoryConfigEntry[]> {
     const result = await this.git.run(
       ["config", "--includes", "--null", "--get-regexp", CONTENT_CONFIG_PATTERN],
-      {
-        cwd: repositoryPath,
-        acceptedExitCodes: [0, 1],
-        ...(signal === undefined ? {} : { signal }),
-      },
+      gitRunOptions(repositoryPath, signal, [0, 1]),
     );
     const entries = result.stdout
       .split("\0")
@@ -170,11 +163,7 @@ export class CompositionWorkspaceManager {
         "--get",
         "core.attributesFile",
       ],
-      {
-        cwd: repositoryPath,
-        acceptedExitCodes: [0, 1],
-        ...(signal === undefined ? {} : { signal }),
-      },
+      gitRunOptions(repositoryPath, signal, [0, 1]),
     );
     if (attributesFile.exitCode === 0) {
       const [configuredPath] = attributesFile.stdout.split("\0");
@@ -208,10 +197,7 @@ export class CompositionWorkspaceManager {
       }
       await this.git.run(
         ["config", "--local", "--replace-all", entry.name, entry.value],
-        {
-          cwd: workspacePath,
-          ...(signal === undefined ? {} : { signal }),
-        },
+        gitRunOptions(workspacePath, signal),
       );
       requiresFullCheckout ||= EXTERNAL_DRIVER_PATTERN.test(entry.name);
     }
@@ -226,17 +212,11 @@ export class CompositionWorkspaceManager {
     const [source, target] = await Promise.all([
       this.git.run(
         ["rev-parse", "--git-path", "info/attributes"],
-        {
-          cwd: repositoryPath,
-          ...(signal === undefined ? {} : { signal }),
-        },
+        gitRunOptions(repositoryPath, signal),
       ),
       this.git.run(
         ["rev-parse", "--git-path", "info/attributes"],
-        {
-          cwd: workspacePath,
-          ...(signal === undefined ? {} : { signal }),
-        },
+        gitRunOptions(workspacePath, signal),
       ),
     ]);
     const sourcePath = resolve(repositoryPath, source.stdout.trimEnd());
@@ -258,10 +238,7 @@ export class CompositionWorkspaceManager {
     requiresFullCheckout: boolean,
     signal: AbortSignal | undefined,
   ): Promise<void> {
-    const options = {
-      cwd: workspacePath,
-      ...(signal === undefined ? {} : { signal }),
-    };
+    const options = gitRunOptions(workspacePath, signal);
     if (requiresFullCheckout) {
       await this.git.run(["checkout", "--quiet", "--detach", baseCommit], options);
       return;

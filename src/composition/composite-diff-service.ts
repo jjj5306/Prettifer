@@ -4,6 +4,7 @@ import {
 } from "./composition-workspace.js";
 import { SelectionError, SelectionPlanner } from "./selection-planner.js";
 import {
+  gitRunOptions,
   GitCommandError,
   GitCommandRunner,
 } from "../git/git-command-runner.js";
@@ -115,42 +116,26 @@ export class CompositeDiffService {
     selectedCommits: readonly string[],
     signal: AbortSignal | undefined,
   ): Promise<string[]> {
-    const changedPaths: string[][] = [];
-    for (
-      let offset = 0;
-      offset < selectedCommits.length;
-      offset += MAX_CONCURRENT_GIT_REQUESTS
-    ) {
-      const batch = selectedCommits.slice(
-        offset,
-        offset + MAX_CONCURRENT_GIT_REQUESTS,
-      );
-      changedPaths.push(
-        ...(await Promise.all(
-          batch.map(async (commit) => {
-            const result = await this.git.run(
-              [
-                "diff-tree",
-                "--no-commit-id",
-                "--name-only",
-                "--no-renames",
-                "-r",
-                "-z",
-                "--root",
-                commit,
-              ],
-              runOptions(repositoryPath, signal),
-            );
-            return result.stdout
-              .split("\0")
-              .filter((path) => path.length > 0);
-          }),
-        )),
-      );
-    }
-    return [...new Set(
-      changedPaths.flat(),
-    )].sort(comparePath);
+    const changedPaths = await mapWithGitConcurrency(
+      selectedCommits,
+      async (commit) => {
+        const result = await this.git.run(
+          [
+            "diff-tree",
+            "--no-commit-id",
+            "--name-only",
+            "--no-renames",
+            "-r",
+            "-z",
+            "--root",
+            commit,
+          ],
+          gitRunOptions(repositoryPath, signal),
+        );
+        return result.stdout.split("\0").filter((path) => path.length > 0);
+      },
+    );
+    return [...new Set(changedPaths.flat())].sort(comparePath);
   }
 
   private async composeInWorkspace(
@@ -162,7 +147,7 @@ export class CompositeDiffService {
       try {
         await this.git.run(
           ["cherry-pick", "--no-commit", commit],
-          runOptions(workspace.path, signal),
+          gitRunOptions(workspace.path, signal),
         );
       } catch (error) {
         if (!(error instanceof GitCommandError)) {
@@ -173,7 +158,7 @@ export class CompositeDiffService {
         }
         const unmergedFiles = await this.git.run(
           ["ls-files", "--unmerged", "-z"],
-          runOptions(workspace.path, signal),
+          gitRunOptions(workspace.path, signal),
         );
         if (unmergedFiles.stdout.length === 0) {
           throw error;
@@ -198,44 +183,24 @@ export class CompositeDiffService {
           "--src-prefix=a/",
           "--dst-prefix=b/",
         ],
-        runOptions(workspace.path, signal),
+        gitRunOptions(workspace.path, signal),
       ),
       this.git.run(
         ["diff", "--cached", "--name-status", "-z", "--no-renames"],
-        runOptions(workspace.path, signal),
+        gitRunOptions(workspace.path, signal),
       ),
       this.git.run(
         ["diff", "--cached", "--numstat", "-z", "--no-renames"],
-        runOptions(workspace.path, signal),
+        gitRunOptions(workspace.path, signal),
       ),
     ]);
     const changedPaths = parseNameStatus(nameStatus.stdout).sort((left, right) =>
       comparePath(left.path, right.path),
     );
     const binaryPaths = parseBinaryPaths(numstat.stdout);
-    const files: CompositeFileChange[] = [];
-    for (
-      let offset = 0;
-      offset < changedPaths.length;
-      offset += MAX_CONCURRENT_GIT_REQUESTS
-    ) {
-      const batch = changedPaths.slice(
-        offset,
-        offset + MAX_CONCURRENT_GIT_REQUESTS,
-      );
-      files.push(
-        ...(await Promise.all(
-          batch.map((change) =>
-            this.readFileChange(
-              workspace,
-              change,
-              binaryPaths.has(change.path),
-              signal,
-            ),
-          ),
-        )),
-      );
-    }
+    const files = await mapWithGitConcurrency(changedPaths, (change) =>
+      this.readFileChange(workspace, change, binaryPaths.has(change.path), signal),
+    );
 
     return {
       baseCommit: workspace.baseCommit,
@@ -268,18 +233,18 @@ export class CompositeDiffService {
           afterContent: (
             await this.git.run(
               ["show", `:${change.path}`],
-              runOptions(workspace.path, signal),
+              gitRunOptions(workspace.path, signal),
             )
           ).stdout,
         };
       case "modified": {
         const beforeContent = await this.git.run(
           ["show", `${workspace.baseCommit}:${change.path}`],
-          runOptions(workspace.path, signal),
+          gitRunOptions(workspace.path, signal),
         );
         const afterContent = await this.git.run(
           ["show", `:${change.path}`],
-          runOptions(workspace.path, signal),
+          gitRunOptions(workspace.path, signal),
         );
         return {
           path: change.path,
@@ -295,7 +260,7 @@ export class CompositeDiffService {
           beforeContent: (
             await this.git.run(
               ["show", `${workspace.baseCommit}:${change.path}`],
-              runOptions(workspace.path, signal),
+              gitRunOptions(workspace.path, signal),
             )
           ).stdout,
           afterContent: null,
@@ -364,9 +329,20 @@ function comparePath(left: string, right: string): number {
   return 0;
 }
 
-function runOptions(
-  cwd: string,
-  signal: AbortSignal | undefined,
-): { cwd: string; signal?: AbortSignal } {
-  return signal === undefined ? { cwd } : { cwd, signal };
+
+/** Runs the mapper over every item, keeping at most four Git processes alive. */
+async function mapWithGitConcurrency<TItem, TResult>(
+  items: readonly TItem[],
+  map: (item: TItem) => Promise<TResult>,
+): Promise<TResult[]> {
+  const results: TResult[] = [];
+  for (
+    let offset = 0;
+    offset < items.length;
+    offset += MAX_CONCURRENT_GIT_REQUESTS
+  ) {
+    const batch = items.slice(offset, offset + MAX_CONCURRENT_GIT_REQUESTS);
+    results.push(...(await Promise.all(batch.map(map))));
+  }
+  return results;
 }
