@@ -4,7 +4,10 @@ Git 이력에서 서로 떨어진 커밋을 골라, 선택한 변경만 반영�
 하나의 통합 diff를 만들어 검토하는 Windows 데스크톱 도구입니다.
 
 이 문서는 **저장소에서 작업하는 사람과 AI 에이전트를 위한 안내**입니다.
-사용자용 설치 방법, 기능 소개와 버그 리포트는 배포용 저장소를 참고하세요.
+사용자용 설치 방법과 기능 소개는
+[공개 배포 저장소](https://github.com/jjj5306/prettifer-release)와
+[Windows v0.1.0 릴리스](https://github.com/jjj5306/prettifer-release/releases/tag/v0.1.0)를
+참고하세요.
 
 ## 시작하기 전에 읽을 문서
 
@@ -78,11 +81,14 @@ npx openspec validate --all --strict       # 전체 검증
 
 - Node.js `22.13+` 또는 `24+`
 - Git `2.30+`
+- OpenSpec CLI `1.6.0`
 - Windows (데스크톱 앱과 Playwright Electron 검증 기준 환경)
 
 ```powershell
 node --version
 git --version
+npm install --global @fission-ai/openspec@1.6.0
+openspec --version
 ```
 
 ### 설치와 실행
@@ -97,7 +103,7 @@ npm run desktop:start
 작업 완료 전에 다음을 모두 통과해야 합니다.
 
 ```powershell
-npm test                                   # 유닛 테스트
+npm test                                   # 코어·통합·renderer 테스트
 npm run lint                               # ESLint
 npm run typecheck                          # 프로세스 경계별 TypeScript 검사
 npm run test:desktop:e2e                   # 패키징 + Playwright Electron
@@ -118,10 +124,11 @@ npm run desktop:make                       # out/desktop/make/zip/win32/x64/
 ### 코어 라이브러리
 
 코어만 따로 쓰려면 빌드 후 예제를 실행합니다. 공개 API와 CLI 형식은 아직
-보장하지 않습니다.
+보장하지 않습니다. 자세한 입력, 결과와 오류 해결은
+[코어 퀵스타트](docs/core-quickstart.md)를 참고하세요.
 
 ```powershell
-npm run build
+npm run build:core
 node .\examples\compose-selected-commits.mjs <repoPath> <baseRef> <headRef> <commit...>
 ```
 
@@ -130,7 +137,7 @@ node .\examples\compose-selected-commits.mjs <repoPath> <baseRef> <headRef> <com
 ```text
 src/
 ├─ history/        저장소 이력과 비교 범위 조회
-├─ composition/    통합 결과 계산 (임시 worktree, sparse checkout, 선택 적용)
+├─ composition/    통합 결과 계산 (격리된 임시 clone, 선택 적용, Git 객체 결과 수집)
 ├─ git/            Git 실행 경계
 └─ desktop/
    ├─ main/        Electron main - Git, 파일 시스템, 결과 계산
@@ -163,12 +170,13 @@ typed API만 호출합니다.
 - 같은 파일을 여러 번 변경한 선택의 최종 상태 합성
 - 텍스트 파일의 추가, 수정, 삭제와 바이너리 파일 식별
 - 선택 변경 시 최신 계산 결과 게시와 이전 계산 취소
-- 계산 중 사용자 branch, HEAD, staged/unstaged/untracked 상태 보존
+- 계산 중 사용자 branch, HEAD, staged/unstaged/untracked와 Git 메타데이터 보존
 
 **아직 지원하지 않음**
 
 - 변경 파일 그룹화 · 파일별 커밋 흐름 · 커밋별 변경 파일 탐색
 - 충돌 파일의 부분 결과와 파일별 문제 상태
 - merge commit 기준 부모 선택 · 조상 관계 없는 커밋의 적용 순서 확인
+- 전체 Git 그래프와 불완전 이력 진단
 - rename 추론, 루트 커밋 비교
 - 공개 CLI, 설치 프로그램, 코드 서명, 자동 업데이트
