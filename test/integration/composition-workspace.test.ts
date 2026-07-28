@@ -1,4 +1,6 @@
-import { access, rm } from "node:fs/promises";
+import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -10,6 +12,8 @@ import {
 import {
   GitCommandAbortedError,
   GitCommandRunner,
+  type GitRunOptions,
+  type ProcessOutput,
 } from "../../src/git/git-command-runner.js";
 import {
   createAuthHistoryFixture,
@@ -31,6 +35,7 @@ describe("CompositionWorkspaceManager", () => {
     const head = await manager.withWorkspace(
       fixture.path,
       fixture.commits.base,
+      [],
       async (workspace) => {
         workspacePath = workspace.path;
         return new GitCommandRunner().run(["rev-parse", "HEAD"], {
@@ -55,6 +60,7 @@ describe("CompositionWorkspaceManager", () => {
     const first = manager.withWorkspace(
       fixture.path,
       fixture.commits.base,
+      [],
       async (workspace) => {
         firstPath = workspace.path;
         paths.push(workspace.path);
@@ -65,6 +71,7 @@ describe("CompositionWorkspaceManager", () => {
     const second = manager.withWorkspace(
       fixture.path,
       fixture.commits.base,
+      [],
       (workspace) => {
         paths.push(workspace.path);
         return Promise.reject(new Error("apply failed"));
@@ -72,7 +79,8 @@ describe("CompositionWorkspaceManager", () => {
     );
 
     await expect(second).rejects.toThrow("apply failed");
-    await expect(first).resolves.toBe(firstPath);
+    const firstResult = await first;
+    expect(firstResult).toBe(firstPath);
     expect(new Set(paths).size).toBe(2);
     for (const path of paths) {
       await expect(access(path)).rejects.toThrow();
@@ -87,6 +95,7 @@ describe("CompositionWorkspaceManager", () => {
     const operation = manager.withWorkspace(
       fixture.path,
       fixture.commits.base,
+      [],
       (workspace) => {
         workspacePath = workspace.path;
         return Promise.reject(new GitCommandAbortedError());
@@ -95,6 +104,218 @@ describe("CompositionWorkspaceManager", () => {
 
     await expect(operation).rejects.toBeInstanceOf(GitCommandAbortedError);
     await expect(access(workspacePath)).rejects.toThrow();
+  });
+
+  it("materializes only selected paths in the temporary workspace", async () => {
+    fixture = await createAuthHistoryFixture();
+    const manager = new CompositionWorkspaceManager(new GitCommandRunner());
+    const repositoryConfigBefore = fixture.git([
+      "config",
+      "--local",
+      "--list",
+    ]);
+
+    await manager.withWorkspace(
+      fixture.path,
+      fixture.commits.base,
+      ["src/auth/login.ts"],
+      async (workspace) => {
+        await expect(access(`${workspace.path}/src/auth/login.ts`)).resolves.toBeUndefined();
+        await expect(access(`${workspace.path}/docs/auth.md`)).rejects.toThrow();
+        const workspaceGit = new GitCommandRunner();
+        await expect(
+          workspaceGit.run(["config", "--local", "--get", "core.autocrlf"], {
+            cwd: workspace.path,
+          }),
+        ).resolves.toMatchObject({ stdout: "false\n" });
+      },
+    );
+
+    expect(fixture.git(["worktree", "list", "--porcelain"])).not.toContain(
+      "prettifer-composition-",
+    );
+    expect(fixture.git(["config", "--local", "--list"])).toBe(
+      repositoryConfigBefore,
+    );
+  });
+
+  it("uses effective worktree-specific content settings", async () => {
+    fixture = await createAuthHistoryFixture();
+    fixture.git(["config", "extensions.worktreeConfig", "true"]);
+    fixture.git(["config", "--worktree", "core.autocrlf", "input"]);
+    const manager = new CompositionWorkspaceManager(new GitCommandRunner());
+
+    await manager.withWorkspace(
+      fixture.path,
+      fixture.commits.base,
+      ["src/auth/login.ts"],
+      async (workspace) => {
+        await expect(
+          new GitCommandRunner().run(
+            ["config", "--includes", "--get", "core.autocrlf"],
+            { cwd: workspace.path },
+          ),
+        ).resolves.toMatchObject({ stdout: "input\n" });
+      },
+    );
+  });
+
+  it("copies repository-specific info attributes before checkout", async () => {
+    fixture = await createAuthHistoryFixture();
+    const gitDirectory = fixture.git(["rev-parse", "--absolute-git-dir"]).trim();
+    const attributesPath = join(gitDirectory, "info", "attributes");
+    await writeFile(attributesPath, "src/auth/login.ts binary\n", "utf8");
+    const manager = new CompositionWorkspaceManager(new GitCommandRunner());
+
+    await manager.withWorkspace(
+      fixture.path,
+      fixture.commits.base,
+      ["src/auth/login.ts"],
+      async (workspace) => {
+        await expect(
+          new GitCommandRunner().run(
+            ["check-attr", "binary", "--", "src/auth/login.ts"],
+            { cwd: workspace.path },
+          ),
+        ).resolves.toMatchObject({
+          stdout: "src/auth/login.ts: binary: set\n",
+        });
+      },
+    );
+  });
+
+  it("uses Git 2.30-compatible commands to locate repository attributes", async () => {
+    fixture = await createAuthHistoryFixture();
+    const git = new RecordingGitRunner();
+    const manager = new CompositionWorkspaceManager(git);
+
+    await manager.withWorkspace(
+      fixture.path,
+      fixture.commits.base,
+      ["src/auth/login.ts"],
+      () => Promise.resolve(),
+    );
+
+    expect(git.commands.flat()).not.toContain("--path-format=absolute");
+  });
+
+  it("keeps a relative attributes file anchored to the source repository", async () => {
+    fixture = await createAuthHistoryFixture();
+    const attributesFile = join(fixture.path, "prettifer-attributes");
+    await writeFile(attributesFile, "src/auth/login.ts binary\n", "utf8");
+    fixture.git([
+      "config",
+      "--local",
+      "core.attributesFile",
+      "prettifer-attributes",
+    ]);
+    expect(fixture.git([
+      "check-attr",
+      "binary",
+      "--",
+      "src/auth/login.ts",
+    ])).toBe("src/auth/login.ts: binary: set\n");
+    const manager = new CompositionWorkspaceManager(new GitCommandRunner());
+
+    await manager.withWorkspace(
+      fixture.path,
+      fixture.commits.base,
+      ["src/auth/login.ts"],
+      async (workspace) => {
+        await expect(
+          new GitCommandRunner().run(
+            ["check-attr", "binary", "--", "src/auth/login.ts"],
+            { cwd: workspace.path },
+          ),
+        ).resolves.toMatchObject({
+          stdout: "src/auth/login.ts: binary: set\n",
+        });
+      },
+    );
+
+    expect(fixture.git([
+      "config",
+      "--local",
+      "--get",
+      "core.attributesFile",
+    ])).toBe("prettifer-attributes\n");
+  });
+
+  it("uses a full checkout for a repository-specific external driver", async () => {
+    fixture = await createAuthHistoryFixture();
+    fixture.git([
+      "config",
+      "--local",
+      "merge.prettifer.driver",
+      "prettifer-merge-driver %O %A %B",
+    ]);
+    fixture.git([
+      "config",
+      "--local",
+      "core.hooksPath",
+      "C:/prettifer-source-hooks-must-not-run",
+    ]);
+    const repositoryConfigBefore = fixture.git(["config", "--local", "--list"]);
+    const manager = new CompositionWorkspaceManager(new GitCommandRunner());
+
+    await manager.withWorkspace(
+      fixture.path,
+      fixture.commits.base,
+      ["src/auth/login.ts"],
+      async (workspace) => {
+        await expect(access(`${workspace.path}/docs/auth.md`)).resolves.toBeUndefined();
+        const workspaceGit = new GitCommandRunner();
+        await expect(
+          workspaceGit.run(
+            ["config", "--includes", "--get", "merge.prettifer.driver"],
+            { cwd: workspace.path },
+          ),
+        ).resolves.toMatchObject({
+          stdout: "prettifer-merge-driver %O %A %B\n",
+        });
+        const hooksPath = await workspaceGit.run(
+          ["config", "--local", "--get", "core.hooksPath"],
+          { cwd: workspace.path },
+        );
+        expect(hooksPath.stdout).toContain("disabled-hooks");
+        expect(hooksPath.stdout).not.toContain("source-hooks-must-not-run");
+      },
+    );
+
+    expect(fixture.git(["config", "--local", "--list"])).toBe(
+      repositoryConfigBefore,
+    );
+  });
+
+  it("does not remove an unrelated worktree registration", async () => {
+    fixture = await createAuthHistoryFixture();
+    const manager = new CompositionWorkspaceManager(new GitCommandRunner());
+    const unrelatedRoot = await mkdtemp(join(tmpdir(), "prettifer-unrelated-worktree-"));
+    const unrelatedPath = join(unrelatedRoot, "offline");
+    const normalizedUnrelatedPath = unrelatedPath.replaceAll("\\", "/");
+
+    fixture.git(["worktree", "add", "--detach", unrelatedPath, fixture.commits.base]);
+    await rm(unrelatedPath, { force: true, recursive: true });
+
+    try {
+      expect(fixture.git(["worktree", "list", "--porcelain"])).toContain(
+        normalizedUnrelatedPath,
+      );
+
+      await manager.withWorkspace(
+        fixture.path,
+        fixture.commits.base,
+        [],
+        () => Promise.resolve("complete"),
+      );
+
+      expect(fixture.git(["worktree", "list", "--porcelain"])).toContain(
+        normalizedUnrelatedPath,
+      );
+    } finally {
+      fixture.git(["worktree", "prune", "--expire", "now"]);
+      await rm(unrelatedRoot, { force: true, recursive: true });
+    }
   });
 });
 
@@ -130,7 +351,19 @@ describe("removeDirectoryWithRetries", () => {
       }),
     ).rejects.toMatchObject({
       path: "C:\\still-locked",
-      message: expect.stringContaining("정리하지 못했습니다"),
+      message: expect.stringContaining("could not be removed"),
     });
   });
 });
+
+class RecordingGitRunner extends GitCommandRunner {
+  readonly commands: string[][] = [];
+
+  override run(
+    gitArguments: readonly string[],
+    options: GitRunOptions,
+  ): Promise<ProcessOutput> {
+    this.commands.push([...gitArguments]);
+    return super.run(gitArguments, options);
+  }
+}

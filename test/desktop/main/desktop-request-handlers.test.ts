@@ -203,8 +203,8 @@ describe("desktop request handlers", () => {
       status: "error",
       diagnostic: {
         code: "REQUEST_FAILED",
-        message: "요청을 처리할 수 없습니다.",
-        nextAction: "저장소 상태를 확인한 뒤 다시 시도해 주세요.",
+        message: "The request could not be processed.",
+        nextAction: "Check the repository state, then try again.",
       },
     });
   });

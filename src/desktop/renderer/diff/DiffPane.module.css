@@ -1,5 +1,7 @@
 .panel {
   composes: surface from "../PanelSurface.module.css";
+  grid-template-rows: auto auto minmax(0, 1fr);
+  padding: var(--space-4);
 }
 
 .panel h2,
@@ -11,24 +13,42 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .headingRow p {
   color: var(--color-muted);
+  font-size: 0.8125rem;
 }
 
+/*
+ * The host always occupies the flexible row so the editor fills the panel even
+ * when the loading and error rows are absent.
+ */
 .editorHost {
-  min-height: 28rem;
+  grid-row: 3;
+  min-width: 0;
+  height: 100%;
+  min-height: 12rem;
   border: 1px solid var(--color-border);
+  border-radius: 0.35rem;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 18%);
+}
+
+/* Monaco decoration class applied to every line of an added file. */
+:global(.prettifer-added-line) {
+  background: rgb(91 185 140 / 16%);
 }
 
 .error {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.75rem;
+  gap: var(--space-2);
+  padding: var(--space-2);
   border: 1px solid var(--color-danger);
   border-radius: 0.5rem;
 }
@@ -41,6 +61,29 @@
   }
 
   .editorHost {
-    min-height: 20rem;
+    min-height: 30rem;
   }
+}
+
+.binaryState {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: var(--space-2);
+  min-height: 16rem;
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border);
+  border-radius: 0.35rem;
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.binaryState strong {
+  color: var(--color-focus);
+  font-size: 1rem;
+}
+
+.binaryState p {
+  max-width: 32rem;
+  color: var(--color-muted);
 }

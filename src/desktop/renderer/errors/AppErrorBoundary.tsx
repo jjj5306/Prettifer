@@ -9,9 +9,9 @@ interface AppErrorBoundaryProps {
 
 export const AppErrorBoundary = ({ children, onRecover }: AppErrorBoundaryProps) => (
   <RecoveryErrorBoundary
-    title="앱 화면을 표시할 수 없습니다"
-    message="화면을 다시 열어 현재 저장소 상태를 복구해 주세요."
-    actionLabel="앱 화면 다시 열기"
+    title="The app could not be displayed"
+    message="Reload the workspace to restore the current repository state."
+    actionLabel="Reload Workspace"
     onRecover={onRecover}
   >
     {children}

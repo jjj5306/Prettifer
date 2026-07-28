@@ -2,8 +2,14 @@ import {
   type CompositeDiffRequest,
   type CompositeDiffResult,
 } from "./composite-diff-service.js";
-import { SelectionError } from "./selection-planner.js";
-import { GitCommandAbortedError } from "../git/git-command-runner.js";
+import {
+  SelectionError,
+  type SelectionErrorCode,
+} from "./selection-planner.js";
+import {
+  GitCommandAbortedError,
+  GitCommandError,
+} from "../git/git-command-runner.js";
 
 export type { CompositeDiffResult } from "./composite-diff-service.js";
 
@@ -11,8 +17,15 @@ export interface CompositeDiffCalculator {
   compose(request: CompositeDiffRequest): Promise<CompositeDiffResult>;
 }
 
+export type CompositionDiagnosticCode =
+  | SelectionErrorCode
+  | "REPOSITORY_LOCKED"
+  | "REPOSITORY_PERMISSION_DENIED"
+  | "INSUFFICIENT_STORAGE"
+  | "COMPOSITION_FAILED";
+
 export interface CompositionDiagnostic {
-  code: string;
+  code: CompositionDiagnosticCode;
   message: string;
   commit?: string;
   nextAction: string;
@@ -37,7 +50,7 @@ export class CompositeDiffCoordinator {
   private activeController: AbortController | undefined;
   private state: CompositeDiffState = {
     status: "idle",
-    message: "결과를 만들려면 하나 이상의 커밋을 선택해 주세요.",
+    message: "Select at least one commit to build a result.",
   };
 
   constructor(private readonly calculator: CompositeDiffCalculator) {}
@@ -57,7 +70,7 @@ export class CompositeDiffCoordinator {
       this.activeController = undefined;
       this.state = {
         status: "idle",
-        message: "결과를 만들려면 하나 이상의 커밋을 선택해 주세요.",
+        message: "Select at least one commit to build a result.",
       };
       return this.state;
     }
@@ -89,7 +102,7 @@ export class CompositeDiffCoordinator {
       }
       this.activeController = undefined;
       if (error instanceof GitCommandAbortedError) {
-        this.state = { status: "idle", message: "계산이 취소되었습니다." };
+        this.state = { status: "idle", message: "The calculation was cancelled." };
         return this.state;
       }
       this.state = {
@@ -105,7 +118,7 @@ export class CompositeDiffCoordinator {
     this.generation += 1;
     this.activeController?.abort();
     this.activeController = undefined;
-    this.state = { status: "idle", message: "계산이 취소되었습니다." };
+    this.state = { status: "idle", message: "The calculation was cancelled." };
   }
 }
 
@@ -118,9 +131,42 @@ function createDiagnostic(error: unknown): CompositionDiagnostic {
       nextAction: error.nextAction,
     };
   }
+  if (error instanceof GitCommandError) {
+    if (storageFailurePattern.test(error.stderr)) {
+      return {
+        code: "INSUFFICIENT_STORAGE",
+        message:
+          "The selected result could not be built because available storage is insufficient.",
+        nextAction:
+          "Free storage space on the repository or system drive, then try again.",
+      };
+    }
+    if (permissionFailurePattern.test(error.stderr)) {
+      return {
+        code: "REPOSITORY_PERMISSION_DENIED",
+        message: "The selected result could not access the repository workspace.",
+        nextAction:
+          "Check repository and temporary-folder permissions, then try again.",
+      };
+    }
+    if (lockFailurePattern.test(error.stderr)) {
+      return {
+        code: "REPOSITORY_LOCKED",
+        message: "The repository is busy with another Git operation.",
+        nextAction: "Wait for other Git operations to finish, then try again.",
+      };
+    }
+  }
   return {
     code: "COMPOSITION_FAILED",
-    message: error instanceof Error ? error.message : String(error),
-    nextAction: "저장소 상태와 선택을 확인한 뒤 다시 계산해 주세요.",
+    message: "The selected result could not be calculated.",
+    nextAction: "Check the repository and selected commits, then try again.",
   };
 }
+
+const storageFailurePattern =
+  /\bENOSPC\b|no space left on device|not enough space (?:on|available)|there is not enough space|disk (?:is )?full|quota exceeded|insufficient (?:disk )?space/iu;
+const permissionFailurePattern =
+  /\bEACCES\b|\bEPERM\b|permission denied|access is denied|operation not permitted|read-only file system/iu;
+const lockFailurePattern =
+  /could not lock|cannot lock|unable to (?:create|lock)[^\r\n]*\.lock|another git process|\.lock['"]?:?\s*file exists/iu;

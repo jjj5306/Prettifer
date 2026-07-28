@@ -35,44 +35,38 @@ export const RepositoryToolbar = ({
   };
 
   return (
-    <section className={styles.toolbar} aria-labelledby="repository-heading">
+    <section
+      id="repository-workspace"
+      className={styles.toolbar}
+      aria-labelledby="repository-heading"
+      tabIndex={-1}
+    >
       <div className={styles.headingRow}>
-        <div>
-          <p className={styles.eyebrow}>Repository</p>
-          <h2 id="repository-heading">저장소와 비교 범위</h2>
-        </div>
+        <p className={styles.eyebrow}>Repository</p>
+        <h2 id="repository-heading">Repository and comparison range</h2>
         <button
           type="button"
           disabled={repository.status === "selecting"}
           onClick={() => { void onOpenRepository(); }}
         >
-          {session === null ? "저장소 폴더 선택" : "다른 저장소 선택"}
+          {session === null ? "Open Repository" : "Change Repository"}
         </button>
       </div>
 
       {session === null ? (
-        <p className={styles.empty}>분석할 로컬 Git 저장소를 선택해 주세요.</p>
+        <p className={styles.empty}>Choose a local Git repository to review.</p>
       ) : (
         <>
-          <dl className={styles.repositorySummary}>
-            <div>
-              <dt>저장소 경로</dt>
-              <dd>{session.rootPath}</dd>
-            </div>
-            <div>
-              <dt>현재 상태</dt>
-              <dd>현재 브랜치: {session.currentBranch ?? "분리된 HEAD"}</dd>
-            </div>
-          </dl>
           <form
             key={session.repositorySessionId}
             className={styles.rangeForm}
             onSubmit={handleRangeSubmit}
           >
             <label>
-              비교 기준 브랜치
+              <span>Base</span>
               <select
                 name="baseRef"
+                aria-label="Base branch"
                 defaultValue={defaultBaseRef(session, range)}
                 disabled={range.status === "loading"}
               >
@@ -82,9 +76,10 @@ export const RepositoryToolbar = ({
               </select>
             </label>
             <label>
-              작업 브랜치
+              <span>Working</span>
               <select
                 name="headRef"
+                aria-label="Working branch"
                 defaultValue={defaultHeadRef(session, range)}
                 disabled={range.status === "loading"}
               >
@@ -94,11 +89,13 @@ export const RepositoryToolbar = ({
               </select>
             </label>
             <button type="submit" disabled={range.status === "loading"}>
-              {range.status === "loading" ? "커밋 범위 불러오는 중" : "커밋 범위 불러오기"}
+              {range.status === "loading" ? "Loading Commit Range…" : "Load Commit Range"}
             </button>
           </form>
           {range.status === "ready" ? (
-            <p className={styles.rangeSummary}>공통 조상: {range.range.baseCommit}</p>
+            <p className={styles.rangeSummary}>
+              Base <code title={range.range.baseCommit}>{range.range.baseCommit.slice(0, 7)}</code>
+            </p>
           ) : null}
         </>
       )}

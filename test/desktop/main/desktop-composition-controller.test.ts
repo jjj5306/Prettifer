@@ -79,7 +79,7 @@ describe("DesktopCompositionController", () => {
       assertCompositionInput: vi.fn().mockRejectedValue(new RepositoryHistoryError(
         "RANGE_STALE",
         "feature/ui",
-        "브랜치 이력을 새로 불러온 뒤 다시 선택해 주세요.",
+        "Reload the branch history, then select the commits again.",
       )),
     };
     const coordinator = { update: vi.fn(), cancel: vi.fn() };
@@ -101,9 +101,9 @@ describe("DesktopCompositionController", () => {
           selectedCommits: [selectedCommit],
           diagnostic: {
             code: "INVALID_COMMIT",
-            message: "커밋을 찾을 수 없습니다.",
+            message: "The commit could not be found.",
             commit: selectedCommit,
-            nextAction: "선택을 확인해 주세요.",
+            nextAction: "Review the selection.",
           },
         }),
         cancel: vi.fn(),
@@ -135,8 +135,103 @@ describe("DesktopCompositionController", () => {
       status: "error",
       diagnostic: {
         code: "COMPOSITION_FAILED",
-        message: "통합 결과를 계산할 수 없습니다.",
-        nextAction: "저장소 상태와 선택 커밋을 확인한 뒤 다시 계산해 주세요.",
+        message: "The selected result could not be calculated.",
+        nextAction: "Check the repository and selected commits, then try again.",
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain(secret);
+  });
+
+  it("publishes an actionable prerequisite diagnostic without Git internals", async () => {
+    const controller = new DesktopCompositionController(
+      { assertCompositionInput: vi.fn().mockResolvedValue(undefined) },
+      {
+        update: vi.fn().mockResolvedValue({
+          status: "error",
+          selectedCommits: [selectedCommit],
+          diagnostic: {
+            code: "COMMIT_APPLY_CONFLICT",
+            message: "The commit cannot be applied independently.",
+            commit: selectedCommit,
+            nextAction: "Select its earlier prerequisite commits, then try again.",
+          },
+        }),
+        cancel: vi.fn(),
+      },
+    );
+
+    await expect(controller.compose(request, "C:\\work\\repo")).resolves.toEqual({
+      status: "error",
+      diagnostic: {
+        code: "COMMIT_APPLY_CONFLICT",
+        message: "The commit cannot be applied independently.",
+        subject: selectedCommit,
+        nextAction: "Select its earlier prerequisite commits, then try again.",
+      },
+    });
+  });
+
+  it.each([
+    {
+      code: "REPOSITORY_LOCKED",
+      message: "The repository is busy with another Git operation.",
+      nextAction: "Wait for other Git operations to finish, then try again.",
+    },
+    {
+      code: "REPOSITORY_PERMISSION_DENIED",
+      message: "The selected result could not access the repository workspace.",
+      nextAction: "Check repository and temporary-folder permissions, then try again.",
+    },
+    {
+      code: "INSUFFICIENT_STORAGE",
+      message: "The selected result could not be built because available storage is insufficient.",
+      nextAction: "Free storage space on the repository or system drive, then try again.",
+    },
+  ])("publishes the safe $code diagnostic", async (diagnostic) => {
+    const controller = new DesktopCompositionController(
+      { assertCompositionInput: vi.fn().mockResolvedValue(undefined) },
+      {
+        update: vi.fn().mockResolvedValue({
+          status: "error",
+          selectedCommits: [selectedCommit],
+          diagnostic,
+        }),
+        cancel: vi.fn(),
+      },
+    );
+
+    await expect(controller.compose(request, "C:\\work\\repo")).resolves.toEqual({
+      status: "error",
+      diagnostic,
+    });
+  });
+
+  it("redacts an unrecognized coordinator diagnostic", async () => {
+    const secret = "C:\\Users\\secret\\prettifer-worktree";
+    const controller = new DesktopCompositionController(
+      { assertCompositionInput: vi.fn().mockResolvedValue(undefined) },
+      {
+        update: vi.fn().mockResolvedValue({
+          status: "error",
+          selectedCommits: [selectedCommit],
+          diagnostic: {
+            code: "FUTURE_INTERNAL_FAILURE",
+            message: secret,
+            nextAction: secret,
+          },
+        }),
+        cancel: vi.fn(),
+      },
+    );
+
+    const result = await controller.compose(request, "C:\\work\\repo");
+
+    expect(result).toEqual({
+      status: "error",
+      diagnostic: {
+        code: "COMPOSITION_FAILED",
+        message: "The selected result could not be calculated.",
+        nextAction: "Check the repository and selected commits, then try again.",
       },
     });
     expect(JSON.stringify(result)).not.toContain(secret);

@@ -1,44 +1,199 @@
 .panel {
   composes: surface from "../PanelSurface.module.css";
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
-.panel h2,
+.header,
+.title,
+.viewToggle {
+  display: flex;
+  align-items: center;
+}
+
+.header {
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.title {
+  min-width: 0;
+  gap: var(--space-2);
+}
+
+.title h2,
 .panel p {
   margin: 0;
 }
 
-.fileList {
+.title span {
+  color: var(--color-muted);
+  font-family: var(--font-code);
+  font-size: 0.6875rem;
+}
+
+.viewToggle {
+  flex: 0 0 auto;
+}
+
+.viewToggle button {
   display: grid;
-  max-height: 22rem;
-  gap: 0.35rem;
+  width: 1.9rem;
+  min-height: 1.75rem;
+  place-content: center;
+  padding: 0;
+  border-radius: 0;
+  color: var(--color-muted);
+  font-size: 0.6875rem;
+}
+
+.viewToggle button + button {
+  margin-left: -1px;
+}
+
+.viewToggle .activeView {
+  position: relative;
+  z-index: 1;
+  border-color: var(--color-accent);
+  background: var(--color-selected);
+  color: var(--color-focus);
+}
+
+.content {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.fileList,
+.tree {
+  display: grid;
+  gap: 1px;
   margin: 0;
   padding: 0;
-  overflow: auto;
   list-style: none;
+}
+
+.tree {
+  /* Places the guide under the twisty of the parent directory row. */
+  --tree-guide-offset: 1.125rem;
+  --tree-connector: 0.75rem;
+  --tree-row-center: 0.95rem;
+}
+
+.tree .tree {
+  margin-left: var(--tree-guide-offset);
+  padding-left: var(--tree-connector);
+}
+
+.tree li,
+.fileList li {
+  min-width: 0;
+}
+
+.tree .tree > li {
+  position: relative;
+}
+
+/* Vertical guide of the parent directory, stopped at the last row it connects. */
+.tree .tree > li::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(-1 * var(--tree-connector));
+  width: 1px;
+  background: var(--color-border);
+  content: "";
+}
+
+.tree .tree > li:last-child::before {
+  bottom: auto;
+  height: var(--tree-row-center);
+}
+
+/* Horizontal connector that ends the guide beside each row. */
+.tree .tree > li::after {
+  position: absolute;
+  top: var(--tree-row-center);
+  left: calc(-1 * var(--tree-connector));
+  width: var(--tree-connector);
+  height: 1px;
+  background: var(--color-border);
+  content: "";
+}
+
+.directory {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 1.9rem;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.2rem var(--space-2);
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-muted);
+  font-weight: 600;
+  text-align: left;
+}
+
+/* Matches the file status column so directory and file names share one edge. */
+.twisty {
+  display: grid;
+  width: 1.25rem;
+  flex: 0 0 auto;
+  place-content: center;
+  font-size: 0.625rem;
 }
 
 .file,
 .selectedFile {
   display: grid;
-  grid-template-columns: 3rem minmax(0, 1fr);
+  grid-template-columns: 1.25rem minmax(0, 1fr);
   width: 100%;
-  gap: 0.5rem;
+  min-width: 0;
+  min-height: 1.9rem;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.2rem var(--space-2);
+  border-color: transparent;
+  background: transparent;
   text-align: left;
 }
 
 .selectedFile {
-  border-width: 2px;
   border-color: var(--color-accent);
+  background: var(--color-selected);
+  box-shadow: inset 2px 0 var(--color-accent);
 }
 
-.file span:last-child,
-.selectedFile span:last-child {
+.status {
+  font-family: var(--font-code);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.added {
+  color: var(--color-added);
+}
+
+.modified {
+  color: var(--color-modified);
+}
+
+.deleted {
+  color: var(--color-deleted);
+}
+
+.path {
+  min-width: 0;
   overflow: hidden;
+  font-family: var(--font-code);
+  font-size: 0.75rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.status {
-  color: var(--color-accent);
-  font-weight: 700;
+.empty {
+  color: var(--color-muted);
 }

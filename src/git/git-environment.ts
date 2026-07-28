@@ -52,7 +52,7 @@ export async function verifyGitEnvironment(
   } catch (error) {
     throw new GitEnvironmentError(
       "GIT_NOT_FOUND",
-      "Git 실행 파일을 찾을 수 없습니다. Git을 설치하거나 Prettifer의 gitPath 설정을 확인해 주세요.",
+      "Git could not be found. Install Git or check Prettifer's gitPath setting.",
       { cause: error },
     );
   }
@@ -61,7 +61,7 @@ export async function verifyGitEnvironment(
   if (compareVersion(version, MINIMUM_GIT_VERSION) < 0) {
     throw new GitEnvironmentError(
       "GIT_VERSION_UNSUPPORTED",
-      `Git ${formatVersion(MINIMUM_GIT_VERSION)} 이상이 필요합니다. 현재 버전은 ${formatVersion(version)}입니다.`,
+      `Git ${formatVersion(MINIMUM_GIT_VERSION)} or newer is required. The current version is ${formatVersion(version)}.`,
     );
   }
 
@@ -73,7 +73,7 @@ function parseGitVersion(raw: string): GitVersion {
   if (match === null) {
     throw new GitEnvironmentError(
       "GIT_VERSION_INVALID",
-      `Git 버전을 확인할 수 없습니다: ${raw}`,
+      `The Git version could not be determined: ${raw}`,
     );
   }
 

@@ -1,0 +1,47 @@
+.splitter,
+.draggingSplitter {
+  position: relative;
+  width: 0.3125rem;
+  min-height: 0;
+  background: var(--color-background);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+/* Widens the grab area without widening the visible groove. */
+.splitter::before,
+.draggingSplitter::before {
+  position: absolute;
+  top: 0;
+  right: -0.25rem;
+  bottom: 0;
+  left: -0.25rem;
+  content: "";
+}
+
+.splitter:hover,
+.splitter:focus-visible,
+.draggingSplitter {
+  background: var(--color-accent);
+}
+
+.splitter:focus-visible,
+.draggingSplitter:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 0;
+}
+
+/* The narrow layout stacks the panes, so there is no column left to resize. */
+@media (max-width: 64rem) {
+  .splitter,
+  .draggingSplitter {
+    display: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .splitter,
+  .draggingSplitter {
+    background: CanvasText;
+  }
+}

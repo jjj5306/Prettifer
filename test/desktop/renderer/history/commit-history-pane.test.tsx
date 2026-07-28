@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { StrictMode } from "react";
-import { render, screen } from "@testing-library/react";
+import { StrictMode, useState } from "react";
+import { render, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -28,6 +28,27 @@ const mergeCommit = {
   isMerge: true,
   selectable: false,
 };
+const secondCommit = {
+  ...firstCommit,
+  id: "d".repeat(40),
+  shortId: "d".repeat(7),
+  parentIds: [firstCommit.id],
+  title: "refine desktop navigation",
+  authoredAt: "2026-07-23T00:02:00.000Z",
+};
+const firstCommitCardName = [
+  `Inspect commit: ${firstCommit.title}`,
+  firstCommit.id,
+  firstCommit.authorName,
+  firstCommit.authoredAt,
+].join(" · ");
+const mergeCommitCardName = [
+  `Inspect commit: ${mergeCommit.title}`,
+  mergeCommit.id,
+  mergeCommit.authorName,
+  mergeCommit.authoredAt,
+  "Merge commits cannot be included in the selected result",
+].join(" · ");
 const range = {
   baseRef: "main",
   baseRefCommit: "f".repeat(40),
@@ -49,6 +70,31 @@ function readyRange(overrides: Partial<Extract<RangeState, { status: "ready" }>>
 }
 
 describe("CommitHistoryPane", () => {
+  it("names the region Commit History and displays oldest commits on the left", () => {
+    render(
+      <CommitHistoryPane
+        range={readyRange({ commits: [secondCommit, firstCommit] })}
+        selectedCommitIds={[]}
+        inspectedCommitId={null}
+        onToggleCommit={vi.fn()}
+        onInspectCommit={vi.fn()}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    const history = screen.getByRole("region", { name: "Commit History" });
+    const commitButtons = Array.from(
+      history.querySelectorAll<HTMLButtonElement>("ol > li > button"),
+    );
+    expect(commitButtons.map((button) => button.textContent)).toEqual([
+      expect.stringContaining(firstCommit.title),
+      expect.stringContaining(secondCommit.title),
+    ]);
+    expect(screen.getByRole("list", {
+      name: "First-parent commits, oldest first",
+    })).toBeVisible();
+  });
+
   it("shows commit metadata, merge restrictions and a 100-item page action", () => {
     render(
       <StrictMode>
@@ -65,10 +111,28 @@ describe("CommitHistoryPane", () => {
 
     expect(screen.getByText(firstCommit.shortId)).toBeVisible();
     expect(screen.getAllByText(firstCommit.authorName)).toHaveLength(2);
-    expect(screen.getByRole("checkbox", { name: `통합에 포함: ${firstCommit.title}` })).toBeEnabled();
-    expect(screen.getByRole("checkbox", { name: `통합에 포함할 수 없음: ${mergeCommit.title}` })).toBeDisabled();
-    expect(screen.getByText("병합 커밋 · 선택할 수 없음")).toBeVisible();
-    expect(screen.getByRole("button", { name: "이전 커밋 100개 더 불러오기" })).toBeVisible();
+    expect(screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` })).toBeEnabled();
+    expect(screen.getByRole("checkbox", { name: `Cannot include in selected result: ${mergeCommit.title}` })).toBeDisabled();
+    expect(screen.getByText("Merge commit · unavailable")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Load 100 older commits" })).toBeVisible();
+  });
+
+  it("shows the authored month and day and keeps the full timestamp available", () => {
+    render(
+      <CommitHistoryPane
+        range={readyRange({ commits: [firstCommit] })}
+        selectedCommitIds={[]}
+        inspectedCommitId={null}
+        onToggleCommit={vi.fn()}
+        onInspectCommit={vi.fn()}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    const authored = screen.getByText("07-23");
+    expect(authored).toBeVisible();
+    expect(authored).toHaveAttribute("datetime", firstCommit.authoredAt);
+    expect(authored).toHaveAttribute("title", firstCommit.authoredAt);
   });
 
   it("keeps non-contiguous composition selection separate from inspection", async () => {
@@ -88,18 +152,69 @@ describe("CommitHistoryPane", () => {
       </StrictMode>,
     );
 
-    expect(screen.getByText("통합 선택 1개")).toBeVisible();
-    expect(screen.getByRole("checkbox", { name: `통합에 포함: ${firstCommit.title}` })).toBeChecked();
-    expect(screen.getByRole("button", { name: `현재 탐색: ${mergeCommit.title}` })).toHaveAttribute("aria-current", "true");
-    expect(screen.getByText(mergeCommit.id)).toBeVisible();
+    expect(screen.getByText("1 selected")).toBeVisible();
+    expect(screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` })).toBeChecked();
+    const inspectedMerge = screen.getByRole("button", { name: mergeCommitCardName });
+    expect(inspectedMerge).toHaveAttribute("aria-current", "true");
+    expect(inspectedMerge).toHaveAttribute("title", mergeCommit.title);
+    expect(within(inspectedMerge).getByText(mergeCommit.shortId))
+      .toHaveAttribute("title", mergeCommit.id);
+    expect(within(inspectedMerge).getByText(mergeCommit.authorName)).toBeVisible();
+    expect(within(inspectedMerge).getByText("07-23"))
+      .toHaveAttribute("title", mergeCommit.authoredAt);
 
-    await user.click(screen.getByRole("checkbox", { name: `통합에 포함: ${firstCommit.title}` }));
-    await user.click(screen.getByRole("button", { name: `커밋 자세히 보기: ${firstCommit.title}` }));
+    await user.click(screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` }));
+    await user.click(screen.getByRole("button", { name: firstCommitCardName }));
+    expect(onToggleCommit).toHaveBeenCalledOnce();
     expect(onToggleCommit).toHaveBeenCalledWith(firstCommit.id);
+    expect(onInspectCommit).toHaveBeenCalledOnce();
     expect(onInspectCommit).toHaveBeenCalledWith(firstCommit.id);
   });
 
-  it("explains an empty selection", () => {
+  it("selects commits only from their checkboxes and keeps card inspection separate", async () => {
+    const user = userEvent.setup();
+    const InteractiveHistory = () => {
+      const [selectedCommitIds, setSelectedCommitIds] = useState<string[]>([]);
+      const [inspectedCommitId, setInspectedCommitId] = useState<string | null>(null);
+      return (
+        <CommitHistoryPane
+          range={readyRange({ commits: [firstCommit, secondCommit] })}
+          selectedCommitIds={selectedCommitIds}
+          inspectedCommitId={inspectedCommitId}
+          onToggleCommit={(commitId) => {
+            setSelectedCommitIds((current) => current.includes(commitId)
+              ? current.filter((selected) => selected !== commitId)
+              : [...current, commitId]);
+          }}
+          onInspectCommit={setInspectedCommitId}
+          onLoadMore={vi.fn()}
+        />
+      );
+    };
+    render(<InteractiveHistory />);
+
+    await user.click(screen.getByRole("checkbox", {
+      name: `Include in selected result: ${firstCommit.title}`,
+    }));
+    await user.click(screen.getByRole("checkbox", {
+      name: `Include in selected result: ${secondCommit.title}`,
+    }));
+
+    expect(screen.getByText("2 selected")).toBeVisible();
+    expect(screen.getByRole("checkbox", {
+      name: `Include in selected result: ${firstCommit.title}`,
+    })).toBeChecked();
+    expect(screen.getByRole("checkbox", {
+      name: `Include in selected result: ${secondCommit.title}`,
+    })).toBeChecked();
+
+    await user.click(screen.getByRole("button", { name: firstCommitCardName }));
+    expect(screen.getByText("2 selected")).toBeVisible();
+    expect(screen.getByRole("button", { name: firstCommitCardName }))
+      .toHaveAttribute("aria-current", "true");
+  });
+
+  it("reports an empty selection in the compact heading", () => {
     render(
       <StrictMode>
         <CommitHistoryPane
@@ -112,7 +227,7 @@ describe("CommitHistoryPane", () => {
         />
       </StrictMode>,
     );
-    expect(screen.getByText("통합 결과를 만들려면 하나 이상의 커밋을 선택해 주세요.")).toBeVisible();
+    expect(screen.getByText("0 selected")).toBeVisible();
   });
 
   it("explains an empty branch range", () => {
@@ -130,7 +245,7 @@ describe("CommitHistoryPane", () => {
     );
 
     expect(screen.getByText(
-      "선택한 브랜치 범위에 표시할 커밋이 없습니다. 다른 브랜치 범위를 선택해 주세요.",
+      "No commits are available in this range. Choose another branch range.",
     )).toBeVisible();
   });
 
@@ -150,7 +265,7 @@ describe("CommitHistoryPane", () => {
       </StrictMode>,
     );
 
-    screen.getByRole("checkbox", { name: `통합에 포함: ${firstCommit.title}` }).focus();
+    screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` }).focus();
     await user.keyboard("[Space]");
 
     expect(onToggleCommit).toHaveBeenCalledWith(firstCommit.id);
@@ -171,7 +286,7 @@ describe("CommitHistoryPane", () => {
         />
       </StrictMode>,
     );
-    await user.click(screen.getByRole("button", { name: "이전 커밋 100개 더 불러오기" }));
+    await user.click(screen.getByRole("button", { name: "Load 100 older commits" }));
     expect(onLoadMore).toHaveBeenCalledOnce();
 
     rerender(
@@ -186,6 +301,35 @@ describe("CommitHistoryPane", () => {
         />
       </StrictMode>,
     );
-    expect(screen.getByRole("checkbox", { name: `통합에 포함: ${firstCommit.title}` })).toHaveFocus();
+    expect(screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` })).toHaveFocus();
+  });
+
+  it("restores focus to the first commit card when no commit is selectable", async () => {
+    const user = userEvent.setup();
+    const onLoadMore = vi.fn();
+    const { rerender } = render(
+      <CommitHistoryPane
+        range={readyRange({ commits: [mergeCommit] })}
+        selectedCommitIds={[]}
+        inspectedCommitId={null}
+        onToggleCommit={vi.fn()}
+        onInspectCommit={vi.fn()}
+        onLoadMore={onLoadMore}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Load 100 older commits" }));
+
+    rerender(
+      <CommitHistoryPane
+        range={readyRange({ commits: [mergeCommit], nextOffset: null })}
+        selectedCommitIds={[]}
+        inspectedCommitId={null}
+        onToggleCommit={vi.fn()}
+        onInspectCommit={vi.fn()}
+        onLoadMore={onLoadMore}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: mergeCommitCardName })).toHaveFocus();
   });
 });

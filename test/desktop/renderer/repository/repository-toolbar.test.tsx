@@ -45,12 +45,12 @@ describe("RepositoryToolbar", () => {
       </StrictMode>,
     );
 
-    expect(screen.getByText("분석할 로컬 Git 저장소를 선택해 주세요.")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "저장소 폴더 선택" }));
+    expect(screen.getByText("Choose a local Git repository to review.")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Open Repository" }));
     expect(onOpenRepository).toHaveBeenCalledOnce();
   });
 
-  it("shows the normalized path, current branch and local branch controls", () => {
+  it("shows local branch controls", () => {
     render(
       <StrictMode>
         <RepositoryToolbar
@@ -62,10 +62,8 @@ describe("RepositoryToolbar", () => {
       </StrictMode>,
     );
 
-    expect(screen.getByText(session.rootPath)).toBeVisible();
-    expect(screen.getByText("현재 브랜치: feature/ui")).toBeVisible();
-    expect(screen.getByRole("combobox", { name: "비교 기준 브랜치" })).toHaveValue("main");
-    expect(screen.getByRole("combobox", { name: "작업 브랜치" })).toHaveValue("feature/ui");
+    expect(screen.getByRole("combobox", { name: "Base branch" })).toHaveValue("main");
+    expect(screen.getByRole("combobox", { name: "Working branch" })).toHaveValue("feature/ui");
   });
 
   it("loads the selected branch range and displays its common ancestor", async () => {
@@ -96,9 +94,9 @@ describe("RepositoryToolbar", () => {
       </StrictMode>,
     );
 
-    await user.click(screen.getByRole("button", { name: "커밋 범위 불러오기" }));
+    await user.click(screen.getByRole("button", { name: "Load Commit Range" }));
     expect(onLoadRange).toHaveBeenCalledWith("main", "feature/ui");
-    expect(screen.getByText(`공통 조상: ${commonCommit}`)).toBeVisible();
+    expect(screen.getByText(commonCommit.slice(0, 7))).toHaveAttribute("title", commonCommit);
   });
 
   it("keeps the previous repository visible with actionable diagnostics", () => {
@@ -110,9 +108,9 @@ describe("RepositoryToolbar", () => {
             session,
             diagnostic: {
               code: "INVALID_REPOSITORY",
-              message: "Git 저장소를 열 수 없습니다.",
+              message: "The Git repository could not be opened.",
               subject: "C:\\work\\plain",
-              nextAction: "다른 Git 저장소 폴더를 선택해 주세요.",
+              nextAction: "Choose another Git repository folder.",
             },
           }}
           range={baseState.range}
@@ -122,9 +120,9 @@ describe("RepositoryToolbar", () => {
       </StrictMode>,
     );
 
-    expect(screen.getByText(session.rootPath)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Change Repository" })).toBeVisible();
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "Git 저장소를 열 수 없습니다. 다른 Git 저장소 폴더를 선택해 주세요.",
+      "The Git repository could not be opened. Choose another Git repository folder.",
     );
   });
 
@@ -145,9 +143,9 @@ describe("RepositoryToolbar", () => {
         />
       </StrictMode>,
     );
-    expect(screen.getByRole("button", { name: "커밋 범위 불러오는 중" })).toBeDisabled();
-    expect(screen.getByRole("combobox", { name: "비교 기준 브랜치" })).toBeDisabled();
-    expect(screen.getByRole("combobox", { name: "작업 브랜치" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Loading Commit Range…" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Base branch" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Working branch" })).toBeDisabled();
 
     rerender(
       <StrictMode>
@@ -159,8 +157,8 @@ describe("RepositoryToolbar", () => {
             headRef: "feature/ui",
             diagnostic: {
               code: "NO_COMMON_ANCESTOR",
-              message: "공통 이력을 찾을 수 없습니다.",
-              nextAction: "다른 브랜치를 선택해 주세요.",
+              message: "No common history was found.",
+              nextAction: "Choose another branch range.",
             },
           }}
           onOpenRepository={vi.fn()}
@@ -169,7 +167,7 @@ describe("RepositoryToolbar", () => {
       </StrictMode>,
     );
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "공통 이력을 찾을 수 없습니다. 다른 브랜치를 선택해 주세요.",
+      "No common history was found. Choose another branch range.",
     );
   });
 
@@ -184,7 +182,7 @@ describe("RepositoryToolbar", () => {
       />,
     );
     await user.selectOptions(
-      screen.getByRole("combobox", { name: "작업 브랜치" }),
+      screen.getByRole("combobox", { name: "Working branch" }),
       "main",
     );
 
@@ -202,7 +200,7 @@ describe("RepositoryToolbar", () => {
       />,
     );
 
-    expect(screen.getByRole("combobox", { name: "작업 브랜치" }))
+    expect(screen.getByRole("combobox", { name: "Working branch" }))
       .toHaveValue("feature/ui");
   });
 });

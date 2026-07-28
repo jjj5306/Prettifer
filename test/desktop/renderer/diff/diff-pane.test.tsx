@@ -28,21 +28,74 @@ describe("DiffPane", () => {
       </StrictMode>,
     );
     expect(loadAdapter).not.toHaveBeenCalled();
-    expect(screen.getByText("표시할 변경 파일을 선택해 주세요.")).toBeVisible();
+    expect(screen.getByText("Select a changed file to review.")).toBeVisible();
 
     rerender(
       <StrictMode>
         <DiffPane identity={identity} file={file} loadAdapter={loadAdapter} />
       </StrictMode>,
     );
-    expect(screen.getByText("diff 편집기를 불러오는 중입니다.")).toBeVisible();
+    expect(screen.getByText("Loading diff editor…")).toBeVisible();
     await waitFor(() => {
       expect(adapter.show).toHaveBeenCalledWith(expect.any(HTMLElement), identity, file);
     });
     expect(screen.getByRole("textbox", {
-      name: "읽기 전용 diff: src/app.ts · 원본과 통합 결과",
+      name: "Read-only diff: src/app.ts · base and selected result",
     })).toBeVisible();
-    expect(screen.getByText("왼쪽 원본 · 오른쪽 통합 결과")).toBeVisible();
+    expect(screen.getByText("Base on the left · selected result on the right")).toBeVisible();
+  });
+
+  it("reviews an added file as full contents instead of a base comparison", async () => {
+    const adapter = { show: vi.fn(), dispose: vi.fn() };
+    const loadAdapter = vi.fn().mockResolvedValue(adapter);
+    const addedFile = {
+      path: "src/new.ts",
+      status: "added" as const,
+      beforeContent: null,
+      afterContent: "added",
+    };
+    render(
+      <StrictMode>
+        <DiffPane identity={identity} file={addedFile} loadAdapter={loadAdapter} />
+      </StrictMode>,
+    );
+
+    await waitFor(() => {
+      expect(adapter.show).toHaveBeenCalledWith(expect.any(HTMLElement), identity, addedFile);
+    });
+    expect(screen.getByRole("heading", { name: "Added File" })).toBeVisible();
+    expect(screen.getByText(
+      "New file · every line is part of the selected result",
+    )).toBeVisible();
+    expect(screen.getByRole("textbox", {
+      name: "Read-only added file: src/new.ts · full contents added by the selected result",
+    })).toBeVisible();
+    expect(screen.queryByText(
+      "Base on the left · selected result on the right",
+    )).toBeNull();
+  });
+
+  it("shows a readable binary state without loading Monaco", () => {
+    const loadAdapter = vi.fn();
+    render(
+      <DiffPane
+        identity={identity}
+        file={{
+          path: "fixtures/project.csp",
+          status: "added",
+          binary: true,
+          beforeContent: null,
+          afterContent: null,
+        }}
+        loadAdapter={loadAdapter}
+      />,
+    );
+
+    expect(loadAdapter).not.toHaveBeenCalled();
+    expect(screen.getByText("Binary file")).toBeVisible();
+    expect(screen.getByText(
+      "Text diff is not available for this file. Its binary contents were not loaded.",
+    )).toBeVisible();
   });
 
   it("disposes Monaco resources when the file changes and the pane unmounts", async () => {
@@ -85,14 +138,14 @@ describe("DiffPane", () => {
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "diff 편집기를 열 수 없습니다. 현재 파일의 diff를 다시 열어 주세요.",
+      "The diff editor could not open. Retry the current file.",
     );
-    const retry = screen.getByRole("button", { name: "diff 다시 열기" });
+    const retry = screen.getByRole("button", { name: "Retry Diff" });
     await user.click(retry);
     await waitFor(() => { expect(adapter.show).toHaveBeenCalledOnce(); });
     expect(retry).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", {
-      name: "읽기 전용 diff: src/app.ts · 원본과 통합 결과",
+      name: "Read-only diff: src/app.ts · base and selected result",
     })).toHaveFocus();
   });
 });

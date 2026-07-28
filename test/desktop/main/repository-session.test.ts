@@ -45,7 +45,7 @@ describe("RepositorySessionManager", () => {
       .mockRejectedValueOnce(new RepositoryHistoryError(
         "INVALID_REPOSITORY",
         "C:\\work\\plain",
-        "다른 Git 저장소 폴더를 선택해 주세요.",
+        "Choose another Git repository folder.",
       ));
     const manager = new RepositorySessionManager(
       { getRepository },
@@ -97,7 +97,7 @@ describe("RepositorySessionController", () => {
         getRepository: vi.fn().mockRejectedValue(new RepositoryHistoryError(
           "INVALID_REPOSITORY",
           "C:\\work\\plain",
-          "다른 Git 저장소 폴더를 선택해 주세요.",
+          "Choose another Git repository folder.",
         )),
       },
       (path) => path,
@@ -111,9 +111,9 @@ describe("RepositorySessionController", () => {
       status: "error",
       diagnostic: {
         code: "INVALID_REPOSITORY",
-        message: "Git 저장소를 열 수 없습니다: C:\\work\\plain",
+        message: "The Git repository could not be opened: C:\\work\\plain",
         subject: "C:\\work\\plain",
-        nextAction: "다른 Git 저장소 폴더를 선택해 주세요.",
+        nextAction: "Choose another Git repository folder.",
       },
     });
   });

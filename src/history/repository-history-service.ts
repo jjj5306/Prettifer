@@ -101,14 +101,14 @@ export class RepositoryHistoryService {
         throw new RepositoryHistoryError(
           "GIT_UNAVAILABLE",
           requestedPath,
-          "Git을 설치하거나 실행 경로를 확인한 뒤 다시 시도해 주세요.",
+          "Install Git or check its executable path, then try again.",
           { cause: error },
         );
       }
       throw new RepositoryHistoryError(
         "INVALID_REPOSITORY",
         requestedPath,
-        "다른 Git 저장소 폴더를 선택해 주세요.",
+        "Choose another Git repository folder.",
         { cause: error },
       );
     }
@@ -152,7 +152,7 @@ export class RepositoryHistoryService {
       throw new RepositoryHistoryError(
         "NO_COMMON_ANCESTOR",
         `${request.baseRef}..${request.headRef}`,
-        "다른 브랜치를 선택하거나 필요한 Git 이력을 준비해 주세요.",
+        "Choose another branch or fetch the required Git history.",
         { cause: error },
       );
     }
@@ -181,7 +181,7 @@ export class RepositoryHistoryService {
       throw new RepositoryHistoryError(
         "HISTORY_FAILED",
         request.range.headRef,
-        "커밋 페이지 범위를 확인한 뒤 다시 불러와 주세요.",
+        "Check the commit page range, then load it again.",
       );
     }
 
@@ -248,7 +248,7 @@ export class RepositoryHistoryService {
         throw new RepositoryHistoryError(
           "RANGE_STALE",
           request.range.headRef,
-          "브랜치 이력을 새로 불러온 뒤 다시 선택해 주세요.",
+          "Reload the branch history, then select the commits again.",
         );
       }
     } catch (error) {
@@ -258,7 +258,7 @@ export class RepositoryHistoryService {
       throw new RepositoryHistoryError(
         "RANGE_STALE",
         request.range.headRef,
-        "브랜치 이력을 새로 불러온 뒤 다시 선택해 주세요.",
+        "Reload the branch history, then select the commits again.",
         { cause: error },
       );
     }
@@ -297,7 +297,7 @@ export class RepositoryHistoryService {
         throw new RepositoryHistoryError(
           "COMMIT_NOT_SELECTABLE",
           unsupported,
-          "first-parent 이력의 일반 커밋만 선택해 주세요.",
+          "Select non-merge commits from the first-parent history.",
         );
       }
     } catch (error) {
@@ -339,7 +339,7 @@ function parseCommits(output: string): RepositoryCommit[] {
         throw new RepositoryHistoryError(
           "HISTORY_FAILED",
           "commit-output",
-          "커밋 이력을 다시 불러와 주세요.",
+          "Reload the commit history.",
         );
       }
       const parentIds = parents.length === 0 ? [] : parents.split(" ");
@@ -366,7 +366,7 @@ function findBranch(
     throw new RepositoryHistoryError(
       "BRANCH_NOT_FOUND",
       branchName,
-      "저장소에 있는 다른 로컬 브랜치를 선택해 주세요.",
+      "Choose another local branch in the repository.",
     );
   }
   return branch;
@@ -380,14 +380,14 @@ function mapHistoryFailure(error: unknown, subject: string): RepositoryHistoryEr
     return new RepositoryHistoryError(
       "GIT_UNAVAILABLE",
       subject,
-      "Git을 설치하거나 실행 경로를 확인한 뒤 다시 시도해 주세요.",
+      "Install Git or check its executable path, then try again.",
       { cause: error },
     );
   }
   return new RepositoryHistoryError(
     "HISTORY_FAILED",
     subject,
-    "저장소 상태를 확인한 뒤 커밋 이력을 다시 불러와 주세요.",
+    "Check the repository state, then reload the commit history.",
     { cause: error },
   );
 }
@@ -419,18 +419,18 @@ function createRangeRevision(
 function createHistoryErrorMessage(code: RepositoryHistoryErrorCode, subject: string): string {
   switch (code) {
     case "INVALID_REPOSITORY":
-      return `Git 저장소를 열 수 없습니다: ${subject}`;
+      return `The Git repository could not be opened: ${subject}`;
     case "GIT_UNAVAILABLE":
-      return "Git 실행 파일을 사용할 수 없습니다.";
+      return "The Git executable is unavailable.";
     case "BRANCH_NOT_FOUND":
-      return `로컬 브랜치를 찾을 수 없습니다: ${subject}`;
+      return `The local branch could not be found: ${subject}`;
     case "NO_COMMON_ANCESTOR":
-      return `브랜치의 공통 이력을 찾을 수 없습니다: ${subject}`;
+      return `No common history was found for the branches: ${subject}`;
     case "RANGE_STALE":
-      return `브랜치 이력이 변경되었습니다: ${subject}`;
+      return `The branch history has changed: ${subject}`;
     case "COMMIT_NOT_SELECTABLE":
-      return `통합에 포함할 수 없는 커밋입니다: ${subject}`;
+      return `This commit cannot be included in the selected result: ${subject}`;
     case "HISTORY_FAILED":
-      return `커밋 이력을 불러올 수 없습니다: ${subject}`;
+      return `The commit history could not be loaded: ${subject}`;
   }
 }

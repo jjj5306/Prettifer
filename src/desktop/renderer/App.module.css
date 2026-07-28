@@ -5,30 +5,50 @@
 :global(html),
 :global(body),
 :global(#root) {
+  width: 100%;
   min-width: 100%;
+  height: 100%;
   min-height: 100%;
   margin: 0;
+  background: #111317;
 }
 
 .app {
-  --color-background: #08101d;
-  --color-panel: #101a2a;
-  --color-border: #31415d;
-  --color-text: #e8eef9;
-  --color-muted: #afbdd3;
-  --color-accent: #77a7ff;
-  --color-danger: #ff8b93;
-  --color-warning: #ffd479;
+  --color-background: #111317;
+  --color-panel: #171a1f;
+  --color-surface: #1e2024;
+  --color-selected: #282a2e;
+  --color-border: #2b3038;
+  --color-text: #e2e2e8;
+  --color-muted: #9097a3;
+  --color-accent: #8f80fa;
+  --color-focus: #c7bfff;
+  --color-added: #5bb98c;
+  --color-deleted: #e06c75;
+  --color-modified: #f9bc45;
+  --color-danger: var(--color-deleted);
+  --color-warning: var(--color-modified);
+  --font-ui: "Hanken Grotesk Variable", "Segoe UI Variable", "Segoe UI", sans-serif;
+  --font-code: "Geist Variable", "Cascadia Code", Consolas, monospace;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
 
-  box-sizing: border-box;
+  /* Shared height of the app bar, repository, commit and result bars. */
+  --bar-height: 3rem;
+
   display: grid;
-  min-height: 100vh;
-  gap: 1rem;
-  padding: 1.25rem;
+  grid-template-columns: 3.25rem minmax(0, 1fr);
+  width: 100%;
+  height: 100vh;
+  min-height: 40rem;
+  overflow: hidden;
   background: var(--color-background);
   color: var(--color-text);
-  font-family:
-    Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  line-height: 1.45;
 }
 
 .app *::before,
@@ -39,105 +59,240 @@
 .app button,
 .app select,
 .app input {
-  min-height: 2.75rem;
+  min-height: 2.25rem;
   border: 1px solid var(--color-border);
-  border-radius: 0.4rem;
-  background: #152239;
+  border-radius: 0.25rem;
+  background: var(--color-surface);
   color: var(--color-text);
   font: inherit;
 }
 
 .app button {
-  padding: 0.5rem 0.8rem;
+  padding: 0.4rem 0.75rem;
   cursor: pointer;
+}
+
+.appContent {
+  display: grid;
+  grid-column: 2;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app button:hover:not(:disabled),
+.app select:hover:not(:disabled) {
+  background: var(--color-selected);
+  border-color: var(--color-muted);
 }
 
 .app button:focus-visible,
 .app select:focus-visible,
-.app input:focus-visible {
-  outline: 3px solid var(--color-accent);
-  outline-offset: 2px;
+.app input:focus-visible,
+.app [tabindex]:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -1px;
 }
 
 .app button:disabled,
-.app input:disabled {
+.app input:disabled,
+.app select:disabled {
   cursor: not-allowed;
-  opacity: 0.65;
+  opacity: 0.55;
 }
 
 .appHeader {
+  display: flex;
+  min-width: 0;
+  min-height: var(--bar-height);
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-background);
+}
+
+.brandMark {
   display: grid;
-  gap: 0.25rem;
-}
-
-.eyebrow,
-.title,
-.description {
-  margin: 0;
-}
-
-.eyebrow {
-  color: var(--color-accent);
-  font-size: 0.75rem;
+  width: 1.65rem;
+  height: 1.65rem;
+  place-content: center;
+  border: 1px solid var(--color-accent);
+  border-radius: 0.25rem;
+  color: var(--color-focus);
   font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 
 .title {
-  font-size: clamp(1.75rem, 4vw, 2.75rem);
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--color-focus);
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
 }
 
-.description {
+.repositoryContext {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
   color: var(--color-muted);
-  line-height: 1.5;
+  font-family: var(--font-code);
+  font-size: 0.8125rem;
+}
+
+.repositoryPath {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branchContext {
+  flex: 0 0 auto;
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.workbench {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .workspaceGrid {
   display: grid;
-  grid-template-columns: minmax(18rem, 0.85fr) minmax(22rem, 1.4fr);
-  gap: 1rem;
+  grid-template-rows: var(--bar-height) minmax(0, 1fr);
+  height: 100%;
   min-width: 0;
+  min-height: 0;
+  gap: 1px;
+  overflow: hidden;
+  background: var(--color-border);
 }
 
 .placeholder {
   min-width: 0;
-  padding: 1rem;
+  min-height: 0;
+  padding: var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: 0.75rem;
   background: var(--color-panel);
 }
 
 .reviewArea {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
-  align-content: start;
-  gap: 1rem;
+  min-height: 0;
+  gap: 1px;
+  overflow: hidden;
+  background: var(--color-border);
 }
 
+/* The first column follows the splitter; the splitter itself is the middle column. */
 .resultGrid {
   display: grid;
-  grid-template-columns: minmax(14rem, 0.55fr) minmax(22rem, 1.45fr);
+  grid-template-columns: var(--changed-files-width, 18rem) auto minmax(0, 1fr);
   min-width: 0;
-  gap: 1rem;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-border);
 }
 
 .placeholder h2,
 .placeholder p {
-  margin-top: 0;
+  margin: 0;
+}
+
+.placeholder p {
+  margin-top: var(--space-2);
+  color: var(--color-muted);
+}
+
+.statusBar {
+  display: flex;
+  min-width: 0;
+  min-height: 1.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-background);
+  color: var(--color-muted);
+  font-size: 0.75rem;
+}
+
+@media (min-width: 64.01rem) {
+  .resultGrid {
+    min-height: 70vh;
+  }
+}
+
+.statusBar span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preserved {
+  color: var(--color-focus);
 }
 
 @media (max-width: 64rem) {
+  .app {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .appContent {
+    min-height: 100vh;
+    overflow: visible;
+  }
+
   .workspaceGrid,
   .resultGrid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspaceGrid {
+    grid-template-rows: auto auto;
+    overflow: visible;
+  }
+
+  .workbench {
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .reviewArea,
+  .resultGrid {
+    grid-template-rows: auto;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 48rem) {
+  .appHeader {
+    padding: 0 var(--space-2);
+  }
+
+  .statusBar {
+    flex-wrap: wrap;
+    padding-block: var(--space-1);
   }
 }
 
 @media (forced-colors: active) {
   .app button:focus-visible,
   .app select:focus-visible,
-  .app input:focus-visible {
+  .app input:focus-visible,
+  .app [tabindex]:focus-visible {
     outline-color: Highlight;
   }
 }

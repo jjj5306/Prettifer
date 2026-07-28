@@ -48,7 +48,7 @@ describe("user worktree preservation", () => {
         headRef: fixture.headRef,
         selectedCommits: [fixture.commits.base],
       }),
-    ).rejects.toThrow("현재 비교 범위");
+    ).rejects.toThrow("outside the current comparison range");
 
     await expect(fixture.snapshotWorktree()).resolves.toEqual(before);
   });
@@ -117,7 +117,7 @@ describe("user worktree preservation", () => {
         selectedCommits: [fixture.commits.validateLogin],
         signal: controller.signal,
       }),
-    ).rejects.toThrow("취소");
+    ).rejects.toThrow("cancelled");
 
     await expect(fixture.snapshotWorktree()).resolves.toEqual(before);
   });

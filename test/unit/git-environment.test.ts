@@ -14,7 +14,7 @@ describe("verifyGitEnvironment", () => {
 
     await expect(verifyGitEnvironment(reader)).rejects.toMatchObject({
       code: "GIT_NOT_FOUND",
-      message: expect.stringContaining("Git을 설치"),
+      message: expect.stringContaining("Install Git"),
     });
   });
 

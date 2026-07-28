@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   cancelCompositionRequestSchema,
   commitPageRequestSchema,
+  compositeFileChangeSchema,
   compositionRequestSchema,
   diagnosticSchema,
   rangeRequestSchema,
@@ -95,13 +96,73 @@ describe("desktop shared contracts", () => {
   it("requires actionable diagnostics", () => {
     expect(diagnosticSchema.parse({
       code: "INVALID_REPOSITORY",
-      message: "Git 저장소를 열 수 없습니다.",
+      message: "The Git repository could not be opened.",
       subject: "C:\\work\\plain-folder",
-      nextAction: "다른 Git 저장소 폴더를 선택해 주세요.",
+      nextAction: "Choose another Git repository folder.",
     })).toBeDefined();
     expect(() => diagnosticSchema.parse({
       code: "INVALID_REPOSITORY",
-      message: "Git 저장소를 열 수 없습니다.",
+      message: "The Git repository could not be opened.",
     })).toThrow();
+  });
+
+  it.each([
+    {
+      path: "src/new.ts",
+      status: "added",
+      beforeContent: null,
+      afterContent: "new",
+    },
+    {
+      path: "src/app.ts",
+      status: "modified",
+      beforeContent: "old",
+      afterContent: "new",
+    },
+    {
+      path: "src/old.ts",
+      status: "deleted",
+      beforeContent: "old",
+      afterContent: null,
+    },
+    {
+      path: "assets/logo.png",
+      status: "modified",
+      binary: true,
+      beforeContent: null,
+      afterContent: null,
+    },
+  ])("accepts a valid composite file state: $status", (file) => {
+    expect(compositeFileChangeSchema.parse(file)).toEqual(file);
+  });
+
+  it.each([
+    {
+      path: "src/new.ts",
+      status: "added",
+      beforeContent: null,
+      afterContent: null,
+    },
+    {
+      path: "src/app.ts",
+      status: "modified",
+      beforeContent: null,
+      afterContent: "new",
+    },
+    {
+      path: "src/old.ts",
+      status: "deleted",
+      beforeContent: "old",
+      afterContent: "new",
+    },
+    {
+      path: "assets/logo.png",
+      status: "modified",
+      binary: true,
+      beforeContent: "decoded",
+      afterContent: null,
+    },
+  ])("rejects an impossible composite file state: $status", (file) => {
+    expect(() => compositeFileChangeSchema.parse(file)).toThrow();
   });
 });

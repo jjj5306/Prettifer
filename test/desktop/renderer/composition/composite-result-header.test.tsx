@@ -44,14 +44,14 @@ describe("CompositeResultHeader", () => {
   it("requires a commit selection before calculation", () => {
     renderHeader({ status: "idle" }, 0);
 
-    expect(screen.getByRole("button", { name: "통합 결과 만들기" })).toBeDisabled();
-    expect(screen.getByText("하나 이상의 합성 가능 커밋을 선택해 주세요.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Build Selected Result" })).toBeDisabled();
+    expect(screen.getByText("Select at least one supported commit.")).toBeVisible();
   });
 
   it("starts one calculation and replaces the action with cancellation", async () => {
     const user = userEvent.setup();
     const start = renderHeader({ status: "idle" }, 2);
-    await user.click(screen.getByRole("button", { name: "통합 결과 만들기" }));
+    await user.click(screen.getByRole("button", { name: "Build Selected Result" }));
     expect(start.onCompose).toHaveBeenCalledOnce();
     start.rerender(
       <StrictMode>
@@ -70,16 +70,16 @@ describe("CompositeResultHeader", () => {
       </StrictMode>,
     );
 
-    expect(screen.queryByRole("button", { name: "통합 결과 만들기" })).not.toBeInTheDocument();
-    expect(screen.getByText("통합 결과를 계산하는 중입니다.")).toHaveAttribute(
+    expect(screen.queryByRole("button", { name: "Build Selected Result" })).not.toBeInTheDocument();
+    expect(screen.getByText("Building selected result…")).toHaveAttribute(
       "aria-live",
       "polite",
     );
-    await user.click(screen.getByRole("button", { name: "계산 취소" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(start.onCancel).toHaveBeenCalledOnce();
   });
 
-  it("shows the actual base, application order and unchanged working tree", () => {
+  it("shows the actual base and application order", () => {
     renderHeader({
       status: "ready",
       requestId: "composition-1",
@@ -91,20 +91,20 @@ describe("CompositeResultHeader", () => {
       },
     }, 2);
 
-    expect(screen.getByText(`실제 비교 기준: ${range.baseCommit}`)).toBeVisible();
-    expect(screen.getByText(`적용 순서: ${"d".repeat(40)} → ${"e".repeat(40)}`)).toBeVisible();
-    expect(screen.getByText("포함 커밋 2개 · 현재 선택과 일치")).toBeVisible();
-    expect(screen.getByText("사용자 작업 트리 보존 확인")).toBeVisible();
-    expect(screen.getByText("계산은 성공했으며 변경 파일이 없습니다.")).toBeVisible();
-    expect(screen.getByRole("button", { name: "통합 결과 다시 만들기" })).toBeEnabled();
+    expect(screen.getByText("c".repeat(7))).toHaveAttribute("title", range.baseCommit);
+    expect(screen.getByText("d".repeat(7))).toHaveAttribute("title", "d".repeat(40));
+    expect(screen.getByText("e".repeat(7))).toHaveAttribute("title", "e".repeat(40));
+    expect(screen.getByText("2 commits · matches current selection")).toBeVisible();
+    expect(screen.getByText("Result built successfully with no changed files.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Rebuild Selected Result" })).toBeEnabled();
   });
 
   it("announces a cancelled calculation and keeps the retry action", () => {
     renderHeader({ status: "cancelled", requestId: "composition-1" }, 1);
 
-    expect(screen.getByText("계산을 취소했습니다. 선택한 커밋으로 다시 계산할 수 있습니다."))
+    expect(screen.getByText("Calculation cancelled. You can rebuild with the current selection."))
       .toHaveAttribute("aria-live", "polite");
-    expect(screen.getByRole("button", { name: "통합 결과 다시 만들기" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Rebuild Selected Result" })).toBeEnabled();
   });
 
   it("announces calculation errors and provides retry", () => {
@@ -113,15 +113,15 @@ describe("CompositeResultHeader", () => {
       requestId: "composition-1",
       diagnostic: {
         code: "COMPOSITION_FAILED",
-        message: "선택 커밋을 적용할 수 없습니다.",
+        message: "The selected commit could not be applied.",
         subject: "d".repeat(40),
-        nextAction: "선택을 확인한 뒤 다시 계산해 주세요.",
+        nextAction: "Check the selection and rebuild the result.",
       },
     }, 1);
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "선택 커밋을 적용할 수 없습니다. 선택을 확인한 뒤 다시 계산해 주세요.",
+      "The selected commit could not be applied. Check the selection and rebuild the result.",
     );
-    expect(screen.getByRole("button", { name: "통합 결과 다시 만들기" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Rebuild Selected Result" })).toBeEnabled();
   });
 });

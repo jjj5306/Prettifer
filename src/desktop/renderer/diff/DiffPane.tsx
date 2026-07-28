@@ -9,9 +9,10 @@ import {
 import styles from "./DiffPane.module.css";
 
 type CompositeFile = CompositeDiffResultDto["files"][number];
+type TextCompositeFile = Exclude<CompositeFile, { binary: true }>;
 
 interface DiffAdapter {
-  show(host: HTMLElement, identity: DiffIdentity, file: CompositeFile): void;
+  show(host: HTMLElement, identity: DiffIdentity, file: TextCompositeFile): void;
   dispose(): void;
 }
 
@@ -39,7 +40,7 @@ export const DiffPane = ({
     : `${repositorySessionId}:${requestId}:${file.path}:${String(retry)}`;
 
   useEffect(() => {
-    if (file === null) {
+    if (file === null || file.binary === true) {
       return undefined;
     }
     let active = true;
@@ -75,28 +76,59 @@ export const DiffPane = ({
 
   if (file === null) {
     return (
-      <section className={styles.panel} aria-labelledby="diff-heading">
-        <h2 id="diff-heading">좌우 diff</h2>
-        <p>표시할 변경 파일을 선택해 주세요.</p>
+      <section
+        id="diff-review"
+        className={styles.panel}
+        aria-labelledby="diff-heading"
+        tabIndex={-1}
+      >
+        <h2 id="diff-heading">Side-by-side Diff</h2>
+        <p>Select a changed file to review.</p>
+      </section>
+    );
+  }
+
+  if (file.binary === true) {
+    return (
+      <section
+        id="diff-review"
+        className={styles.panel}
+        aria-labelledby="diff-heading"
+        tabIndex={-1}
+      >
+        <div className={styles.headingRow}>
+          <h2 id="diff-heading">{reviewView(file).heading}</h2>
+          <p>{file.path}</p>
+        </div>
+        <div className={styles.binaryState}>
+          <strong>Binary file</strong>
+          <p>Text diff is not available for this file. Its binary contents were not loaded.</p>
+        </div>
       </section>
     );
   }
 
   const status = outcome?.key === currentKey ? outcome.status : "loading";
+  const view = reviewView(file);
   return (
-    <section className={styles.panel} aria-labelledby="diff-heading">
+    <section
+      id="diff-review"
+      className={styles.panel}
+      aria-labelledby="diff-heading"
+      tabIndex={-1}
+    >
       <div className={styles.headingRow}>
-        <h2 id="diff-heading">좌우 diff</h2>
-        <p>왼쪽 원본 · 오른쪽 통합 결과</p>
+        <h2 id="diff-heading">{view.heading}</h2>
+        <p>{view.description}</p>
       </div>
       {status === "loading" ? (
-        <p aria-live="polite">diff 편집기를 불러오는 중입니다.</p>
+        <p aria-live="polite">Loading diff editor…</p>
       ) : null}
       {status === "error" ? (
         <div role="alert" className={styles.error}>
-          <p>diff 편집기를 열 수 없습니다. 현재 파일의 diff를 다시 열어 주세요.</p>
+          <p>The diff editor could not open. Retry the current file.</p>
           <button type="button" onClick={() => { setRetry((current) => current + 1); }}>
-            diff 다시 열기
+            Retry Diff
           </button>
         </div>
       ) : null}
@@ -107,11 +139,36 @@ export const DiffPane = ({
         aria-multiline="true"
         aria-readonly="true"
         tabIndex={0}
-        aria-label={`읽기 전용 diff: ${file.path} · 원본과 통합 결과`}
+        aria-label={`${view.editorLabel}: ${file.path} · ${view.editorContext}`}
       />
     </section>
   );
 };
+
+interface ReviewView {
+  readonly heading: string;
+  readonly description: string;
+  readonly editorLabel: string;
+  readonly editorContext: string;
+}
+
+/** An added file has no base revision, so it is reviewed as one added document. */
+function reviewView(file: CompositeFile): ReviewView {
+  if (file.status === "added") {
+    return {
+      heading: "Added File",
+      description: "New file · every line is part of the selected result",
+      editorLabel: "Read-only added file",
+      editorContext: "full contents added by the selected result",
+    };
+  }
+  return {
+    heading: "Side-by-side Diff",
+    description: "Base on the left · selected result on the right",
+    editorLabel: "Read-only diff",
+    editorContext: "base and selected result",
+  };
+}
 
 async function loadMonacoAdapter(): Promise<DiffAdapter> {
   const monaco = await import("monaco-editor");

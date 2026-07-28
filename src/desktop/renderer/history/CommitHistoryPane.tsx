@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 
 import type { RangeState } from "../state/app-state.js";
 import { DiagnosticMessage } from "../errors/DiagnosticMessage.js";
-import { CommitDetails } from "./CommitDetails.js";
 import styles from "./CommitHistoryPane.module.css";
 
 interface CommitHistoryPaneProps {
@@ -23,6 +22,7 @@ export const CommitHistoryPane = ({
   onLoadMore,
 }: CommitHistoryPaneProps) => {
   const firstCommitRef = useRef<HTMLInputElement>(null);
+  const firstCommitButtonRef = useRef<HTMLButtonElement>(null);
   const loadMoreRef = useRef<HTMLButtonElement>(null);
   const restorePageFocus = useRef(false);
 
@@ -33,26 +33,58 @@ export const CommitHistoryPane = ({
       range.pagination.status !== "loading"
     ) {
       restorePageFocus.current = false;
-      (loadMoreRef.current ?? firstCommitRef.current)?.focus();
+      (
+        loadMoreRef.current ??
+        firstCommitRef.current ??
+        firstCommitButtonRef.current
+      )?.focus();
     }
   }, [range]);
 
   if (range.status === "idle") {
-    return <section className={styles.panel}><p>브랜치 범위를 먼저 불러와 주세요.</p></section>;
+    return (
+      <section
+        id="commit-history"
+        className={styles.panel}
+        aria-label="Commit History"
+        tabIndex={-1}
+      >
+        <p>Load a comparison range to view commits.</p>
+      </section>
+    );
   }
   if (range.status === "loading") {
-    return <section className={styles.panel} aria-live="polite"><p>커밋 이력을 불러오는 중입니다.</p></section>;
+    return (
+      <section
+        id="commit-history"
+        className={styles.panel}
+        aria-label="Commit History"
+        aria-live="polite"
+        tabIndex={-1}
+      >
+        <p>Loading commit history…</p>
+      </section>
+    );
   }
   if (range.status === "error" || range.status === "stale") {
     return (
-      <section className={styles.panel}>
+      <section
+        id="commit-history"
+        className={styles.panel}
+        aria-label="Commit History"
+        tabIndex={-1}
+      >
         <DiagnosticMessage diagnostic={range.diagnostic} />
       </section>
     );
   }
 
   const selected = new Set(selectedCommitIds);
-  const inspected = range.commits.find((commit) => commit.id === inspectedCommitId) ?? null;
+  const commitsInDisplayOrder = [...range.commits].reverse();
+  const firstSelectableCommitId = commitsInDisplayOrder.find(
+    (commit) => commit.selectable,
+  )?.id;
+  const firstCommitId = commitsInDisplayOrder[0]?.id;
 
   const handleLoadMore = (): void => {
     restorePageFocus.current = true;
@@ -60,55 +92,73 @@ export const CommitHistoryPane = ({
   };
 
   return (
-    <section className={styles.panel} aria-labelledby="commit-history-heading">
+    <section
+      id="commit-history"
+      className={`${styles.panel} ${styles.readyPanel}`}
+      aria-labelledby="commit-history-heading"
+      tabIndex={-1}
+    >
       <div className={styles.headingRow}>
-        <h2 id="commit-history-heading">커밋 이력</h2>
-        <strong>통합 선택 {selectedCommitIds.length}개</strong>
+        <h2 id="commit-history-heading">Commit History</h2>
+        <strong>{selectedCommitIds.length} selected</strong>
       </div>
-      {selectedCommitIds.length === 0 ? (
-        <p className={styles.hint}>통합 결과를 만들려면 하나 이상의 커밋을 선택해 주세요.</p>
-      ) : null}
       {range.commits.length === 0 ? (
-        <p>선택한 브랜치 범위에 표시할 커밋이 없습니다. 다른 브랜치 범위를 선택해 주세요.</p>
+        <p>No commits are available in this range. Choose another branch range.</p>
       ) : (
-        <ol className={styles.commitList} aria-label="최신순 first-parent 커밋">
-          {range.commits.map((commit, index) => {
+        <ol className={styles.commitList} aria-label="First-parent commits, oldest first">
+          {commitsInDisplayOrder.map((commit) => {
             const isInspected = inspectedCommitId === commit.id;
+            const isSelected = selected.has(commit.id);
             return (
               <li
                 key={commit.id}
-                className={isInspected ? styles.inspectedRow : styles.commitRow}
+                className={[
+                  styles.commitRow,
+                  isSelected ? styles.selectedRow : "",
+                  isInspected ? styles.inspectedRow : "",
+                ].join(" ")}
               >
                 <label className={styles.selection}>
                   <input
-                    ref={index === 0 ? firstCommitRef : undefined}
+                    ref={commit.id === firstSelectableCommitId ? firstCommitRef : undefined}
                     type="checkbox"
                     checked={selected.has(commit.id)}
                     disabled={!commit.selectable}
                     aria-label={commit.selectable
-                      ? `통합에 포함: ${commit.title}`
-                      : `통합에 포함할 수 없음: ${commit.title}`}
+                      ? `Include in selected result: ${commit.title}`
+                      : `Cannot include in selected result: ${commit.title}`}
                     onChange={() => { onToggleCommit(commit.id); }}
                   />
-                  <span aria-hidden="true">통합</span>
                 </label>
                 <button
+                  ref={commit.id === firstCommitId ? firstCommitButtonRef : undefined}
                   type="button"
+                  title={commit.title}
                   className={styles.commitButton}
                   aria-current={isInspected ? "true" : undefined}
-                  aria-label={isInspected
-                    ? `현재 탐색: ${commit.title}`
-                    : `커밋 자세히 보기: ${commit.title}`}
-                  onClick={() => { onInspectCommit(commit.id); }}
+                  aria-label={[
+                    `Inspect commit: ${commit.title}`,
+                    commit.id,
+                    commit.authorName,
+                    commit.authoredAt,
+                    ...(commit.isMerge
+                      ? ["Merge commits cannot be included in the selected result"]
+                      : []),
+                  ].join(" · ")}
+                  onClick={() => {
+                    onInspectCommit(commit.id);
+                  }}
                 >
                   <span className={styles.commitTitle}>{commit.title}</span>
                   <span className={styles.metadata}>
-                    <code>{commit.shortId}</code>
+                    <code title={commit.id}>{commit.shortId}</code>
+                    <time dateTime={commit.authoredAt} title={commit.authoredAt}>
+                      {authoredMonthDay(commit.authoredAt)}
+                    </time>
                     <span>{commit.authorName}</span>
-                    <time dateTime={commit.authoredAt}>{commit.authoredAt}</time>
                   </span>
                   {commit.isMerge ? (
-                    <span className={styles.merge}>병합 커밋 · 선택할 수 없음</span>
+                    <span className={styles.merge}>Merge commit · unavailable</span>
                   ) : null}
                 </button>
               </li>
@@ -124,14 +174,26 @@ export const CommitHistoryPane = ({
           onClick={handleLoadMore}
         >
           {range.pagination.status === "loading"
-            ? "이전 커밋 불러오는 중"
-            : "이전 커밋 100개 더 불러오기"}
+            ? "Loading older commits…"
+            : "Load 100 older commits"}
         </button>
       )}
       {range.pagination.status === "error" ? (
         <DiagnosticMessage diagnostic={range.pagination.diagnostic} />
       ) : null}
-      <CommitDetails commit={inspected} />
     </section>
   );
 };
+
+/**
+ * The commit card is one line, so only the authored month and day are shown.
+ * The full timestamp stays available as the machine-readable and hover value.
+ */
+function authoredMonthDay(authoredAt: string): string {
+  const authoredDay = authoredAt.split("T")[0] ?? authoredAt;
+  const [, month, dayOfMonth] = authoredDay.split("-");
+  if (month === undefined || dayOfMonth === undefined) {
+    return authoredDay;
+  }
+  return `${month}-${dayOfMonth}`;
+}

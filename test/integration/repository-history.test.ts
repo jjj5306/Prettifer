@@ -56,7 +56,7 @@ describe("RepositoryHistoryService", () => {
       expect.objectContaining<Partial<RepositoryHistoryError>>({
         code: "INVALID_REPOSITORY",
         subject: resolve(temporaryPath),
-        nextAction: "다른 Git 저장소 폴더를 선택해 주세요.",
+        nextAction: "Choose another Git repository folder.",
       }),
     );
   });
@@ -70,7 +70,7 @@ describe("RepositoryHistoryService", () => {
     await expect(service.getRepository(process.cwd())).rejects.toEqual(
       expect.objectContaining<Partial<RepositoryHistoryError>>({
         code: "GIT_UNAVAILABLE",
-        nextAction: "Git을 설치하거나 실행 경로를 확인한 뒤 다시 시도해 주세요.",
+        nextAction: "Install Git or check its executable path, then try again.",
       }),
     );
   });
@@ -149,7 +149,7 @@ describe("RepositoryHistoryService", () => {
       expect.objectContaining<Partial<RepositoryHistoryError>>({
         code: "RANGE_STALE",
         subject: mutableFixture.headRef,
-        nextAction: "브랜치 이력을 새로 불러온 뒤 다시 선택해 주세요.",
+        nextAction: "Reload the branch history, then select the commits again.",
       }),
     );
     await expect(
