@@ -69,6 +69,11 @@ export default tseslint.config(
       "react/no-array-index-key": "error",
       "react/no-danger": "error",
       "react/prop-types": "off",
+      // The ARIA window splitter pattern puts tabindex on role="separator".
+      "jsx-a11y/no-noninteractive-tabindex": [
+        "error",
+        { tags: [], roles: ["tabpanel", "separator"], allowExpressionValues: true },
+      ],
       "no-restricted-imports": [
         "error",
         {

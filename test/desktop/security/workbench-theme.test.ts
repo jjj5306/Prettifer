@@ -18,5 +18,12 @@ describe("desktop workbench theme", () => {
     expect(styles).toContain("--color-added: #5bb98c");
     expect(styles).toContain("--color-deleted: #e06c75");
     expect(styles).toContain("--color-modified: #f9bc45");
+    expect(styles).toContain('--font-ui: "Hanken Grotesk Variable"');
+    expect(styles).toContain('--font-code: "Geist Variable"');
+    expect(styles).toContain("grid-template-columns: 3.25rem minmax(0, 1fr)");
+    expect(styles).toContain("--bar-height: 3rem");
+    expect(styles).toContain("grid-template-rows: var(--bar-height) minmax(0, 1fr)");
+    expect(styles).toContain("min-height: 70vh");
+    expect(styles).toContain("font-size: 0.875rem");
   });
 });

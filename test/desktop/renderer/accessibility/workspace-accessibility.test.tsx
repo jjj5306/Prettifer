@@ -89,6 +89,10 @@ describe("desktop workspace accessibility", () => {
     render(<StrictMode><DesktopWorkspace controller={createController()} /></StrictMode>);
 
     await user.tab();
+    expect(screen.getByRole("button", { name: "Repository" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Commit History" })).toHaveFocus();
+    await user.tab();
     expect(screen.getByRole("button", { name: "Change Repository" })).toHaveFocus();
     await user.tab();
     expect(screen.getByRole("combobox", { name: "Base branch" })).toHaveFocus();
@@ -105,12 +109,32 @@ describe("desktop workspace accessibility", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: "Prettifer" })).toBeVisible();
     expect(screen.getByRole("heading", { level: 2, name: "Repository and comparison range" })).toBeVisible();
-    expect(screen.getByRole("heading", { level: 2, name: "Commit Timeline" })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 2, name: "Commit History" })).toBeVisible();
     expect(
-      within(screen.getByRole("region", { name: "Commit Timeline" })).getByText(
+      within(screen.getByRole("region", { name: "Commit History" })).getByText(
         "0 selected",
       ),
     ).toBeVisible();
+  });
+
+  it("provides an activity rail for each available review region", async () => {
+    const user = userEvent.setup();
+    render(<StrictMode><DesktopWorkspace controller={createController()} /></StrictMode>);
+
+    const rail = screen.getByRole("navigation", { name: "Workbench" });
+    expect(within(rail).getByRole("button", { name: "Repository" })).toBeEnabled();
+    expect(within(rail).getByRole("button", { name: "Commit History" })).toBeEnabled();
+    expect(within(rail).getByRole("button", { name: "Changed Files" })).toBeDisabled();
+    expect(within(rail).getByRole("button", { name: "Diff Review" })).toBeDisabled();
+
+    const repository = within(rail).getByRole("button", { name: "Repository" });
+    const timeline = within(rail).getByRole("button", { name: "Commit History" });
+    expect(repository).toHaveAttribute("aria-current", "page");
+
+    await user.click(timeline);
+    expect(screen.getByRole("region", { name: "Commit History" })).toHaveFocus();
+    expect(timeline).toHaveAttribute("aria-current", "page");
+    expect(repository).not.toHaveAttribute("aria-current");
   });
 
   it("continues keyboard order through calculation, files and accessible diff", async () => {
@@ -118,21 +142,84 @@ describe("desktop workspace accessibility", () => {
     render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
 
     const expected = [
+      screen.getByRole("button", { name: "Repository" }),
+      screen.getByRole("button", { name: "Commit History" }),
+      screen.getByRole("button", { name: "Changed Files" }),
+      screen.getByRole("button", { name: "Diff Review" }),
       screen.getByRole("button", { name: "Change Repository" }),
       screen.getByRole("combobox", { name: "Base branch" }),
       screen.getByRole("combobox", { name: "Working branch" }),
       screen.getByRole("button", { name: "Load Commit Range" }),
       screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` }),
-      screen.getByRole("button", { name: `Inspect commit: ${firstCommit.title}` }),
+      screen.getByRole("button", { name: `Deselect and inspect commit: ${firstCommit.title}` }),
       screen.getByRole("button", { name: "Rebuild Selected Result" }),
       screen.getByRole("button", { name: "Tree View" }),
       screen.getByRole("button", { name: "List View" }),
       screen.getByRole("button", { name: "Currently viewing file: src/app.ts (Modified)" }),
+      screen.getByRole("separator", { name: "Resize Changed Files" }),
       screen.getByRole("textbox", { name: "Read-only diff: src/app.ts · base and selected result" }),
     ];
     for (const element of expected) {
       await user.tab();
       expect(element).toHaveFocus();
     }
+  });
+
+  it("keeps the resized review pane width across file and view changes", async () => {
+    const user = userEvent.setup();
+    const controller = createController(true);
+    render(<StrictMode><DesktopWorkspace controller={controller} /></StrictMode>);
+
+    const separator = screen.getByRole("separator", { name: "Resize Changed Files" });
+    separator.focus();
+    await user.keyboard("{ArrowRight}{ArrowRight}");
+    expect(separator).toHaveAttribute("aria-valuenow", "320");
+
+    await user.click(screen.getByRole("button", { name: "Tree View" }));
+    await user.click(screen.getByRole("button", {
+      name: "Currently viewing file: src/app.ts (Modified)",
+    }));
+
+    expect(screen.getByRole("separator", { name: "Resize Changed Files" }))
+      .toHaveAttribute("aria-valuenow", "320");
+    expect(controller.selectFile).toHaveBeenCalledWith("src/app.ts");
+  });
+
+  it("keeps the resized review pane width across a rebuilt result", async () => {
+    const user = userEvent.setup();
+    const ready = createController(true);
+    const rebuilding: AppController = {
+      ...ready,
+      state: {
+        ...ready.state,
+        composition: {
+          status: "loading",
+          requestId: "composition-2",
+          sessionRevision: 1,
+          rangeRevision: `${baseCommit}:${headCommit}:${commonCommit}`,
+        },
+      },
+    };
+    const { rerender } = render(
+      <StrictMode><DesktopWorkspace controller={ready} /></StrictMode>,
+    );
+
+    screen.getByRole("separator", { name: "Resize Changed Files" }).focus();
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("separator", { name: "Resize Changed Files" }))
+      .toHaveAttribute("aria-valuenow", "304");
+
+    rerender(<StrictMode><DesktopWorkspace controller={rebuilding} /></StrictMode>);
+    expect(screen.queryByRole("separator", { name: "Resize Changed Files" })).toBeNull();
+
+    rerender(<StrictMode><DesktopWorkspace controller={ready} /></StrictMode>);
+    expect(screen.getByRole("separator", { name: "Resize Changed Files" }))
+      .toHaveAttribute("aria-valuenow", "304");
+  });
+
+  it("does not offer the review pane splitter before a result exists", () => {
+    render(<StrictMode><DesktopWorkspace controller={createController()} /></StrictMode>);
+
+    expect(screen.queryByRole("separator", { name: "Resize Changed Files" })).toBeNull();
   });
 });

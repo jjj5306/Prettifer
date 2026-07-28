@@ -13,7 +13,8 @@ describe("responsive and Windows accessibility styles", () => {
 
     expect(appStyles).toMatch(/@media \(max-width: 64rem\)/u);
     expect(appStyles).toContain("grid-template-columns: minmax(0, 1fr)");
-    expect(historyStyles).toContain("overflow: auto");
+    expect(historyStyles).toContain("overflow-x: auto");
+    expect(historyStyles).toContain("overflow-y: hidden");
     expect(historyStyles).toContain("min-width: 0");
   });
 

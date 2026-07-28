@@ -63,10 +63,7 @@ test("runs the packaged Windows app through its main flow and exits normally", a
   await page.reload({ waitUntil: "domcontentloaded" });
 
   await page.getByRole("button", { name: "Open Repository" }).click();
-  await expect(
-    page.getByRole("region", { name: "Repository and comparison range" })
-      .getByText(fixture.path),
-  ).toBeVisible();
+  await expect(page.getByText(fixture.path, { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Load Commit Range" }).click();
   await page.getByRole("checkbox", {
     name: "Include in selected result: feat(auth): validate login request",
