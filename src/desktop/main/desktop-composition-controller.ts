@@ -175,6 +175,17 @@ function publicCompositionDiagnostic(diagnostic: {
       nextAction: diagnostic.nextAction,
     };
   }
+  if (
+    diagnostic.code === "REPOSITORY_LOCKED" ||
+    diagnostic.code === "REPOSITORY_PERMISSION_DENIED" ||
+    diagnostic.code === "INSUFFICIENT_STORAGE"
+  ) {
+    return {
+      code: diagnostic.code,
+      message: diagnostic.message,
+      nextAction: diagnostic.nextAction,
+    };
+  }
   return {
     code: "COMPOSITION_FAILED",
     message: "The selected result could not be calculated.",

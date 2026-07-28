@@ -7,6 +7,12 @@ import {
   type CompositeFileChange,
 } from "../../src/composition/composite-diff-service.js";
 import {
+  GitCommandError,
+  GitCommandRunner,
+  type GitRunOptions,
+  type ProcessOutput,
+} from "../../src/git/git-command-runner.js";
+import {
   createAuthHistoryFixture,
   type GitFixture,
 } from "../support/git-fixture.js";
@@ -121,6 +127,28 @@ describe("CompositeDiffService", () => {
     expect(second).toEqual(first);
   });
 
+  it("limits concurrent Git processes while collecting paths and file contents", async () => {
+    fixture = await createAuthHistoryFixture();
+    const git = new ConcurrencyTrackingRunner();
+    const service = new CompositeDiffService(git);
+
+    await service.compose({
+      repositoryPath: fixture.path,
+      baseRef: fixture.baseRef,
+      headRef: fixture.headRef,
+      selectedCommits: [
+        fixture.commits.validateLogin,
+        fixture.commits.extractHelpers,
+        fixture.commits.persistSession,
+        fixture.commits.authDocs,
+        fixture.commits.fileLifecycle,
+      ],
+    });
+
+    expect(git.maximumChangedPathRequests).toBe(4);
+    expect(git.maximumContentReadRequests).toBe(4);
+  });
+
   it("identifies a commit that depends on an unselected file-creating commit", async () => {
     fixture = await createAuthHistoryFixture();
     const dependentPath = `${fixture.path}/src/dependent.ts`;
@@ -144,6 +172,18 @@ describe("CompositeDiffService", () => {
       commit: dependent,
     });
 
+    await expect(
+      new CompositeDiffService(new Exit128ConflictRunner()).compose({
+        repositoryPath: fixture.path,
+        baseRef: fixture.baseRef,
+        headRef: fixture.headRef,
+        selectedCommits: [dependent],
+      }),
+    ).rejects.toMatchObject({
+      name: "GitCommandError",
+      exitCode: 128,
+    });
+
     await expect(service.compose({
       repositoryPath: fixture.path,
       baseRef: fixture.baseRef,
@@ -157,6 +197,23 @@ describe("CompositeDiffService", () => {
           afterContent: "export const value = 2;\n",
         }),
       ],
+    });
+  });
+
+  it("preserves a non-conflict Git failure for the caller to diagnose", async () => {
+    fixture = await createAuthHistoryFixture();
+    const service = new CompositeDiffService(
+      new NonConflictCherryPickFailureRunner(),
+    );
+
+    await expect(service.compose({
+      repositoryPath: fixture.path,
+      baseRef: fixture.baseRef,
+      headRef: fixture.headRef,
+      selectedCommits: [fixture.commits.validateLogin],
+    })).rejects.toMatchObject({
+      name: "GitCommandError",
+      stderr: "fatal: could not lock index",
     });
   });
 
@@ -184,3 +241,88 @@ describe("CompositeDiffService", () => {
     });
   });
 });
+
+class NonConflictCherryPickFailureRunner extends GitCommandRunner {
+  override run(
+    gitArguments: readonly string[],
+    options: GitRunOptions,
+  ): Promise<ProcessOutput> {
+    if (gitArguments[0] === "cherry-pick") {
+      return Promise.reject(
+        new GitCommandError(
+          gitArguments,
+          128,
+          "",
+          "fatal: could not lock index",
+        ),
+      );
+    }
+    return super.run(gitArguments, options);
+  }
+}
+
+class Exit128ConflictRunner extends GitCommandRunner {
+  override async run(
+    gitArguments: readonly string[],
+    options: GitRunOptions,
+  ): Promise<ProcessOutput> {
+    try {
+      return await super.run(gitArguments, options);
+    } catch (error) {
+      if (
+        gitArguments[0] !== "cherry-pick" ||
+        !(error instanceof GitCommandError) ||
+        error.exitCode !== 1
+      ) {
+        throw error;
+      }
+      throw new GitCommandError(
+        gitArguments,
+        128,
+        error.stdout,
+        error.stderr,
+        { cause: error },
+      );
+    }
+  }
+}
+
+class ConcurrencyTrackingRunner extends GitCommandRunner {
+  private activeChangedPathRequests = 0;
+  private activeContentReadRequests = 0;
+  maximumChangedPathRequests = 0;
+  maximumContentReadRequests = 0;
+
+  override async run(
+    gitArguments: readonly string[],
+    options: GitRunOptions,
+  ): Promise<ProcessOutput> {
+    if (gitArguments[0] === "diff-tree") {
+      this.activeChangedPathRequests += 1;
+      this.maximumChangedPathRequests = Math.max(
+        this.maximumChangedPathRequests,
+        this.activeChangedPathRequests,
+      );
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return await super.run(gitArguments, options);
+      } finally {
+        this.activeChangedPathRequests -= 1;
+      }
+    }
+    if (gitArguments[0] === "show") {
+      this.activeContentReadRequests += 1;
+      this.maximumContentReadRequests = Math.max(
+        this.maximumContentReadRequests,
+        this.activeContentReadRequests,
+      );
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return await super.run(gitArguments, options);
+      } finally {
+        this.activeContentReadRequests -= 1;
+      }
+    }
+    return super.run(gitArguments, options);
+  }
+}

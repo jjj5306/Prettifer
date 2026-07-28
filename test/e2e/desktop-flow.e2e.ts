@@ -58,12 +58,12 @@ test("opens a repository, selects non-contiguous commits and reviews file diff",
 
   await openRepository(running.page, fixture.path);
   await running.page.getByRole("button", { name: "Load Commit Range" }).click();
-  await running.page.getByRole("button", {
-    name: "Select and inspect commit: docs(auth): explain session lifecycle",
-  }).click();
-  await running.page.getByRole("button", {
-    name: "Select and inspect commit: feat(auth): validate login request",
-  }).click();
+  await running.page.getByRole("checkbox", {
+    name: "Include in selected result: docs(auth): explain session lifecycle",
+  }).check();
+  await running.page.getByRole("checkbox", {
+    name: "Include in selected result: feat(auth): validate login request",
+  }).check();
   await expect(
     running.page.getByRole("region", { name: "Commit History" }).getByText("2 selected"),
   ).toBeVisible();
@@ -511,7 +511,7 @@ async function launch(
   observeWindow(page);
   await page.waitForLoadState("domcontentloaded");
   if (await page.getByRole("heading", { name: "The app could not be displayed" }).isVisible()) {
-    await page.getByRole("button", { name: "Reload App" }).click();
+    await page.getByRole("button", { name: "Reload Workspace" }).click();
     await page.waitForTimeout(100);
     await page.screenshot({ path: test.info().outputPath("renderer-startup-error.png") });
     throw new Error([

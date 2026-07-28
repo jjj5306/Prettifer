@@ -23,30 +23,40 @@ export const ActivityRail = ({
   activeRegion,
   resultAvailable,
   onActivate,
-}: ActivityRailProps) => (
-  <nav className={styles.rail} aria-label="Workbench">
-    {items.map((item) => {
-      const disabled = (item.id === "files" || item.id === "diff") && !resultAvailable;
-      return (
-        <button
-          key={item.id}
-          type="button"
-          title={item.label}
-          aria-label={item.label}
-          aria-current={item.id === activeRegion ? "page" : undefined}
-          disabled={disabled}
-          className={item.id === activeRegion ? styles.active : undefined}
-          onClick={() => {
-            onActivate(item.id);
-            focusRegion(item.targetId);
-          }}
-        >
-          <RailIcon region={item.id} />
-        </button>
-      );
-    })}
-  </nav>
-);
+}: ActivityRailProps) => {
+  const availableActiveRegion =
+    !resultAvailable && (activeRegion === "files" || activeRegion === "diff")
+      ? "history"
+      : activeRegion;
+
+  return (
+    <nav className={styles.rail} aria-label="Workbench">
+      {items.map((item) => {
+        const disabled =
+          (item.id === "files" || item.id === "diff") && !resultAvailable;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            title={item.label}
+            aria-label={item.label}
+            aria-current={item.id === availableActiveRegion ? "page" : undefined}
+            disabled={disabled}
+            className={
+              item.id === availableActiveRegion ? styles.active : undefined
+            }
+            onClick={() => {
+              onActivate(item.id);
+              focusRegion(item.targetId);
+            }}
+          >
+            <RailIcon region={item.id} />
+          </button>
+        );
+      })}
+    </nav>
+  );
+};
 
 const RailIcon = ({ region }: Readonly<{ region: WorkbenchRegion }>) => {
   const path = iconPath(region);

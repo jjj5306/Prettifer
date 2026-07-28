@@ -36,7 +36,7 @@ const Harness = ({
           element.getBoundingClientRect = () =>
             ({ left: 0, width: measuredWidth }) as DOMRect;
         }
-        pane.containerRef.current = element;
+        pane.containerRef(element);
       }}
     >
       <div id="changed-files" style={{ width: pane.control.width }} />
@@ -139,6 +139,44 @@ describe("PaneSplitter", () => {
     expect(splitter()).toHaveAttribute("aria-valuemax", "720");
   });
 
+  it("measures the review area that mounts after the splitter state exists", async () => {
+    const user = userEvent.setup();
+    // The review area only mounts once a result exists, so the hook has to
+    // re-measure on attach instead of measuring once when it first runs.
+    const LateContainer = () => {
+      const pane = useResizablePane(limits, 288);
+      const [attached, setAttached] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => { setAttached(true); }}>Build</button>
+          {attached ? (
+            <div
+              ref={(element) => {
+                if (element !== null) {
+                  element.getBoundingClientRect = () =>
+                    ({ left: 0, width: 900 }) as DOMRect;
+                }
+                pane.containerRef(element);
+              }}
+            />
+          ) : null}
+          <PaneSplitter
+            label="Resize Changed Files"
+            controls="changed-files"
+            pane={pane.control}
+          />
+        </>
+      );
+    };
+    render(<LateContainer />);
+    expect(splitter()).toHaveAttribute("aria-valuemax", "720");
+
+    await user.click(screen.getByRole("button", { name: "Build" }));
+
+    // 900 review area minus the 384 the diff pane keeps.
+    expect(splitter()).toHaveAttribute("aria-valuemax", "516");
+  });
+
   it("shrinks the pane back into range when the window becomes narrower", () => {
     let measuredWidth = 1024;
     const Narrowing = () => {
@@ -150,7 +188,7 @@ describe("PaneSplitter", () => {
               element.getBoundingClientRect = () =>
                 ({ left: 0, width: measuredWidth }) as DOMRect;
             }
-            pane.containerRef.current = element;
+            pane.containerRef(element);
           }}
         >
           <PaneSplitter label="Resize Changed Files" controls="changed-files" pane={pane.control} />

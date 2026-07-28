@@ -22,6 +22,7 @@ export const CommitHistoryPane = ({
   onLoadMore,
 }: CommitHistoryPaneProps) => {
   const firstCommitRef = useRef<HTMLInputElement>(null);
+  const firstCommitButtonRef = useRef<HTMLButtonElement>(null);
   const loadMoreRef = useRef<HTMLButtonElement>(null);
   const restorePageFocus = useRef(false);
 
@@ -32,7 +33,11 @@ export const CommitHistoryPane = ({
       range.pagination.status !== "loading"
     ) {
       restorePageFocus.current = false;
-      (loadMoreRef.current ?? firstCommitRef.current)?.focus();
+      (
+        loadMoreRef.current ??
+        firstCommitRef.current ??
+        firstCommitButtonRef.current
+      )?.focus();
     }
   }, [range]);
 
@@ -79,6 +84,7 @@ export const CommitHistoryPane = ({
   const firstSelectableCommitId = commitsInDisplayOrder.find(
     (commit) => commit.selectable,
   )?.id;
+  const firstCommitId = commitsInDisplayOrder[0]?.id;
 
   const handleLoadMore = (): void => {
     restorePageFocus.current = true;
@@ -125,18 +131,21 @@ export const CommitHistoryPane = ({
                   />
                 </label>
                 <button
+                  ref={commit.id === firstCommitId ? firstCommitButtonRef : undefined}
                   type="button"
                   title={commit.title}
                   className={styles.commitButton}
                   aria-current={isInspected ? "true" : undefined}
-                  aria-pressed={commit.selectable ? isSelected : undefined}
-                  aria-label={commit.selectable
-                    ? `${isSelected ? "Deselect" : "Select"} and inspect commit: ${commit.title}`
-                    : `Inspect unavailable commit: ${commit.title}`}
+                  aria-label={[
+                    `Inspect commit: ${commit.title}`,
+                    commit.id,
+                    commit.authorName,
+                    commit.authoredAt,
+                    ...(commit.isMerge
+                      ? ["Merge commits cannot be included in the selected result"]
+                      : []),
+                  ].join(" · ")}
                   onClick={() => {
-                    if (commit.selectable) {
-                      onToggleCommit(commit.id);
-                    }
                     onInspectCommit(commit.id);
                   }}
                 >

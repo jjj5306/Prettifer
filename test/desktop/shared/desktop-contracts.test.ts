@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   cancelCompositionRequestSchema,
   commitPageRequestSchema,
+  compositeFileChangeSchema,
   compositionRequestSchema,
   diagnosticSchema,
   rangeRequestSchema,
@@ -103,5 +104,65 @@ describe("desktop shared contracts", () => {
       code: "INVALID_REPOSITORY",
       message: "The Git repository could not be opened.",
     })).toThrow();
+  });
+
+  it.each([
+    {
+      path: "src/new.ts",
+      status: "added",
+      beforeContent: null,
+      afterContent: "new",
+    },
+    {
+      path: "src/app.ts",
+      status: "modified",
+      beforeContent: "old",
+      afterContent: "new",
+    },
+    {
+      path: "src/old.ts",
+      status: "deleted",
+      beforeContent: "old",
+      afterContent: null,
+    },
+    {
+      path: "assets/logo.png",
+      status: "modified",
+      binary: true,
+      beforeContent: null,
+      afterContent: null,
+    },
+  ])("accepts a valid composite file state: $status", (file) => {
+    expect(compositeFileChangeSchema.parse(file)).toEqual(file);
+  });
+
+  it.each([
+    {
+      path: "src/new.ts",
+      status: "added",
+      beforeContent: null,
+      afterContent: null,
+    },
+    {
+      path: "src/app.ts",
+      status: "modified",
+      beforeContent: null,
+      afterContent: "new",
+    },
+    {
+      path: "src/old.ts",
+      status: "deleted",
+      beforeContent: "old",
+      afterContent: "new",
+    },
+    {
+      path: "assets/logo.png",
+      status: "modified",
+      binary: true,
+      beforeContent: "decoded",
+      afterContent: null,
+    },
+  ])("rejects an impossible composite file state: $status", (file) => {
+    expect(() => compositeFileChangeSchema.parse(file)).toThrow();
   });
 });

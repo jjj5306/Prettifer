@@ -171,6 +171,72 @@ describe("DesktopCompositionController", () => {
     });
   });
 
+  it.each([
+    {
+      code: "REPOSITORY_LOCKED",
+      message: "The repository is busy with another Git operation.",
+      nextAction: "Wait for other Git operations to finish, then try again.",
+    },
+    {
+      code: "REPOSITORY_PERMISSION_DENIED",
+      message: "The selected result could not access the repository workspace.",
+      nextAction: "Check repository and temporary-folder permissions, then try again.",
+    },
+    {
+      code: "INSUFFICIENT_STORAGE",
+      message: "The selected result could not be built because available storage is insufficient.",
+      nextAction: "Free storage space on the repository or system drive, then try again.",
+    },
+  ])("publishes the safe $code diagnostic", async (diagnostic) => {
+    const controller = new DesktopCompositionController(
+      { assertCompositionInput: vi.fn().mockResolvedValue(undefined) },
+      {
+        update: vi.fn().mockResolvedValue({
+          status: "error",
+          selectedCommits: [selectedCommit],
+          diagnostic,
+        }),
+        cancel: vi.fn(),
+      },
+    );
+
+    await expect(controller.compose(request, "C:\\work\\repo")).resolves.toEqual({
+      status: "error",
+      diagnostic,
+    });
+  });
+
+  it("redacts an unrecognized coordinator diagnostic", async () => {
+    const secret = "C:\\Users\\secret\\prettifer-worktree";
+    const controller = new DesktopCompositionController(
+      { assertCompositionInput: vi.fn().mockResolvedValue(undefined) },
+      {
+        update: vi.fn().mockResolvedValue({
+          status: "error",
+          selectedCommits: [selectedCommit],
+          diagnostic: {
+            code: "FUTURE_INTERNAL_FAILURE",
+            message: secret,
+            nextAction: secret,
+          },
+        }),
+        cancel: vi.fn(),
+      },
+    );
+
+    const result = await controller.compose(request, "C:\\work\\repo");
+
+    expect(result).toEqual({
+      status: "error",
+      diagnostic: {
+        code: "COMPOSITION_FAILED",
+        message: "The selected result could not be calculated.",
+        nextAction: "Check the repository and selected commits, then try again.",
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain(secret);
+  });
+
   it("publishes only the newest request when an older validation finishes late", async () => {
     const validation = deferredSignal();
     const history = {

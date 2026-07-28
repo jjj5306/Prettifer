@@ -26,7 +26,7 @@ export const ChangedFilePane = ({
   const [collapsedDirectories, setCollapsedDirectories] = useState<ReadonlySet<string>>(
     new Set<string>(),
   );
-  const tree = buildFileTree(result.files);
+  const tree = view === "tree" ? buildFileTree(result.files) : [];
 
   const handleToggleDirectory = (path: string) => {
     setCollapsedDirectories((current) => {

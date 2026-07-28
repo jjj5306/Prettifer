@@ -9,9 +9,10 @@ import {
 import styles from "./DiffPane.module.css";
 
 type CompositeFile = CompositeDiffResultDto["files"][number];
+type TextCompositeFile = Exclude<CompositeFile, { binary: true }>;
 
 interface DiffAdapter {
-  show(host: HTMLElement, identity: DiffIdentity, file: CompositeFile): void;
+  show(host: HTMLElement, identity: DiffIdentity, file: TextCompositeFile): void;
   dispose(): void;
 }
 

@@ -137,6 +137,28 @@ describe("desktop workspace accessibility", () => {
     expect(repository).not.toHaveAttribute("aria-current");
   });
 
+  it("does not mark a disabled review region as current while rebuilding", async () => {
+    const user = userEvent.setup();
+    const ready = createController(true);
+    const { rerender } = render(
+      <StrictMode><DesktopWorkspace controller={ready} /></StrictMode>,
+    );
+    const files = screen.getByRole("button", { name: "Changed Files" });
+
+    await user.click(files);
+    expect(files).toHaveAttribute("aria-current", "page");
+
+    rerender(
+      <StrictMode><DesktopWorkspace controller={createController()} /></StrictMode>,
+    );
+
+    expect(screen.getByRole("button", { name: "Changed Files" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Changed Files" }))
+      .not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("button", { name: "Commit History" }))
+      .toHaveAttribute("aria-current", "page");
+  });
+
   it("continues keyboard order through calculation, files and accessible diff", async () => {
     const user = userEvent.setup();
     render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
@@ -151,7 +173,14 @@ describe("desktop workspace accessibility", () => {
       screen.getByRole("combobox", { name: "Working branch" }),
       screen.getByRole("button", { name: "Load Commit Range" }),
       screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` }),
-      screen.getByRole("button", { name: `Deselect and inspect commit: ${firstCommit.title}` }),
+      screen.getByRole("button", {
+        name: [
+          `Inspect commit: ${firstCommit.title}`,
+          firstCommit.id,
+          firstCommit.authorName,
+          firstCommit.authoredAt,
+        ].join(" · "),
+      }),
       screen.getByRole("button", { name: "Rebuild Selected Result" }),
       screen.getByRole("button", { name: "Tree View" }),
       screen.getByRole("button", { name: "List View" }),

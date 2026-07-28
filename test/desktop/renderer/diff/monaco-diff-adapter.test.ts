@@ -70,17 +70,30 @@ const identity = {
 
 describe("MonacoDiffAdapter", () => {
   it.each([
-    ["modified", "before", "after"],
-    ["deleted", "before", ""],
-  ] as const)("creates read-only %s models", (status, expectedBefore, expectedAfter) => {
+    [
+      {
+        path: "src/app.ts",
+        status: "modified",
+        beforeContent: "before",
+        afterContent: "after",
+      },
+      "before",
+      "after",
+    ],
+    [
+      {
+        path: "src/app.ts",
+        status: "deleted",
+        beforeContent: "before",
+        afterContent: null,
+      },
+      "before",
+      "",
+    ],
+  ] as const)("creates read-only $0.status models", (file, expectedBefore, expectedAfter) => {
     const fixture = createMonaco();
     const adapter = new MonacoDiffAdapter(fixture.monaco);
-    adapter.show(document.createElement("div"), identity, {
-      path: "src/app.ts",
-      status,
-      beforeContent: "before",
-      afterContent: status === "deleted" ? null : "after",
-    });
+    adapter.show(document.createElement("div"), identity, file);
 
     expect(fixture.models.map((model) => model.value)).toEqual([expectedBefore, expectedAfter]);
     expect(fixture.models.map((model) => model.language)).toEqual(["typescript", "typescript"]);
@@ -208,5 +221,113 @@ describe("MonacoDiffAdapter", () => {
     }).toThrow("editor failed");
     expect(fixture.models[0]?.dispose).toHaveBeenCalledOnce();
     expect(fixture.models[1]?.dispose).toHaveBeenCalledOnce();
+  });
+
+  it("disposes an added editor and model when model attachment fails", () => {
+    const fixture = createMonaco();
+    fixture.monaco.editor.create = (_host: HTMLElement, options: unknown) => {
+      const editor = {
+        setModel: vi.fn(() => { throw new Error("set model failed"); }),
+        createDecorationsCollection: vi.fn(),
+        dispose: vi.fn(),
+        options,
+      };
+      fixture.addedEditors.push(editor);
+      return editor;
+    };
+    const adapter = new MonacoDiffAdapter(fixture.monaco);
+
+    expect(() => {
+      adapter.show(document.createElement("div"), identity, {
+        path: "src/new.ts",
+        status: "added",
+        beforeContent: null,
+        afterContent: "new",
+      });
+    }).toThrow("set model failed");
+    expect(fixture.addedEditors[0]?.dispose).toHaveBeenCalledOnce();
+    expect(fixture.models[0]?.dispose).toHaveBeenCalledOnce();
+  });
+
+  it("disposes an added editor and model when decoration setup fails", () => {
+    const fixture = createMonaco();
+    fixture.monaco.editor.create = (_host: HTMLElement, options: unknown) => {
+      const editor = {
+        setModel: vi.fn(),
+        createDecorationsCollection: vi.fn(() => {
+          throw new Error("decorations failed");
+        }),
+        dispose: vi.fn(),
+        options,
+      };
+      fixture.addedEditors.push(editor);
+      return editor;
+    };
+    const adapter = new MonacoDiffAdapter(fixture.monaco);
+
+    expect(() => {
+      adapter.show(document.createElement("div"), identity, {
+        path: "src/new.ts",
+        status: "added",
+        beforeContent: null,
+        afterContent: "new",
+      });
+    }).toThrow("decorations failed");
+    expect(fixture.addedEditors[0]?.dispose).toHaveBeenCalledOnce();
+    expect(fixture.models[0]?.dispose).toHaveBeenCalledOnce();
+  });
+
+  it("disposes a diff editor and both models when model attachment fails", () => {
+    const fixture = createMonaco();
+    fixture.monaco.editor.createDiffEditor = (
+      _host: HTMLElement,
+      options: unknown,
+    ) => {
+      const editor = {
+        setModel: vi.fn(() => { throw new Error("set diff model failed"); }),
+        dispose: vi.fn(),
+        options,
+      };
+      fixture.editors.push(editor);
+      return editor;
+    };
+    const adapter = new MonacoDiffAdapter(fixture.monaco);
+
+    expect(() => {
+      adapter.show(document.createElement("div"), identity, {
+        path: "src/app.ts",
+        status: "modified",
+        beforeContent: "old",
+        afterContent: "new",
+      });
+    }).toThrow("set diff model failed");
+    expect(fixture.editors[0]?.dispose).toHaveBeenCalledOnce();
+    expect(fixture.models[0]?.dispose).toHaveBeenCalledOnce();
+    expect(fixture.models[1]?.dispose).toHaveBeenCalledOnce();
+  });
+
+  it("disposes the first model when creating the second model fails", () => {
+    const fixture = createMonaco();
+    const createModel = fixture.monaco.editor.createModel;
+    let modelCount = 0;
+    fixture.monaco.editor.createModel = (value, language, uri) => {
+      modelCount += 1;
+      if (modelCount === 2) {
+        throw new Error("result model failed");
+      }
+      return createModel(value, language, uri);
+    };
+    const adapter = new MonacoDiffAdapter(fixture.monaco);
+
+    expect(() => {
+      adapter.show(document.createElement("div"), identity, {
+        path: "src/app.ts",
+        status: "modified",
+        beforeContent: "old",
+        afterContent: "new",
+      });
+    }).toThrow("result model failed");
+    expect(fixture.models[0]?.dispose).toHaveBeenCalledOnce();
+    expect(fixture.editors).toHaveLength(0);
   });
 });

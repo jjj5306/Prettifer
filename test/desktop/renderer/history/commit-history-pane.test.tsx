@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { StrictMode, useState } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -36,6 +36,19 @@ const secondCommit = {
   title: "refine desktop navigation",
   authoredAt: "2026-07-23T00:02:00.000Z",
 };
+const firstCommitCardName = [
+  `Inspect commit: ${firstCommit.title}`,
+  firstCommit.id,
+  firstCommit.authorName,
+  firstCommit.authoredAt,
+].join(" · ");
+const mergeCommitCardName = [
+  `Inspect commit: ${mergeCommit.title}`,
+  mergeCommit.id,
+  mergeCommit.authorName,
+  mergeCommit.authoredAt,
+  "Merge commits cannot be included in the selected result",
+].join(" · ");
 const range = {
   baseRef: "main",
   baseRefCommit: "f".repeat(40),
@@ -141,20 +154,24 @@ describe("CommitHistoryPane", () => {
 
     expect(screen.getByText("1 selected")).toBeVisible();
     expect(screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` })).toBeChecked();
-    expect(screen.getByRole("button", {
-      name: `Inspect unavailable commit: ${mergeCommit.title}`,
-    })).toHaveAttribute("aria-current", "true");
-    expect(screen.getByText(mergeCommit.shortId)).toHaveAttribute("title", mergeCommit.id);
+    const inspectedMerge = screen.getByRole("button", { name: mergeCommitCardName });
+    expect(inspectedMerge).toHaveAttribute("aria-current", "true");
+    expect(inspectedMerge).toHaveAttribute("title", mergeCommit.title);
+    expect(within(inspectedMerge).getByText(mergeCommit.shortId))
+      .toHaveAttribute("title", mergeCommit.id);
+    expect(within(inspectedMerge).getByText(mergeCommit.authorName)).toBeVisible();
+    expect(within(inspectedMerge).getByText("07-23"))
+      .toHaveAttribute("title", mergeCommit.authoredAt);
 
     await user.click(screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` }));
-    await user.click(screen.getByRole("button", {
-      name: `Deselect and inspect commit: ${firstCommit.title}`,
-    }));
+    await user.click(screen.getByRole("button", { name: firstCommitCardName }));
+    expect(onToggleCommit).toHaveBeenCalledOnce();
     expect(onToggleCommit).toHaveBeenCalledWith(firstCommit.id);
+    expect(onInspectCommit).toHaveBeenCalledOnce();
     expect(onInspectCommit).toHaveBeenCalledWith(firstCommit.id);
   });
 
-  it("selects multiple commits from their card bodies and updates the count", async () => {
+  it("selects commits only from their checkboxes and keeps card inspection separate", async () => {
     const user = userEvent.setup();
     const InteractiveHistory = () => {
       const [selectedCommitIds, setSelectedCommitIds] = useState<string[]>([]);
@@ -176,11 +193,11 @@ describe("CommitHistoryPane", () => {
     };
     render(<InteractiveHistory />);
 
-    await user.click(screen.getByRole("button", {
-      name: `Select and inspect commit: ${firstCommit.title}`,
+    await user.click(screen.getByRole("checkbox", {
+      name: `Include in selected result: ${firstCommit.title}`,
     }));
-    await user.click(screen.getByRole("button", {
-      name: `Select and inspect commit: ${secondCommit.title}`,
+    await user.click(screen.getByRole("checkbox", {
+      name: `Include in selected result: ${secondCommit.title}`,
     }));
 
     expect(screen.getByText("2 selected")).toBeVisible();
@@ -190,6 +207,11 @@ describe("CommitHistoryPane", () => {
     expect(screen.getByRole("checkbox", {
       name: `Include in selected result: ${secondCommit.title}`,
     })).toBeChecked();
+
+    await user.click(screen.getByRole("button", { name: firstCommitCardName }));
+    expect(screen.getByText("2 selected")).toBeVisible();
+    expect(screen.getByRole("button", { name: firstCommitCardName }))
+      .toHaveAttribute("aria-current", "true");
   });
 
   it("reports an empty selection in the compact heading", () => {
@@ -280,5 +302,34 @@ describe("CommitHistoryPane", () => {
       </StrictMode>,
     );
     expect(screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` })).toHaveFocus();
+  });
+
+  it("restores focus to the first commit card when no commit is selectable", async () => {
+    const user = userEvent.setup();
+    const onLoadMore = vi.fn();
+    const { rerender } = render(
+      <CommitHistoryPane
+        range={readyRange({ commits: [mergeCommit] })}
+        selectedCommitIds={[]}
+        inspectedCommitId={null}
+        onToggleCommit={vi.fn()}
+        onInspectCommit={vi.fn()}
+        onLoadMore={onLoadMore}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Load 100 older commits" }));
+
+    rerender(
+      <CommitHistoryPane
+        range={readyRange({ commits: [mergeCommit], nextOffset: null })}
+        selectedCommitIds={[]}
+        inspectedCommitId={null}
+        onToggleCommit={vi.fn()}
+        onInspectCommit={vi.fn()}
+        onLoadMore={onLoadMore}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: mergeCommitCardName })).toHaveFocus();
   });
 });

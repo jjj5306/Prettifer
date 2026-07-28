@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useState } from "react";
 
 export interface PaneWidthLimits {
   readonly minimum: number;
@@ -18,7 +18,7 @@ export interface PaneWidthControl {
 
 export interface ResizablePane {
   /** Attach to the element the pane width is measured against. */
-  readonly containerRef: RefObject<HTMLDivElement | null>;
+  readonly containerRef: (element: HTMLDivElement | null) => void;
   readonly control: PaneWidthControl;
 }
 
@@ -31,18 +31,20 @@ export function useResizablePane(
   limits: PaneWidthLimits,
   initialWidth: number,
 ): ResizablePane {
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  // The container mounts only once a result exists, so it is tracked as state
+  // to re-measure on attach instead of measuring once when the hook mounts.
+  const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const [requestedWidth, setRequestedWidth] = useState(initialWidth);
   const [containerWidth, setContainerWidth] = useState(0);
 
   useEffect(() => {
     const measure = (): void => {
-      setContainerWidth(containerRef.current?.getBoundingClientRect().width ?? 0);
+      setContainerWidth(container?.getBoundingClientRect().width ?? 0);
     };
     measure();
     window.addEventListener("resize", measure);
     return () => { window.removeEventListener("resize", measure); };
-  }, []);
+  }, [container]);
 
   const maximum = containerWidth <= 0
     // The container is not laid out yet, so only the absolute limit applies.
@@ -50,14 +52,14 @@ export function useResizablePane(
     : clamp(containerWidth - limits.minimumRemaining, limits.minimum, limits.maximum);
 
   return {
-    containerRef,
+    containerRef: setContainer,
     control: {
       width: Math.round(clamp(requestedWidth, limits.minimum, maximum)),
       minimum: limits.minimum,
       maximum,
       setWidth: (width) => { setRequestedWidth(clamp(width, limits.minimum, maximum)); },
       setWidthFromPointer: (clientX) => {
-        const containerLeft = containerRef.current?.getBoundingClientRect().left ?? 0;
+        const containerLeft = container?.getBoundingClientRect().left ?? 0;
         setRequestedWidth(clamp(clientX - containerLeft, limits.minimum, maximum));
       },
     },

@@ -23,6 +23,7 @@ interface MutableDirectory {
   readonly name: string;
   readonly path: string;
   readonly children: FileTreeNode[];
+  readonly directories: Map<string, MutableDirectory>;
 }
 
 /**
@@ -70,19 +71,19 @@ function buildDirectoryTree(
     name: "",
     path: "",
     children: [],
+    directories: new Map(),
   };
 
   for (const file of files) {
     const segments = file.path.split(/[\\/]/u).filter((segment) => segment.length > 0);
     const fileName = segments.at(-1) ?? file.path;
     let parent = root;
+    let directoryPath = "";
 
-    for (const [index, segment] of segments.slice(0, -1).entries()) {
-      const directoryPath = segments.slice(0, index + 1).join("/");
-      const existing = parent.children.find(
-        (node): node is MutableDirectory =>
-          node.kind === "directory" && node.path === directoryPath,
-      );
+    for (const segment of segments.slice(0, -1)) {
+      directoryPath =
+        directoryPath.length === 0 ? segment : `${directoryPath}/${segment}`;
+      const existing = parent.directories.get(segment);
       if (existing !== undefined) {
         parent = existing;
         continue;
@@ -92,7 +93,9 @@ function buildDirectoryTree(
         name: segment,
         path: directoryPath,
         children: [],
+        directories: new Map(),
       };
+      parent.directories.set(segment, directory);
       parent.children.push(directory);
       parent = directory;
     }

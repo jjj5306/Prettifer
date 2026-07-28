@@ -1,6 +1,7 @@
 import type { CompositeDiffResultDto } from "../../shared/index.js";
 
 type CompositeFile = CompositeDiffResultDto["files"][number];
+type TextCompositeFile = Exclude<CompositeFile, { binary: true }>;
 
 /** Monaco decoration class that paints an added line, styled in DiffPane.module.css. */
 export const ADDED_LINE_CLASS_NAME = "prettifer-added-line";
@@ -78,7 +79,7 @@ export class MonacoDiffAdapter {
 
   constructor(private readonly monaco: MonacoApi) {}
 
-  show(host: HTMLElement, identity: DiffIdentity, file: CompositeFile): void {
+  show(host: HTMLElement, identity: DiffIdentity, file: TextCompositeFile): void {
     this.dispose();
     this.resources = file.status === "added"
       ? this.createAddedFileView(host, identity, file)
@@ -99,12 +100,13 @@ export class MonacoDiffAdapter {
   private createAddedFileView(
     host: HTMLElement,
     identity: DiffIdentity,
-    file: CompositeFile,
+    file: Extract<TextCompositeFile, { status: "added" }>,
   ): readonly Disposable[] {
     let model: TextModel | undefined;
+    let editor: CodeEditor | undefined;
     try {
-      model = this.createModel(identity, file, "result", file.afterContent ?? "");
-      const editor = this.monaco.editor.create(host, {
+      model = this.createModel(identity, file, "result", file.afterContent);
+      editor = this.monaco.editor.create(host, {
         ...baseEditorOptions,
         renderLineHighlight: "none",
         ariaLabel: "Read-only contents of a file added by the selected result",
@@ -113,6 +115,7 @@ export class MonacoDiffAdapter {
       editor.createDecorationsCollection([addedLineDecoration(model.getLineCount())]);
       return [editor, model];
     } catch (error) {
+      editor?.dispose();
       model?.dispose();
       throw error;
     }
@@ -121,14 +124,20 @@ export class MonacoDiffAdapter {
   private createComparisonView(
     host: HTMLElement,
     identity: DiffIdentity,
-    file: CompositeFile,
+    file: Exclude<TextCompositeFile, { status: "added" }>,
   ): readonly Disposable[] {
     let originalModel: TextModel | undefined;
     let resultModel: TextModel | undefined;
+    let editor: DiffEditor | undefined;
     try {
-      originalModel = this.createModel(identity, file, "original", file.beforeContent ?? "");
-      resultModel = this.createModel(identity, file, "result", file.afterContent ?? "");
-      const editor = this.monaco.editor.createDiffEditor(host, {
+      originalModel = this.createModel(identity, file, "original", file.beforeContent);
+      resultModel = this.createModel(
+        identity,
+        file,
+        "result",
+        file.afterContent ?? "",
+      );
+      editor = this.monaco.editor.createDiffEditor(host, {
         ...baseEditorOptions,
         originalEditable: false,
         renderSideBySide: true,
@@ -141,6 +150,7 @@ export class MonacoDiffAdapter {
       editor.setModel({ original: originalModel, modified: resultModel });
       return [editor, originalModel, resultModel];
     } catch (error) {
+      editor?.dispose();
       originalModel?.dispose();
       resultModel?.dispose();
       throw error;
@@ -149,7 +159,7 @@ export class MonacoDiffAdapter {
 
   private createModel(
     identity: DiffIdentity,
-    file: CompositeFile,
+    file: TextCompositeFile,
     side: "original" | "result",
     value: string,
   ): TextModel {

@@ -6,6 +6,7 @@ import {
   type CompositeDiffResult,
 } from "../../src/composition/composite-diff-coordinator.js";
 import { SelectionError } from "../../src/composition/selection-planner.js";
+import { GitCommandError } from "../../src/git/git-command-runner.js";
 
 const result = (commit: string): CompositeDiffResult => ({
   baseCommit: "base",
@@ -88,7 +89,89 @@ describe("CompositeDiffCoordinator", () => {
       },
     });
   });
+
+  it.each([
+    {
+      name: "repository lock",
+      stderr:
+        "fatal: Unable to create 'C:\\Users\\secret\\repo\\.git\\index.lock': File exists.",
+      diagnostic: {
+        code: "REPOSITORY_LOCKED",
+        message: "The repository is busy with another Git operation.",
+        nextAction: "Wait for other Git operations to finish, then try again.",
+      },
+    },
+    {
+      name: "repository permission",
+      stderr:
+        "fatal: could not open 'C:\\Users\\secret\\repo\\.git\\index': Permission denied",
+      diagnostic: {
+        code: "REPOSITORY_PERMISSION_DENIED",
+        message: "The selected result could not access the repository workspace.",
+        nextAction: "Check repository and temporary-folder permissions, then try again.",
+      },
+    },
+    {
+      name: "insufficient storage",
+      stderr:
+        "fatal: cannot write 'C:\\Users\\secret\\AppData\\Local\\Temp\\index': No space left on device",
+      diagnostic: {
+        code: "INSUFFICIENT_STORAGE",
+        message: "The selected result could not be built because available storage is insufficient.",
+        nextAction: "Free storage space on the repository or system drive, then try again.",
+      },
+    },
+  ])("classifies a $name failure without exposing Git details", async ({
+    stderr,
+    diagnostic,
+  }) => {
+    const coordinator = new CompositeDiffCoordinator(rejectingCalculator(
+      new GitCommandError(["cherry-pick"], 128, "", stderr),
+    ));
+
+    const state = await coordinator.update(requestFor("selected"));
+
+    expect(state).toEqual({
+      status: "error",
+      selectedCommits: ["selected"],
+      diagnostic,
+    });
+    expect(JSON.stringify(state)).not.toContain("C:\\Users\\secret");
+    expect(JSON.stringify(state)).not.toContain(stderr);
+  });
+
+  it.each([
+    new Error("C:\\Users\\secret\\prettifer-worktree failed"),
+    new GitCommandError(
+      ["cherry-pick"],
+      128,
+      "",
+      "fatal: unexpected failure in C:\\Users\\secret\\prettifer-worktree",
+    ),
+  ])("redacts an unknown calculation failure", async (error) => {
+    const coordinator = new CompositeDiffCoordinator(rejectingCalculator(error));
+
+    const state = await coordinator.update(requestFor("selected"));
+
+    expect(state).toEqual({
+      status: "error",
+      selectedCommits: ["selected"],
+      diagnostic: {
+        code: "COMPOSITION_FAILED",
+        message: "The selected result could not be calculated.",
+        nextAction: "Check the repository and selected commits, then try again.",
+      },
+    });
+    expect(JSON.stringify(state)).not.toContain("C:\\Users\\secret");
+    expect(JSON.stringify(state)).not.toContain("prettifer-worktree");
+  });
 });
+
+function rejectingCalculator(error: Error): CompositeDiffCalculator {
+  return {
+    compose: () => Promise.reject(error),
+  };
+}
 
 function requestFor(commit: string) {
   return {

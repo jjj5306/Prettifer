@@ -1,6 +1,6 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import type { GitCommandRunner } from "../git/git-command-runner.js";
 
@@ -33,6 +33,21 @@ const defaultDirectoryRemover: DirectoryRemover = {
   remove: (path) => rm(path, { force: true, recursive: true }),
 };
 
+interface RepositoryConfigEntry {
+  readonly name: string;
+  readonly value: string;
+}
+
+const CONTENT_CONFIG_PATTERN = [
+  "^(core\\.",
+  "(attributesfile|autocrlf|bigfilethreshold|checkroundtripencoding|eol|",
+  "longpaths|safecrlf|symlinks)",
+  "|merge\\.renormalize|merge\\..*\\.(driver|recursive)",
+  "|filter\\..*\\.(clean|smudge|process|required))$",
+].join("");
+const EXTERNAL_DRIVER_PATTERN =
+  /^(?:merge\..*\.driver|filter\..*\.(?:clean|smudge|process))$/u;
+
 export async function removeDirectoryWithRetries(
   path: string,
   options: DirectoryRemovalOptions,
@@ -57,8 +72,6 @@ export async function removeDirectoryWithRetries(
 }
 
 export class CompositionWorkspaceManager {
-  private sparseInitialization: Promise<void> = Promise.resolve();
-
   constructor(private readonly git: GitCommandRunner) {}
 
   async withWorkspace<T>(
@@ -68,34 +81,192 @@ export class CompositionWorkspaceManager {
     operation: (workspace: CompositionWorkspace) => Promise<T>,
     signal?: AbortSignal,
   ): Promise<T> {
+    const sourceConfiguration = await this.readContentConfiguration(
+      repositoryPath,
+      signal,
+    );
     const root = await mkdtemp(join(tmpdir(), "prettifer-composition-"));
-    const path = join(root, "worktree");
-    let registered = false;
+    const path = join(root, "repository");
 
     try {
-      await this.git.run(["worktree", "add", "--detach", "--no-checkout", path, baseCommit], {
-        cwd: repositoryPath,
-        ...(signal === undefined ? {} : { signal }),
-      });
-      registered = true;
-      await this.prepareSelectedPaths(path, changedPaths, signal);
+      await this.git.run(
+        [
+          "clone",
+          "--quiet",
+          "--no-checkout",
+          "--local",
+          "--no-tags",
+          "--",
+          repositoryPath,
+          path,
+        ],
+        {
+          cwd: root,
+          ...(signal === undefined ? {} : { signal }),
+        },
+      );
+      await this.copyRepositoryAttributes(repositoryPath, path, signal);
+      const requiresFullCheckout = await this.applyContentConfiguration(
+        path,
+        sourceConfiguration,
+        signal,
+      );
+      const disabledHooksPath = join(root, "disabled-hooks");
+      await mkdir(disabledHooksPath);
+      await this.git.run(
+        ["config", "--local", "--replace-all", "core.hooksPath", disabledHooksPath],
+        {
+          cwd: path,
+          ...(signal === undefined ? {} : { signal }),
+        },
+      );
+      await this.prepareSelectedPaths(
+        path,
+        baseCommit,
+        changedPaths,
+        requiresFullCheckout,
+        signal,
+      );
       return await operation({ path, baseCommit });
     } finally {
-      await this.cleanup(repositoryPath, root, path, registered);
+      await removeDirectoryWithRetries(root, {
+        attempts: 3,
+        delayMilliseconds: 25,
+      });
+    }
+  }
+
+  private async readContentConfiguration(
+    repositoryPath: string,
+    signal: AbortSignal | undefined,
+  ): Promise<readonly RepositoryConfigEntry[]> {
+    const result = await this.git.run(
+      ["config", "--includes", "--null", "--get-regexp", CONTENT_CONFIG_PATTERN],
+      {
+        cwd: repositoryPath,
+        acceptedExitCodes: [0, 1],
+        ...(signal === undefined ? {} : { signal }),
+      },
+    );
+    const entries = result.stdout
+      .split("\0")
+      .filter((record) => record.length > 0)
+      .map((record) => {
+        const separator = record.indexOf("\n");
+        if (separator < 0) {
+          throw new Error("The repository Git configuration could not be parsed.");
+        }
+        return {
+          name: record.slice(0, separator),
+          value: record.slice(separator + 1),
+        };
+      });
+    const attributesFile = await this.git.run(
+      [
+        "config",
+        "--includes",
+        "--null",
+        "--path",
+        "--get",
+        "core.attributesFile",
+      ],
+      {
+        cwd: repositoryPath,
+        acceptedExitCodes: [0, 1],
+        ...(signal === undefined ? {} : { signal }),
+      },
+    );
+    if (attributesFile.exitCode === 0) {
+      const [configuredPath] = attributesFile.stdout.split("\0");
+      if (configuredPath === undefined) {
+        throw new Error("The repository attributes file path could not be parsed.");
+      }
+      entries.push({
+        name: "core.attributesfile",
+        value: configuredPath.length === 0
+          ? configuredPath
+          : resolve(repositoryPath, configuredPath),
+      });
+    }
+    return [...new Map(entries.map((entry) => [entry.name, entry])).values()];
+  }
+
+  private async applyContentConfiguration(
+    workspacePath: string,
+    sourceEntries: readonly RepositoryConfigEntry[],
+    signal: AbortSignal | undefined,
+  ): Promise<boolean> {
+    const workspaceEntries = new Map(
+      (
+        await this.readContentConfiguration(workspacePath, signal)
+      ).map((entry) => [entry.name, entry.value]),
+    );
+    let requiresFullCheckout = false;
+    for (const entry of sourceEntries) {
+      if (workspaceEntries.get(entry.name) === entry.value) {
+        continue;
+      }
+      await this.git.run(
+        ["config", "--local", "--replace-all", entry.name, entry.value],
+        {
+          cwd: workspacePath,
+          ...(signal === undefined ? {} : { signal }),
+        },
+      );
+      requiresFullCheckout ||= EXTERNAL_DRIVER_PATTERN.test(entry.name);
+    }
+    return requiresFullCheckout;
+  }
+
+  private async copyRepositoryAttributes(
+    repositoryPath: string,
+    workspacePath: string,
+    signal: AbortSignal | undefined,
+  ): Promise<void> {
+    const [source, target] = await Promise.all([
+      this.git.run(
+        ["rev-parse", "--git-path", "info/attributes"],
+        {
+          cwd: repositoryPath,
+          ...(signal === undefined ? {} : { signal }),
+        },
+      ),
+      this.git.run(
+        ["rev-parse", "--git-path", "info/attributes"],
+        {
+          cwd: workspacePath,
+          ...(signal === undefined ? {} : { signal }),
+        },
+      ),
+    ]);
+    const sourcePath = resolve(repositoryPath, source.stdout.trimEnd());
+    const targetPath = resolve(workspacePath, target.stdout.trimEnd());
+    try {
+      await mkdir(dirname(targetPath), { recursive: true });
+      await copyFile(sourcePath, targetPath);
+    } catch (error) {
+      if (!isFileSystemError(error, "ENOENT")) {
+        throw error;
+      }
     }
   }
 
   private async prepareSelectedPaths(
     workspacePath: string,
+    baseCommit: string,
     changedPaths: readonly string[],
+    requiresFullCheckout: boolean,
     signal: AbortSignal | undefined,
   ): Promise<void> {
     const options = {
       cwd: workspacePath,
       ...(signal === undefined ? {} : { signal }),
     };
-    await this.git.run(["reset", "--mixed", "--quiet", "HEAD"], options);
-    await this.initializeSparseCheckout(options);
+    if (requiresFullCheckout) {
+      await this.git.run(["checkout", "--quiet", "--detach", baseCommit], options);
+      return;
+    }
+    await this.git.run(["sparse-checkout", "init", "--no-cone"], options);
     await this.git.run(
       [
         "sparse-checkout",
@@ -107,60 +278,7 @@ export class CompositionWorkspaceManager {
       ],
       options,
     );
-  }
-
-  private initializeSparseCheckout(options: {
-    cwd: string;
-    signal?: AbortSignal;
-  }): Promise<void> {
-    const initialization = this.sparseInitialization.then(async () => {
-      await this.git.run(["sparse-checkout", "init", "--no-cone"], options);
-    });
-    this.sparseInitialization = initialization.catch(() => undefined);
-    return initialization;
-  }
-
-  private async cleanup(
-    repositoryPath: string,
-    root: string,
-    path: string,
-    registered: boolean,
-  ): Promise<void> {
-    if (registered) {
-      try {
-        await this.git.run(["worktree", "remove", "--force", path], {
-          cwd: repositoryPath,
-        });
-      } catch {
-        // Direct directory removal followed by prune completes the same cleanup.
-      }
-    }
-
-    let directoryError: unknown;
-    try {
-      await removeDirectoryWithRetries(root, {
-        attempts: 3,
-        delayMilliseconds: 25,
-      });
-    } catch (error) {
-      directoryError = error;
-    }
-
-    let pruneError: unknown;
-    try {
-      await this.git.run(["worktree", "prune", "--expire", "now"], {
-        cwd: repositoryPath,
-      });
-    } catch (error) {
-      pruneError = error;
-    }
-
-    if (directoryError !== undefined || pruneError !== undefined) {
-      throw new AggregateError(
-        [directoryError, pruneError].filter((error) => error !== undefined),
-        `Failed to remove the temporary workspace: ${path}`,
-      );
-    }
+    await this.git.run(["checkout", "--quiet", "--detach", baseCommit], options);
   }
 }
 
@@ -169,10 +287,15 @@ function toSparsePattern(path: string): string {
 }
 
 function isRetryableFileSystemError(error: unknown): boolean {
-  if (!(error instanceof Error) || !("code" in error)) {
-    return false;
-  }
-  return error.code === "EPERM" || error.code === "EBUSY" || error.code === "ENOTEMPTY";
+  return (
+    isFileSystemError(error, "EPERM") ||
+    isFileSystemError(error, "EBUSY") ||
+    isFileSystemError(error, "ENOTEMPTY")
+  );
+}
+
+function isFileSystemError(error: unknown, code: string): boolean {
+  return error instanceof Error && "code" in error && error.code === code;
 }
 
 async function delay(milliseconds: number): Promise<void> {

@@ -83,13 +83,39 @@ export const cancelCompositionRequestSchema = sessionIdentitySchema.extend({
   requestId: z.uuid(),
 }).strict();
 
-export const compositeFileChangeSchema = z.object({
-  path: z.string().min(1),
-  status: z.enum(["added", "modified", "deleted"]),
-  binary: z.literal(true).optional(),
-  beforeContent: z.string().nullable(),
-  afterContent: z.string().nullable(),
-}).strict();
+const compositeFilePathSchema = z.string().min(1);
+const textFileFields = {
+  path: compositeFilePathSchema,
+  binary: z.never().optional(),
+} as const;
+
+export const compositeFileChangeSchema = z.union([
+  z.object({
+    ...textFileFields,
+    status: z.literal("added"),
+    beforeContent: z.null(),
+    afterContent: z.string(),
+  }).strict(),
+  z.object({
+    ...textFileFields,
+    status: z.literal("modified"),
+    beforeContent: z.string(),
+    afterContent: z.string(),
+  }).strict(),
+  z.object({
+    ...textFileFields,
+    status: z.literal("deleted"),
+    beforeContent: z.string(),
+    afterContent: z.null(),
+  }).strict(),
+  z.object({
+    path: compositeFilePathSchema,
+    status: z.enum(["added", "modified", "deleted"]),
+    binary: z.literal(true),
+    beforeContent: z.null(),
+    afterContent: z.null(),
+  }).strict(),
+]);
 
 export const compositeDiffResultSchema = z.object({
   baseCommit: commitIdSchema,
