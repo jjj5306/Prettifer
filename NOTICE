@@ -1,0 +1,25 @@
+Prettifer
+Copyright 2026 Jun (https://github.com/jjj5306)
+
+This product is licensed under the Apache License, Version 2.0, with the
+"Commons Clause" License Condition v1.0. See the LICENSE file for the full
+terms.
+
+The Commons Clause removes the right to Sell the Software. You may use, modify
+and redistribute Prettifer, including inside a for-profit organization, but you
+may not provide it to third parties for a fee or other consideration as a
+product or service whose value derives substantially from its functionality.
+
+Because of that condition, Prettifer is source-available rather than an
+OSI-approved open source project. Please do not describe it as "open source".
+
+This product bundles third-party software under their own licenses:
+
+  - Electron - MIT License
+  - Monaco Editor - MIT License
+  - React and React DOM - MIT License
+  - Zod - MIT License
+  - Hanken Grotesk (Fontsource) - SIL Open Font License 1.1
+  - Geist (Fontsource) - SIL Open Font License 1.1
+
+Their license texts are distributed with the packaged application.
