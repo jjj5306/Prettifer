@@ -25,7 +25,44 @@ interface MutableDirectory {
   readonly children: FileTreeNode[];
 }
 
+/**
+ * Builds the changed file hierarchy and joins directory chains that hold a
+ * single directory, so deep repository paths do not indent one level per
+ * segment. The joined row keeps the deepest directory path as its identity.
+ */
 export function buildFileTree(
+  files: readonly CompositeFile[],
+): readonly FileTreeNode[] {
+  return joinSingleChildDirectories(buildDirectoryTree(files));
+}
+
+function joinSingleChildDirectories(
+  nodes: readonly FileTreeNode[],
+): readonly FileTreeNode[] {
+  return nodes.map((node) => {
+    if (node.kind === "file") {
+      return node;
+    }
+    const segments = [node.name];
+    let deepest = node;
+    while (deepest.children.length === 1) {
+      const [onlyChild] = deepest.children;
+      if (onlyChild?.kind !== "directory") {
+        break;
+      }
+      segments.push(onlyChild.name);
+      deepest = onlyChild;
+    }
+    return {
+      kind: "directory",
+      name: segments.join("/"),
+      path: deepest.path,
+      children: joinSingleChildDirectories(deepest.children),
+    };
+  });
+}
+
+function buildDirectoryTree(
   files: readonly CompositeFile[],
 ): readonly FileTreeNode[] {
   const root: MutableDirectory = {

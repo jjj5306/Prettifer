@@ -45,6 +45,59 @@ describe("DiffPane", () => {
     expect(screen.getByText("Base on the left · selected result on the right")).toBeVisible();
   });
 
+  it("reviews an added file as full contents instead of a base comparison", async () => {
+    const adapter = { show: vi.fn(), dispose: vi.fn() };
+    const loadAdapter = vi.fn().mockResolvedValue(adapter);
+    const addedFile = {
+      path: "src/new.ts",
+      status: "added" as const,
+      beforeContent: null,
+      afterContent: "added",
+    };
+    render(
+      <StrictMode>
+        <DiffPane identity={identity} file={addedFile} loadAdapter={loadAdapter} />
+      </StrictMode>,
+    );
+
+    await waitFor(() => {
+      expect(adapter.show).toHaveBeenCalledWith(expect.any(HTMLElement), identity, addedFile);
+    });
+    expect(screen.getByRole("heading", { name: "Added File" })).toBeVisible();
+    expect(screen.getByText(
+      "New file · every line is part of the selected result",
+    )).toBeVisible();
+    expect(screen.getByRole("textbox", {
+      name: "Read-only added file: src/new.ts · full contents added by the selected result",
+    })).toBeVisible();
+    expect(screen.queryByText(
+      "Base on the left · selected result on the right",
+    )).toBeNull();
+  });
+
+  it("shows a readable binary state without loading Monaco", () => {
+    const loadAdapter = vi.fn();
+    render(
+      <DiffPane
+        identity={identity}
+        file={{
+          path: "fixtures/project.csp",
+          status: "added",
+          binary: true,
+          beforeContent: null,
+          afterContent: null,
+        }}
+        loadAdapter={loadAdapter}
+      />,
+    );
+
+    expect(loadAdapter).not.toHaveBeenCalled();
+    expect(screen.getByText("Binary file")).toBeVisible();
+    expect(screen.getByText(
+      "Text diff is not available for this file. Its binary contents were not loaded.",
+    )).toBeVisible();
+  });
+
   it("disposes Monaco resources when the file changes and the pane unmounts", async () => {
     const firstAdapter = { show: vi.fn(), dispose: vi.fn() };
     const secondAdapter = { show: vi.fn(), dispose: vi.fn() };

@@ -5,8 +5,7 @@
 
 .header,
 .title,
-.viewToggle,
-.directory {
+.viewToggle {
   display: flex;
   align-items: center;
 }
@@ -28,7 +27,7 @@
 
 .title span {
   color: var(--color-muted);
-  font-family: "Cascadia Code", Consolas, monospace;
+  font-family: var(--font-code);
   font-size: 0.6875rem;
 }
 
@@ -37,8 +36,11 @@
 }
 
 .viewToggle button {
+  display: grid;
+  width: 1.9rem;
   min-height: 1.75rem;
-  padding: 0.2rem 0.45rem;
+  place-content: center;
+  padding: 0;
   border-radius: 0;
   color: var(--color-muted);
   font-size: 0.6875rem;
@@ -71,17 +73,76 @@
   list-style: none;
 }
 
+.tree {
+  /* Places the guide under the twisty of the parent directory row. */
+  --tree-guide-offset: 1.125rem;
+  --tree-connector: 0.75rem;
+  --tree-row-center: 0.95rem;
+}
+
 .tree .tree {
-  margin-left: var(--space-3);
-  padding-left: var(--space-2);
-  border-left: 1px solid var(--color-border);
+  margin-left: var(--tree-guide-offset);
+  padding-left: var(--tree-connector);
+}
+
+.tree li,
+.fileList li {
+  min-width: 0;
+}
+
+.tree .tree > li {
+  position: relative;
+}
+
+/* Vertical guide of the parent directory, stopped at the last row it connects. */
+.tree .tree > li::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(-1 * var(--tree-connector));
+  width: 1px;
+  background: var(--color-border);
+  content: "";
+}
+
+.tree .tree > li:last-child::before {
+  bottom: auto;
+  height: var(--tree-row-center);
+}
+
+/* Horizontal connector that ends the guide beside each row. */
+.tree .tree > li::after {
+  position: absolute;
+  top: var(--tree-row-center);
+  left: calc(-1 * var(--tree-connector));
+  width: var(--tree-connector);
+  height: 1px;
+  background: var(--color-border);
+  content: "";
 }
 
 .directory {
-  min-height: 1.75rem;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 1.9rem;
+  align-items: center;
   gap: var(--space-1);
+  padding: 0.2rem var(--space-2);
+  border-color: transparent;
+  background: transparent;
   color: var(--color-muted);
   font-weight: 600;
+  text-align: left;
+}
+
+/* Matches the file status column so directory and file names share one edge. */
+.twisty {
+  display: grid;
+  width: 1.25rem;
+  flex: 0 0 auto;
+  place-content: center;
+  font-size: 0.625rem;
 }
 
 .file,
@@ -106,7 +167,7 @@
 }
 
 .status {
-  font-family: "Cascadia Code", Consolas, monospace;
+  font-family: var(--font-code);
   font-size: 0.6875rem;
   font-weight: 700;
   text-align: center;
@@ -127,7 +188,7 @@
 .path {
   min-width: 0;
   overflow: hidden;
-  font-family: "Cascadia Code", Consolas, monospace;
+  font-family: var(--font-code);
   font-size: 0.75rem;
   text-overflow: ellipsis;
   white-space: nowrap;

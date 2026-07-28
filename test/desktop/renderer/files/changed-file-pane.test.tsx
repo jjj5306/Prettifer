@@ -68,6 +68,56 @@ describe("ChangedFilePane", () => {
     expect(onSelectFile).not.toHaveBeenCalled();
   });
 
+  it("collapses and expands a Tree View directory without losing the selection", async () => {
+    const user = userEvent.setup();
+    const onSelectFile = vi.fn();
+    render(
+      <StrictMode>
+        <ChangedFilePane
+          result={result}
+          selectedFilePath="src/nested/m.ts"
+          onSelectFile={onSelectFile}
+        />
+      </StrictMode>,
+    );
+    await user.click(screen.getByRole("button", { name: "Tree View" }));
+
+    const nested = screen.getByRole("button", { name: "nested" });
+    expect(nested).toHaveAttribute("aria-expanded", "true");
+
+    await user.click(nested);
+    expect(nested).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", {
+      name: "Currently viewing file: src/nested/m.ts (Modified)",
+    })).toBeNull();
+    expect(screen.getByRole("button", { name: "View file: src/a.ts (Added)" })).toBeVisible();
+
+    await user.click(nested);
+    expect(nested).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", {
+      name: "Currently viewing file: src/nested/m.ts (Modified)",
+    })).toHaveAttribute("aria-pressed", "true");
+    expect(onSelectFile).not.toHaveBeenCalled();
+  });
+
+  it("collapses a Tree View directory with keyboard activation", async () => {
+    const user = userEvent.setup();
+    render(
+      <StrictMode>
+        <ChangedFilePane result={result} selectedFilePath={null} onSelectFile={vi.fn()} />
+      </StrictMode>,
+    );
+    await user.click(screen.getByRole("button", { name: "Tree View" }));
+
+    const root = screen.getByRole("button", { name: "src" });
+    root.focus();
+    await user.keyboard("{Enter}");
+
+    expect(root).toHaveAttribute("aria-expanded", "false");
+    expect(root).toHaveFocus();
+    expect(screen.queryByRole("button", { name: /file: /iu })).toBeNull();
+  });
+
   it("changes the selected file with keyboard activation", async () => {
     const user = userEvent.setup();
     const onSelectFile = vi.fn();

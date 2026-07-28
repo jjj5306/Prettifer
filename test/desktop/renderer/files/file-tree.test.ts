@@ -44,6 +44,64 @@ describe("buildFileTree", () => {
     ]);
   });
 
+  it("joins a directory chain that holds a single directory into one row", () => {
+    const files = [
+      {
+        path: "bundles/core/src/com/codescroll/generator.java",
+        status: "modified" as const,
+        beforeContent: "",
+        afterContent: "",
+      },
+      {
+        path: "bundles/core/src/com/codescroll/tests/generator-test.java",
+        status: "added" as const,
+        beforeContent: null,
+        afterContent: "",
+      },
+    ];
+
+    expect(buildFileTree(files)).toEqual([{
+      kind: "directory",
+      name: "bundles/core/src/com/codescroll",
+      path: "bundles/core/src/com/codescroll",
+      children: [
+        {
+          kind: "file",
+          name: "generator.java",
+          path: "bundles/core/src/com/codescroll/generator.java",
+          file: files[0],
+        },
+        {
+          kind: "directory",
+          name: "tests",
+          path: "bundles/core/src/com/codescroll/tests",
+          children: [{
+            kind: "file",
+            name: "generator-test.java",
+            path: "bundles/core/src/com/codescroll/tests/generator-test.java",
+            file: files[1],
+          }],
+        },
+      ],
+    }]);
+  });
+
+  it("keeps a directory that holds a single file as its own row", () => {
+    const file = {
+      path: "docs/auth.md",
+      status: "modified" as const,
+      beforeContent: "",
+      afterContent: "",
+    };
+
+    expect(buildFileTree([file])).toEqual([{
+      kind: "directory",
+      name: "docs",
+      path: "docs",
+      children: [{ kind: "file", name: "auth.md", path: "docs/auth.md", file }],
+    }]);
+  });
+
   it("accepts Windows separators without changing the original path", () => {
     const file = {
       path: "src\\app.ts",
