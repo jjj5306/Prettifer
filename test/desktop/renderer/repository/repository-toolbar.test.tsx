@@ -50,7 +50,7 @@ describe("RepositoryToolbar", () => {
     expect(onOpenRepository).toHaveBeenCalledOnce();
   });
 
-  it("shows the normalized path, current branch and local branch controls", () => {
+  it("shows local branch controls", () => {
     render(
       <StrictMode>
         <RepositoryToolbar
@@ -62,8 +62,6 @@ describe("RepositoryToolbar", () => {
       </StrictMode>,
     );
 
-    expect(screen.getByText(session.rootPath)).toBeVisible();
-    expect(screen.getByText("Current branch: feature/ui")).toBeVisible();
     expect(screen.getByRole("combobox", { name: "Base branch" })).toHaveValue("main");
     expect(screen.getByRole("combobox", { name: "Working branch" })).toHaveValue("feature/ui");
   });
@@ -98,7 +96,7 @@ describe("RepositoryToolbar", () => {
 
     await user.click(screen.getByRole("button", { name: "Load Commit Range" }));
     expect(onLoadRange).toHaveBeenCalledWith("main", "feature/ui");
-    expect(screen.getByText(`Common ancestor: ${commonCommit}`)).toBeVisible();
+    expect(screen.getByText(commonCommit.slice(0, 7))).toHaveAttribute("title", commonCommit);
   });
 
   it("keeps the previous repository visible with actionable diagnostics", () => {
@@ -122,7 +120,7 @@ describe("RepositoryToolbar", () => {
       </StrictMode>,
     );
 
-    expect(screen.getByText(session.rootPath)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Change Repository" })).toBeVisible();
     expect(screen.getByRole("alert")).toHaveTextContent(
       "The Git repository could not be opened. Choose another Git repository folder.",
     );

@@ -19,28 +19,20 @@ export const CompositeResultHeader = ({
   onCancel,
 }: CompositeResultHeaderProps) => (
   <section className={styles.header} aria-labelledby="composite-result-heading">
-    <div className={styles.headingRow}>
-      <div>
-        <p className={styles.eyebrow}>Composite result</p>
-        <h2 id="composite-result-heading">Selected Result</h2>
-      </div>
-      {composition.status === "loading" ? (
-        <button type="button" onClick={() => { void onCancel(); }}>Cancel</button>
-      ) : (
-        <button
-          type="button"
-          disabled={selectedCount === 0}
-          onClick={() => { void onCompose(); }}
-        >
-          {composition.status === "idle" ? "Build Selected Result" : "Rebuild Selected Result"}
-        </button>
-      )}
+    <div className={styles.identity}>
+      <p className={styles.eyebrow}>Composite result</p>
+      <h2 id="composite-result-heading">Selected Result</h2>
     </div>
     <OperationStatus composition={composition} selectedCount={selectedCount} />
     {composition.status === "ready" ? (
       <dl className={styles.summary}>
         <div><dt>Range</dt><dd>{range.baseRef} → {range.headRef}</dd></div>
-        <div><dt>Base</dt><dd>{composition.result.baseCommit}</dd></div>
+        <div>
+          <dt>Base</dt>
+          <dd><code title={composition.result.baseCommit}>
+            {composition.result.baseCommit.slice(0, 7)}
+          </code></dd>
+        </div>
         <div>
           <dt>Included</dt>
           <dd>
@@ -52,10 +44,27 @@ export const CompositeResultHeader = ({
         </div>
         <div>
           <dt>Applied</dt>
-          <dd>{composition.result.selectedCommits.join(" → ")}</dd>
+          <dd className={styles.commitChain}>
+            {composition.result.selectedCommits.map((commit, index) => (
+              <span key={commit}>
+                {index === 0 ? null : <span aria-hidden="true">→</span>}
+                <code title={commit}>{commit.slice(0, 7)}</code>
+              </span>
+            ))}
+          </dd>
         </div>
-        <div><dt>Repository</dt><dd>Working tree preserved</dd></div>
       </dl>
     ) : null}
+    {composition.status === "loading" ? (
+      <button type="button" onClick={() => { void onCancel(); }}>Cancel</button>
+    ) : (
+      <button
+        type="button"
+        disabled={selectedCount === 0}
+        onClick={() => { void onCompose(); }}
+      >
+        {composition.status === "idle" ? "Build Selected Result" : "Rebuild Selected Result"}
+      </button>
+    )}
   </section>
 );

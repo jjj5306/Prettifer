@@ -35,12 +35,15 @@ export const RepositoryToolbar = ({
   };
 
   return (
-    <section className={styles.toolbar} aria-labelledby="repository-heading">
+    <section
+      id="repository-workspace"
+      className={styles.toolbar}
+      aria-labelledby="repository-heading"
+      tabIndex={-1}
+    >
       <div className={styles.headingRow}>
-        <div>
-          <p className={styles.eyebrow}>Repository</p>
-          <h2 id="repository-heading">Repository and comparison range</h2>
-        </div>
+        <p className={styles.eyebrow}>Repository</p>
+        <h2 id="repository-heading">Repository and comparison range</h2>
         <button
           type="button"
           disabled={repository.status === "selecting"}
@@ -54,25 +57,16 @@ export const RepositoryToolbar = ({
         <p className={styles.empty}>Choose a local Git repository to review.</p>
       ) : (
         <>
-          <dl className={styles.repositorySummary}>
-            <div>
-              <dt>Repository path</dt>
-              <dd>{session.rootPath}</dd>
-            </div>
-            <div>
-              <dt>Current state</dt>
-              <dd>Current branch: {session.currentBranch ?? "Detached HEAD"}</dd>
-            </div>
-          </dl>
           <form
             key={session.repositorySessionId}
             className={styles.rangeForm}
             onSubmit={handleRangeSubmit}
           >
             <label>
-              Base branch
+              <span>Base</span>
               <select
                 name="baseRef"
+                aria-label="Base branch"
                 defaultValue={defaultBaseRef(session, range)}
                 disabled={range.status === "loading"}
               >
@@ -82,9 +76,10 @@ export const RepositoryToolbar = ({
               </select>
             </label>
             <label>
-              Working branch
+              <span>Working</span>
               <select
                 name="headRef"
+                aria-label="Working branch"
                 defaultValue={defaultHeadRef(session, range)}
                 disabled={range.status === "loading"}
               >
@@ -98,7 +93,9 @@ export const RepositoryToolbar = ({
             </button>
           </form>
           {range.status === "ready" ? (
-            <p className={styles.rangeSummary}>Common ancestor: {range.range.baseCommit}</p>
+            <p className={styles.rangeSummary}>
+              Base <code title={range.range.baseCommit}>{range.range.baseCommit.slice(0, 7)}</code>
+            </p>
           ) : null}
         </>
       )}

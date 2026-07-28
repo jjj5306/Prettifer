@@ -79,7 +79,7 @@ describe("CompositeResultHeader", () => {
     expect(start.onCancel).toHaveBeenCalledOnce();
   });
 
-  it("shows the actual base, application order and unchanged working tree", () => {
+  it("shows the actual base and application order", () => {
     renderHeader({
       status: "ready",
       requestId: "composition-1",
@@ -91,10 +91,10 @@ describe("CompositeResultHeader", () => {
       },
     }, 2);
 
-    expect(screen.getByText(range.baseCommit)).toBeVisible();
-    expect(screen.getByText(`${"d".repeat(40)} → ${"e".repeat(40)}`)).toBeVisible();
+    expect(screen.getByText("c".repeat(7))).toHaveAttribute("title", range.baseCommit);
+    expect(screen.getByText("d".repeat(7))).toHaveAttribute("title", "d".repeat(40));
+    expect(screen.getByText("e".repeat(7))).toHaveAttribute("title", "e".repeat(40));
     expect(screen.getByText("2 commits · matches current selection")).toBeVisible();
-    expect(screen.getByText("Working tree preserved")).toBeVisible();
     expect(screen.getByText("Result built successfully with no changed files.")).toBeVisible();
     expect(screen.getByRole("button", { name: "Rebuild Selected Result" })).toBeEnabled();
   });
