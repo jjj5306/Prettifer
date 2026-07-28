@@ -1,6 +1,6 @@
 import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -292,14 +292,16 @@ describe("CompositionWorkspaceManager", () => {
     const manager = new CompositionWorkspaceManager(new GitCommandRunner());
     const unrelatedRoot = await mkdtemp(join(tmpdir(), "prettifer-unrelated-worktree-"));
     const unrelatedPath = join(unrelatedRoot, "offline");
-    const normalizedUnrelatedPath = unrelatedPath.replaceAll("\\", "/");
+    // Git reports the resolved path, while os.tmpdir() can return an 8.3 short
+    // name, so the unique directory name is compared instead of the full path.
+    const unrelatedRegistration = `${basename(unrelatedRoot)}/offline`;
 
     fixture.git(["worktree", "add", "--detach", unrelatedPath, fixture.commits.base]);
     await rm(unrelatedPath, { force: true, recursive: true });
 
     try {
       expect(fixture.git(["worktree", "list", "--porcelain"])).toContain(
-        normalizedUnrelatedPath,
+        unrelatedRegistration,
       );
 
       await manager.withWorkspace(
@@ -310,7 +312,7 @@ describe("CompositionWorkspaceManager", () => {
       );
 
       expect(fixture.git(["worktree", "list", "--porcelain"])).toContain(
-        normalizedUnrelatedPath,
+        unrelatedRegistration,
       );
     } finally {
       fixture.git(["worktree", "prune", "--expire", "now"]);
