@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import {
   mkdir,
   mkdtemp,
+  realpath,
   readFile,
   rm,
   unlink,
@@ -40,7 +41,8 @@ export interface GitFixture {
 }
 
 export async function createAuthHistoryFixture(): Promise<GitFixture> {
-  const path = await mkdtemp(join(tmpdir(), "prettifer-fixture-"));
+  // realpath resolves 8.3 short names so fixture paths match what Git reports.
+  const path = await realpath(await mkdtemp(join(tmpdir(), "prettifer-fixture-")));
   const git = (args: readonly string[]): string =>
     execFileSync("git", args, {
       cwd: path,
