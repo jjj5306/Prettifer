@@ -1,0 +1,172 @@
+name: Publish release
+
+# Publishes the Windows build to the public distribution repository.
+# Triggered by pushing a version tag (for example `v0.1.1`) or manually.
+#
+# Requires a repository secret named RELEASE_REPO_TOKEN: a fine-grained personal
+# access token with Contents: read and write on jjj5306/prettifer-release.
+# The default GITHUB_TOKEN cannot write to another repository.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag to publish, for example v0.1.1"
+        required: true
+        type: string
+      draft:
+        description: "Create the release as a draft"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_REPOSITORY: jjj5306/prettifer-release
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out the source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+
+      - name: Resolve the release tag
+        id: release
+        shell: pwsh
+        run: |
+          $tag = if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            '${{ inputs.tag }}'
+          } else {
+            '${{ github.ref_name }}'
+          }
+          if ($tag -notmatch '^v\d+\.\d+\.\d+') {
+            throw "The tag '$tag' is not a vMAJOR.MINOR.PATCH version."
+          }
+          $version = $tag.TrimStart('v')
+          $packageVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($packageVersion -ne $version) {
+            throw "The tag version '$version' does not match package.json '$packageVersion'."
+          }
+          "tag=$tag" | Add-Content $env:GITHUB_OUTPUT
+          "version=$version" | Add-Content $env:GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify the source
+        run: |
+          npm run lint
+          npm run typecheck
+          npm test
+
+      - name: Build the Windows ZIP
+        run: npm run desktop:make
+
+      - name: Collect the release assets
+        id: assets
+        shell: pwsh
+        run: |
+          $zipDirectory = 'out/desktop/make/zip/win32/x64'
+          $zip = Get-ChildItem $zipDirectory -Filter '*.zip' | Select-Object -First 1
+          if ($null -eq $zip) {
+            throw "No ZIP was produced in $zipDirectory."
+          }
+          $staging = 'release-assets'
+          New-Item -ItemType Directory -Force $staging | Out-Null
+          $assetName = "prettifer-win32-x64-${{ steps.release.outputs.version }}.zip"
+          Copy-Item $zip.FullName (Join-Path $staging $assetName)
+          $hash = (Get-FileHash (Join-Path $staging $assetName) -Algorithm SHA256).Hash.ToLower()
+          "$hash  $assetName" | Set-Content (Join-Path $staging 'SHA256SUMS.txt') -Encoding utf8NoBOM
+          "sha256=$hash" | Add-Content $env:GITHUB_OUTPUT
+          "directory=$staging" | Add-Content $env:GITHUB_OUTPUT
+
+      - name: Write the release notes
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+          SHA256: ${{ steps.assets.outputs.sha256 }}
+          SOURCE_REPOSITORY: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.sha }}
+        shell: pwsh
+        run: |
+          $notes = Get-Content .github/release-notes-template.md -Raw
+          $replacements = @{
+            '{{TAG}}' = $env:TAG
+            '{{VERSION}}' = $env:VERSION
+            '{{SHA256}}' = $env:SHA256
+            '{{RELEASE_REPOSITORY}}' = $env:RELEASE_REPOSITORY
+            '{{SOURCE_REPOSITORY}}' = $env:SOURCE_REPOSITORY
+            '{{SHORT_SHA}}' = $env:SOURCE_SHA.Substring(0, 7)
+            '{{SHA}}' = $env:SOURCE_SHA
+          }
+          foreach ($placeholder in $replacements.Keys) {
+            $notes = $notes.Replace($placeholder, $replacements[$placeholder])
+          }
+          if ($notes -match '\{\{[A-Z_]+\}\}') {
+            throw "The release notes still contain an unreplaced placeholder."
+          }
+          $notes | Set-Content release-notes.md -Encoding utf8NoBOM
+
+      - name: Publish to the distribution repository
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_REPO_TOKEN }}
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
+            throw "RELEASE_REPO_TOKEN is not set. Add it as a repository secret."
+          }
+          $tag = '${{ steps.release.outputs.tag }}'
+          $repository = '${{ env.RELEASE_REPOSITORY }}'
+          $assets = Get-ChildItem '${{ steps.assets.outputs.directory }}' -File |
+            Select-Object -ExpandProperty FullName
+          $draft = if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            '${{ inputs.draft }}' -eq 'true'
+          } else {
+            $false
+          }
+
+          $existing = gh release view $tag --repo $repository 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Updating the existing $tag release."
+            gh release edit $tag --repo $repository `
+              --title "Prettifer $tag" --notes-file release-notes.md
+            if ($LASTEXITCODE -ne 0) { throw "Updating the release failed." }
+            gh release upload $tag @assets --repo $repository --clobber
+            if ($LASTEXITCODE -ne 0) { throw "Uploading the assets failed." }
+          } else {
+            Write-Host "Creating the $tag release."
+            $arguments = @(
+              'release', 'create', $tag
+              '--repo', $repository
+              '--title', "Prettifer $tag"
+              '--notes-file', 'release-notes.md'
+            )
+            if ($draft) { $arguments += '--draft' }
+            gh @arguments @assets
+            if ($LASTEXITCODE -ne 0) { throw "Creating the release failed." }
+          }
+
+      - name: Report the published release
+        shell: pwsh
+        run: |
+          $tag = '${{ steps.release.outputs.tag }}'
+          "Published https://github.com/${{ env.RELEASE_REPOSITORY }}/releases/tag/$tag" |
+            Add-Content $env:GITHUB_STEP_SUMMARY
