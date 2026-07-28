@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prettifer PR"
+  short_description: "Review code quality and create a GitHub pull request"
+  default_prompt: "Use $prettifer-pr to review the current branch and create a pull request."

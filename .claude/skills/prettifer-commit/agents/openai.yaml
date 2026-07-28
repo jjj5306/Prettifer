@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prettifer Commit"
+  short_description: "Create issue-linked commits with project conventions"
+  default_prompt: "Use $prettifer-commit to review and commit the current issue changes."

@@ -6,6 +6,15 @@
 !.codex/skills/prettifer-pr/
 !.codex/skills/prettifer-pr/**
 
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/prettifer-commit/
+!.claude/skills/prettifer-commit/**
+!.claude/skills/prettifer-pr/
+!.claude/skills/prettifer-pr/**
+
+
 node_modules/
 .webpack/
 out/
