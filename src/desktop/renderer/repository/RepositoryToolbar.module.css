@@ -1,22 +1,28 @@
 .toolbar {
   composes: surface from "../PanelSurface.module.css";
-  grid-template-columns: minmax(15rem, auto) minmax(0, 1fr);
+  display: flex;
+  min-height: var(--bar-height);
   align-items: center;
-  gap: var(--space-3);
-  padding-block: var(--space-2);
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
 }
 
 .headingRow {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .headingRow h2,
 .headingRow p,
-.repositorySummary dd,
-.repositorySummary dt {
+.rangeSummary {
   margin: 0;
+}
+
+.headingRow h2 {
+  font-size: 0.9375rem;
+  white-space: nowrap;
 }
 
 .eyebrow {
@@ -33,44 +39,39 @@
   color: var(--color-muted);
 }
 
-.repositorySummary {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(10rem, 1fr);
-  gap: var(--space-2);
-  margin: 0;
-}
-
-.repositorySummary div {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-2);
-}
-
-.repositorySummary dt {
-  color: var(--color-muted);
-}
-
-.repositorySummary dd {
-  overflow-wrap: anywhere;
-}
-
 .rangeForm {
   display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: repeat(2, minmax(10rem, 1fr)) auto;
+  flex: 1 1 auto;
+  grid-template-columns: repeat(2, minmax(9rem, 1fr)) auto;
   gap: var(--space-2);
-  align-items: end;
+  align-items: center;
 }
 
 .rangeForm label {
   display: grid;
-  gap: 0.35rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-1);
   color: var(--color-muted);
-  font-size: 0.875rem;
+  font-size: 0.75rem;
 }
 
 .rangeForm select {
+  min-height: 2rem;
   width: 100%;
+}
+
+.rangeForm button,
+.headingRow button {
+  min-height: 2rem;
+  padding-block: 0.25rem;
+  white-space: nowrap;
+}
+
+.rangeSummary {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .diagnostic {
@@ -90,6 +91,7 @@
 
   .toolbar {
     align-items: stretch;
+    flex-direction: column;
   }
 
   .headingRow {
@@ -97,7 +99,4 @@
     flex-direction: column;
   }
 
-  .repositorySummary {
-    grid-template-columns: 1fr;
-  }
 }

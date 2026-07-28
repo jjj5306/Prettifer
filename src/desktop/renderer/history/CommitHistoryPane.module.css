@@ -2,6 +2,15 @@
   composes: surface from "../PanelSurface.module.css";
 }
 
+.readyPanel {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: var(--bar-height);
+  align-items: stretch;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+}
+
 .panel p,
 .panel h2,
 .panel h3 {
@@ -10,29 +19,58 @@
 
 .headingRow {
   display: flex;
-  align-items: baseline;
+  min-width: 8.75rem;
+  align-items: center;
   justify-content: space-between;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
-.hint,
+.headingRow strong {
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.headingRow h2 {
+  font-size: 0.9375rem;
+  white-space: nowrap;
+}
+
 .metadata {
   color: var(--color-muted);
 }
 
 .commitList {
   display: grid;
-  grid-auto-columns: minmax(14rem, 18rem);
+  grid-auto-columns: minmax(18rem, 26rem);
   grid-auto-flow: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
   margin: 0;
   padding: 0;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   list-style: none;
 }
 
-.commitRow,
-.inspectedRow {
+/* A slim scrollbar leaves the commit card its full height inside the bar. */
+.commitList::-webkit-scrollbar {
+  height: 0.375rem;
+}
+
+.commitList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.commitList::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--color-border);
+}
+
+.commitList:hover::-webkit-scrollbar-thumb {
+  background: var(--color-muted);
+}
+
+.commitRow {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   border: 1px solid var(--color-border);
@@ -40,26 +78,34 @@
   background: var(--color-surface);
 }
 
-.inspectedRow {
+.selectedRow {
   border-color: var(--color-accent);
   background: var(--color-selected);
+}
+
+.inspectedRow {
   box-shadow: inset 2px 0 var(--color-accent);
 }
 
 .selection {
   display: grid;
   place-content: center;
-  gap: 0.25rem;
-  padding: var(--space-2);
+  padding: var(--space-1);
   border-right: 1px solid var(--color-border);
-  font-size: 0.6875rem;
 }
 
+.selection input {
+  accent-color: var(--color-accent);
+}
+
+/* One line per commit so the card fits the shared bar height. */
 .commitButton {
-  display: grid;
-  gap: var(--space-1);
+  display: flex;
   min-width: 0;
-  padding: var(--space-2);
+  min-height: 0;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.125rem var(--space-2);
   border: 0;
   background: transparent;
   color: inherit;
@@ -67,62 +113,59 @@
 }
 
 .commitTitle {
+  flex: 1 1 auto;
+  min-width: 4rem;
   overflow: hidden;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/*
+ * Shrinks with the title, but keeps `overflow: visible` so its automatic
+ * minimum size stays at the short SHA and authored day.
+ */
 .metadata {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  font-family: "Cascadia Code", Consolas, monospace;
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+  font-family: var(--font-code);
   font-size: 0.6875rem;
+  white-space: nowrap;
+}
+
+/* The short SHA and authored day identify the commit, so they stay readable. */
+.metadata code,
+.metadata time {
+  flex: 0 0 auto;
+}
+
+/* The author name gives up room first, so the commit title keeps its width. */
+.metadata span {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 4.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .merge {
+  flex: 0 0 auto;
   color: var(--color-warning);
   font-size: 0.6875rem;
-}
-
-.details {
-  display: grid;
-  gap: var(--space-1);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--color-border);
-}
-
-.details dl {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-1) var(--space-3);
-  margin: 0;
-}
-
-.details dl div {
-  display: grid;
-  grid-template-columns: 4.5rem minmax(0, 1fr);
-  gap: var(--space-1);
-}
-
-.details dt {
-  color: var(--color-muted);
-}
-
-.details dd {
-  margin: 0;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 @media (max-width: 64rem) {
+  .readyPanel {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+  }
+
   .commitList {
     grid-auto-flow: row;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
     overflow: visible;
-  }
-
-  .details dl {
-    grid-template-columns: 1fr;
   }
 }
