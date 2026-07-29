@@ -144,3 +144,20 @@ package-lock 관련 CI 설치 실패(#28)를 겪은 적이 있다. 따라서 이
   결과 change 형식 오류는 여전히 사람 또는 에이전트가 로컬에서 잡아야 한다.
 - [검사가 통과해도 사람 판단 항목은 검증되지 않음] → 이 워크플로는 AGENTS.md §7의 기계
   검증 가능 부분만 담당한다. 요구사항 일치와 문서 정합성은 계속 PR 자체 리뷰가 담당한다.
+
+## 실제 실행 확인
+
+PR #38의 첫 실행에서 설계의 위험 항목을 모두 확인했다.
+
+- `Lint, types and unit tests` 통과, 3분 6초. 깨끗한 runner에서 `npm ci`가 성공하고
+  lint, typecheck와 유닛 테스트 268개가 모두 통과했다.
+- `Electron end-to-end tests` 통과, 4분 16초. e2e 11개가 `11 passed (1.1m)`로 끝났다.
+  즉 `windows-latest`에서 Electron 창을 띄우는 검증이 동작하고, Playwright 번들 브라우저
+  설치 없이 `_electron.launch`가 가능하며, 글꼴·배율·Monaco 기하 단언도 runner에서 성립한다.
+- 두 job이 병렬로 실행되어 값싼 신호가 e2e를 기다리지 않는 것을 확인했다.
+
+검증 명령의 실패가 검사 실패로 이어지는지는 임시 PR #39로 확인했다. `Array<string>`은
+유효한 TypeScript지만 `@typescript-eslint/array-type` 위반이므로 lint만 실패하고 typecheck와
+테스트는 통과한다. 즉 검증 명령을 한 step에 묶었다면 초록불이 되었을 경우다. 결과는 `Lint`
+step에서 실패하고 `Type check`와 `Unit tests`가 건너뛰어졌으며 검사 전체가 실패했다. 확인
+후 PR과 브랜치를 삭제했다.
