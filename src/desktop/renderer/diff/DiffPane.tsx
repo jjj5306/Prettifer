@@ -16,9 +16,12 @@ interface DiffAdapter {
   dispose(): void;
 }
 
+type CompositeProblemFile = CompositeDiffResultDto["problemFiles"][number];
+
 interface DiffPaneProps {
   readonly identity: DiffIdentity;
   readonly file: CompositeFile | null;
+  readonly problem?: CompositeProblemFile | null;
   readonly loadAdapter?: () => Promise<DiffAdapter>;
 }
 
@@ -29,6 +32,7 @@ type LoadOutcome =
 export const DiffPane = ({
   identity,
   file,
+  problem = null,
   loadAdapter = loadMonacoAdapter,
 }: DiffPaneProps) => {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -40,7 +44,7 @@ export const DiffPane = ({
     : `${repositorySessionId}:${requestId}:${file.path}:${String(retry)}`;
 
   useEffect(() => {
-    if (file === null || file.binary === true) {
+    if (file === null || file.binary === true || problem !== null) {
       return undefined;
     }
     let active = true;
@@ -72,7 +76,32 @@ export const DiffPane = ({
       active = false;
       adapter?.dispose();
     };
-  }, [currentKey, file, loadAdapter, repositorySessionId, requestId, retry]);
+  }, [currentKey, file, problem, loadAdapter, repositorySessionId, requestId, retry]);
+
+  if (problem !== null) {
+    return (
+      <section
+        id="diff-review"
+        className={styles.panel}
+        aria-labelledby="diff-heading"
+        tabIndex={-1}
+      >
+        <div className={styles.headingRow}>
+          <h2 id="diff-heading">Problem File</h2>
+          <p>{problem.path}</p>
+        </div>
+        <div className={styles.problemState} role="alert">
+          <strong>This file needs a content choice</strong>
+          <p>
+            Applying <code>{problem.commit.slice(0, 7)}</code> to this file could
+            not be completed without choosing between different contents, so the
+            file was left at the comparison base.
+          </p>
+          <p>{problem.nextAction}</p>
+        </div>
+      </section>
+    );
+  }
 
   if (file === null) {
     return (

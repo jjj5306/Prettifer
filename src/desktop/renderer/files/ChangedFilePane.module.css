@@ -197,3 +197,7 @@
 .empty {
   color: var(--color-muted);
 }
+
+.problem {
+  color: var(--color-warning);
+}

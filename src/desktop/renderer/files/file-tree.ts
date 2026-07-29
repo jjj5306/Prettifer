@@ -1,6 +1,4 @@
-import type { CompositeDiffResultDto } from "../../shared/index.js";
-
-type CompositeFile = CompositeDiffResultDto["files"][number];
+import type { ReviewEntry } from "./review-entries.js";
 
 export interface FileTreeDirectory {
   readonly kind: "directory";
@@ -13,7 +11,7 @@ export interface FileTreeFile {
   readonly kind: "file";
   readonly name: string;
   readonly path: string;
-  readonly file: CompositeFile;
+  readonly entry: ReviewEntry;
 }
 
 export type FileTreeNode = FileTreeDirectory | FileTreeFile;
@@ -32,9 +30,9 @@ interface MutableDirectory {
  * segment. The joined row keeps the deepest directory path as its identity.
  */
 export function buildFileTree(
-  files: readonly CompositeFile[],
+  entries: readonly ReviewEntry[],
 ): readonly FileTreeNode[] {
-  return joinSingleChildDirectories(buildDirectoryTree(files));
+  return joinSingleChildDirectories(buildDirectoryTree(entries));
 }
 
 function joinSingleChildDirectories(
@@ -64,7 +62,7 @@ function joinSingleChildDirectories(
 }
 
 function buildDirectoryTree(
-  files: readonly CompositeFile[],
+  entries: readonly ReviewEntry[],
 ): readonly FileTreeNode[] {
   const root: MutableDirectory = {
     kind: "directory",
@@ -74,9 +72,9 @@ function buildDirectoryTree(
     directories: new Map(),
   };
 
-  for (const file of files) {
-    const segments = file.path.split(/[\\/]/u).filter((segment) => segment.length > 0);
-    const fileName = segments.at(-1) ?? file.path;
+  for (const entry of entries) {
+    const segments = entry.path.split(/[\\/]/u).filter((segment) => segment.length > 0);
+    const fileName = segments.at(-1) ?? entry.path;
     let parent = root;
     let directoryPath = "";
 
@@ -103,8 +101,8 @@ function buildDirectoryTree(
     parent.children.push({
       kind: "file",
       name: fileName,
-      path: file.path,
-      file,
+      path: entry.path,
+      entry,
     });
   }
 

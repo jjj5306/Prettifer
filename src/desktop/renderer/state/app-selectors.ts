@@ -29,6 +29,17 @@ export function selectSelectedFile(
   ) ?? null;
 }
 
+export function selectSelectedProblemFile(
+  state: AppState,
+): CompositeDiffResultDto["problemFiles"][number] | null {
+  if (state.composition.status !== "ready" || state.selectedFilePath === null) {
+    return null;
+  }
+  return state.composition.result.problemFiles.find(
+    (problem) => problem.path === state.selectedFilePath,
+  ) ?? null;
+}
+
 /**
  * Counts selected merge commits whose mainline parent the user has not chosen
  * yet. Composition cannot start while any of them remain.

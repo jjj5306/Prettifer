@@ -498,9 +498,17 @@ function withoutMergeParent(
   );
 }
 
+/**
+ * A problem file is reviewable too, so it is selectable even though it has no
+ * composed contents.
+ */
 function hasResultFile(state: AppState, path: string): boolean {
-  return state.composition.status === "ready" &&
-    state.composition.result.files.some((file) => file.path === path);
+  if (state.composition.status !== "ready") {
+    return false;
+  }
+  const { files, problemFiles } = state.composition.result;
+  return files.some((file) => file.path === path)
+    || problemFiles.some((problem) => problem.path === path);
 }
 
 function markRangeStale(state: AppState, diagnostic: Diagnostic): AppState {

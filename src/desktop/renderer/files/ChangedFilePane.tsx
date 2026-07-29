@@ -6,9 +6,9 @@ import {
   type FileTreeDirectory,
   type FileTreeNode,
 } from "./file-tree.js";
+import { buildReviewEntries, type ReviewEntry } from "./review-entries.js";
 import styles from "./ChangedFilePane.module.css";
 
-type CompositeFile = CompositeDiffResultDto["files"][number];
 type FileView = "tree" | "list";
 
 interface ChangedFilePaneProps {
@@ -26,7 +26,8 @@ export const ChangedFilePane = ({
   const [collapsedDirectories, setCollapsedDirectories] = useState<ReadonlySet<string>>(
     new Set<string>(),
   );
-  const tree = view === "tree" ? buildFileTree(result.files) : [];
+  const entries = buildReviewEntries(result);
+  const tree = view === "tree" ? buildFileTree(entries) : [];
 
   const handleToggleDirectory = (path: string) => {
     setCollapsedDirectories((current) => {
@@ -48,7 +49,7 @@ export const ChangedFilePane = ({
       <header className={styles.header}>
         <div className={styles.title}>
           <h2 id="changed-files-heading">Changed Files</h2>
-          <span>{result.files.length}</span>
+          <span>{entries.length}</span>
         </div>
         <div className={styles.viewToggle} role="group" aria-label="Changed files view">
           <button
@@ -74,17 +75,17 @@ export const ChangedFilePane = ({
         </div>
       </header>
 
-      {result.files.length === 0 ? (
+      {entries.length === 0 ? (
         <p className={styles.empty}>No changed files in this result.</p>
       ) : (
         <div className={styles.content}>
           {view === "list" ? (
             <ul className={styles.fileList}>
-              {result.files.map((file) => (
-                <li key={file.path}>
+              {entries.map((entry) => (
+                <li key={entry.path}>
                   <FileButton
-                    file={file}
-                    label={file.path}
+                    entry={entry}
+                    label={entry.path}
                     selectedFilePath={selectedFilePath}
                     onSelectFile={onSelectFile}
                   />
@@ -160,7 +161,7 @@ const FileTree = ({
           />
         ) : (
           <FileButton
-            file={node.file}
+            entry={node.entry}
             label={node.name}
             selectedFilePath={selectedFilePath}
             onSelectFile={onSelectFile}
@@ -214,18 +215,19 @@ const DirectoryBranch = ({
 };
 
 interface FileButtonProps {
-  readonly file: CompositeFile;
+  readonly entry: ReviewEntry;
   readonly label: string;
   readonly selectedFilePath: string | null;
   readonly onSelectFile: (path: string) => void;
 }
 
 const FileButton = ({
-  file,
+  entry,
   label,
   selectedFilePath,
   onSelectFile,
 }: FileButtonProps) => {
+  const file = { path: entry.path, status: entryStatus(entry) };
   const status = fileStatus(file.status);
   const isSelected = file.path === selectedFilePath;
 
@@ -246,8 +248,14 @@ const FileButton = ({
   );
 };
 
+type ReviewStatus = "added" | "modified" | "deleted" | "problem";
+
+function entryStatus(entry: ReviewEntry): ReviewStatus {
+  return entry.kind === "problem" ? "problem" : entry.file.status;
+}
+
 function fileStatus(
-  status: CompositeFile["status"],
+  status: ReviewStatus,
 ): Readonly<{ code: string; label: string }> {
   switch (status) {
     case "added":
@@ -256,5 +264,7 @@ function fileStatus(
       return { code: "M", label: "Modified" };
     case "deleted":
       return { code: "D", label: "Deleted" };
+    case "problem":
+      return { code: "!", label: "Problem" };
   }
 }

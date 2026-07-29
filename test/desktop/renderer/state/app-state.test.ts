@@ -207,6 +207,7 @@ describe("app reducer", () => {
           afterContent: "new",
         }],
         mainlineParents: {},
+        problemFiles: [],
         unifiedDiff: "diff",
       },
     });
@@ -220,6 +221,7 @@ describe("app reducer", () => {
         selectedCommits: [commits[0]!.id],
         files: [],
         mainlineParents: {},
+        problemFiles: [],
         unifiedDiff: "",
       },
     });
@@ -250,10 +252,49 @@ describe("app reducer", () => {
           afterContent: "export {};",
         }],
         mainlineParents: {},
+        problemFiles: [],
         unifiedDiff: "diff",
       },
     });
     expect(loaded.selectedFilePath).toBe("src/app.ts");
+  });
+
+  it("selects a problem file for review but rejects an unknown path", () => {
+    const loading = appReducer(readyState(), {
+      type: "composition/loading",
+      requestId: "composition-1",
+      sessionRevision: 1,
+      rangeRevision: range.rangeRevision,
+    });
+    const loaded = appReducer(loading, {
+      type: "composition/loaded",
+      requestId: "composition-1",
+      sessionRevision: 1,
+      rangeRevision: range.rangeRevision,
+      result: {
+        baseCommit: commonCommit,
+        selectedCommits: [commits[0]!.id],
+        files: [{
+          path: "src/app.ts",
+          status: "modified",
+          beforeContent: "before",
+          afterContent: "after",
+        }],
+        mainlineParents: {},
+        problemFiles: [{
+          path: "src/broken.ts",
+          code: "CONTENT_CHOICE_REQUIRED",
+          commit: commits[0]!.id,
+          nextAction: "Select the prerequisite commits, then build the result again.",
+        }],
+        unifiedDiff: "diff",
+      },
+    });
+
+    const problem = appReducer(loaded, { type: "file/selected", path: "src/broken.ts" });
+    expect(problem.selectedFilePath).toBe("src/broken.ts");
+    expect(appReducer(problem, { type: "file/selected", path: "src/absent.ts" }))
+      .toBe(problem);
   });
 
   it("keeps cancellation visible and ignores a late cancellation from an older request", () => {

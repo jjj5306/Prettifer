@@ -1,5 +1,7 @@
 import type { RepositoryRangeDto } from "../../shared/index.js";
 import type { CompositionState } from "../state/app-state.js";
+
+type CompositionReadyResult = Extract<CompositionState, { status: "ready" }>["result"];
 import { OperationStatus } from "./OperationStatus.js";
 import styles from "./CompositeResultHeader.module.css";
 
@@ -11,6 +13,7 @@ interface CompositeResultHeaderProps {
   readonly pendingMainlineParents: number;
   readonly onCompose: () => void | Promise<void>;
   readonly onCancel: () => void | Promise<void>;
+  readonly onSelectFile: (path: string) => void;
 }
 
 export const CompositeResultHeader = ({
@@ -20,6 +23,7 @@ export const CompositeResultHeader = ({
   pendingMainlineParents,
   onCompose,
   onCancel,
+  onSelectFile,
 }: CompositeResultHeaderProps) => (
   <section className={styles.header} aria-labelledby="composite-result-heading">
     <div className={styles.identity}>
@@ -31,6 +35,12 @@ export const CompositeResultHeader = ({
       selectedCount={selectedCount}
       pendingMainlineParents={pendingMainlineParents}
     />
+    {composition.status === "ready" && composition.result.problemFiles.length > 0 ? (
+      <ProblemSummary
+        problemFiles={composition.result.problemFiles}
+        onSelectFile={onSelectFile}
+      />
+    ) : null}
     {composition.status === "ready" ? (
       <dl className={styles.summary}>
         <div><dt>Range</dt><dd>{range.baseRef} → {range.headRef}</dd></div>
@@ -86,3 +96,31 @@ export const CompositeResultHeader = ({
     )}
   </section>
 );
+
+interface ProblemSummaryProps {
+  readonly problemFiles: CompositionReadyResult["problemFiles"];
+  readonly onSelectFile: (path: string) => void;
+}
+
+/**
+ * A result with problem files is not known to be runnable, so the summary says
+ * so and offers a way straight to the first problem.
+ */
+const ProblemSummary = ({ problemFiles, onSelectFile }: ProblemSummaryProps) => {
+  const first = problemFiles[0];
+  return (
+    <div className={styles.problemSummary} role="status">
+      <strong>Partial result</strong>
+      <span>
+        {problemFiles.length === 1
+          ? "1 file needs a content choice and was left at the comparison base."
+          : `${String(problemFiles.length)} files need a content choice and were left at the comparison base.`}
+      </span>
+      {first === undefined ? null : (
+        <button type="button" onClick={() => { onSelectFile(first.path); }}>
+          Review first problem file
+        </button>
+      )}
+    </div>
+  );
+};

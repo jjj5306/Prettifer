@@ -24,6 +24,10 @@ import {
   createMergeFixture,
   type MergeFixture,
 } from "../support/merge-fixture.js";
+import {
+  createConflictFixture,
+  type ConflictFixture,
+} from "../support/conflict-fixture.js";
 
 const require = createRequire(import.meta.url);
 const executablePath = require("electron") as string;
@@ -498,6 +502,53 @@ test("composes a merge commit against the chosen mainline parent", async () => {
   expect(running.pageErrors).toEqual([]);
 });
 
+test("reviews a partial result and jumps to its problem file", async () => {
+  const fixture = await createConflictE2eFixture();
+  const running = await launch([fixture.path]);
+  await openRepository(running.page, fixture.path, fixture.headRef);
+  await running.page.getByRole("button", { name: "Load Commit Range" }).click();
+
+  // The prerequisite commit stays unselected, so shared.txt cannot be composed
+  // while the same commit's clean.txt change still applies.
+  await running.page.getByRole("checkbox", {
+    name: "Include in selected result: feat: rewrite the first shared line again and extend clean",
+  }).check();
+  await running.page.getByRole("button", { name: "Build Selected Result" }).click();
+  await expect(running.page.getByText(/Result ready · \d+ changed files/u)).toBeVisible();
+
+  const result = running.page.getByRole("region", { name: "Selected Result" });
+  await expect(result.getByText("Partial result")).toBeVisible();
+  await expect(result.getByText(
+    "1 file needs a content choice and was left at the comparison base.",
+  )).toBeVisible();
+  // The clean change of the partially applied commit is still reviewable, and
+  // the problem file is listed beside it instead of being dropped.
+  await expect(running.page.getByRole("button", {
+    name: "Currently viewing file: clean.txt (Modified)",
+  })).toBeVisible();
+  await expect(running.page.getByRole("button", {
+    name: "View file: shared.txt (Problem)",
+  })).toBeVisible();
+
+  await result.getByRole("button", { name: "Review first problem file" }).click();
+  await expect(running.page.getByRole("heading", { name: "Problem File" })).toBeVisible();
+  await expect(running.page.getByText("This file needs a content choice")).toBeVisible();
+  await expect(running.page.getByRole("button", {
+    name: "Currently viewing file: shared.txt (Problem)",
+  })).toHaveAttribute("aria-pressed", "true");
+
+  // Returning to a composed file shows a diff again.
+  await running.page.getByRole("button", { name: "View file: clean.txt (Modified)" }).click();
+  await expect(running.page.getByRole("textbox", {
+    name: "Read-only diff: clean.txt · base and selected result",
+  })).toBeVisible();
+  await expect(running.page.getByText("Loading diff editor…")).toBeHidden();
+
+  // The user repository keeps its own working tree and branch.
+  expect(fixture.git(["status", "--porcelain"])).toBe("");
+  expect(fixture.git(["rev-parse", "--abbrev-ref", "HEAD"]).trim()).toBe(fixture.headRef);
+});
+
 test("replaces repository state without showing the previous repository", async () => {
   const first = await createFixture();
   const second = await createFixture();
@@ -534,6 +585,12 @@ async function createHistoryE2eFixture(): Promise<HistoryFixture> {
 
 async function createMergeE2eFixture(): Promise<MergeFixture> {
   const fixture = await createMergeFixture();
+  fixtures.push(fixture);
+  return fixture;
+}
+
+async function createConflictE2eFixture(): Promise<ConflictFixture> {
+  const fixture = await createConflictFixture();
   fixtures.push(fixture);
   return fixture;
 }

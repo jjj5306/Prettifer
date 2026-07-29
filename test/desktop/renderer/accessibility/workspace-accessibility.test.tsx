@@ -35,6 +35,7 @@ function createController(withResult = false): AppController {
       },
     ],
     mainlineParents: {},
+    problemFiles: [],
     unifiedDiff: "diff",
   };
   return {

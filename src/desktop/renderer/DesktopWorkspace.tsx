@@ -20,6 +20,7 @@ import {
   selectPendingMainlineParents,
   selectRepositorySession,
   selectSelectedFile,
+  selectSelectedProblemFile,
 } from "./state/app-selectors.js";
 import styles from "./App.module.css";
 
@@ -91,6 +92,7 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
                   pendingMainlineParents={selectPendingMainlineParents(controller.state)}
                   onCompose={controller.composeSelection}
                   onCancel={controller.cancelComposition}
+                  onSelectFile={controller.selectFile}
                 />
               ) : (
                 <section className={styles.placeholder} aria-labelledby="result-placeholder-heading">
@@ -122,6 +124,7 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
                         requestId: controller.state.composition.requestId,
                       }}
                       file={selectedFile}
+                      problem={selectSelectedProblemFile(controller.state)}
                     />
                   </DiffErrorBoundary>
                 </div>

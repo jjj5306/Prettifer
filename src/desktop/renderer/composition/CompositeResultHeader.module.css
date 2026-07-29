@@ -1,6 +1,10 @@
+/*
+ * Every child is placed explicitly so the optional partial-result notice keeps
+ * its own track instead of pushing the metadata into the button column.
+ */
 .header {
   composes: surface from "../PanelSurface.module.css";
-  grid-template-columns: auto minmax(10rem, auto) minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(10rem, auto) auto minmax(0, 1fr) auto;
   min-height: var(--bar-height);
   align-items: center;
   gap: var(--space-3);
@@ -9,6 +13,7 @@
 
 .identity {
   display: grid;
+  grid-column: 1;
   align-items: center;
   gap: 0;
 }
@@ -34,6 +39,7 @@
 }
 
 .status {
+  grid-column: 2;
   overflow: hidden;
   color: var(--color-muted);
   text-overflow: ellipsis;
@@ -41,6 +47,7 @@
 }
 
 .error {
+  grid-column: 2;
   padding: var(--space-2);
   border: 1px solid var(--color-danger);
   border-radius: 0.5rem;
@@ -48,6 +55,7 @@
 
 .summary {
   display: flex;
+  grid-column: 4;
   min-width: 0;
   align-items: center;
   gap: var(--space-3);
@@ -82,6 +90,7 @@
 }
 
 .header > button {
+  grid-column: 5;
   min-height: 2rem;
   padding-block: 0.25rem;
   white-space: nowrap;
@@ -90,6 +99,16 @@
 @media (max-width: 64rem) {
   .header {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* One column per row, so the explicit placement above no longer applies. */
+  .identity,
+  .status,
+  .error,
+  .problemSummary,
+  .summary,
+  .header > button {
+    grid-column: 1;
   }
 
   .summary {
@@ -108,5 +127,39 @@
 .mainlineParent {
   color: var(--color-muted);
   font-size: 0.625rem;
+  white-space: nowrap;
+}
+
+/* Partial result notice with a jump to the first problem file. */
+.problemSummary {
+  display: flex;
+  grid-column: 3;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  border-left: 2px solid var(--color-warning);
+}
+
+.problemSummary strong {
+  color: var(--color-warning);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.problemSummary span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.problemSummary button {
+  flex: 0 0 auto;
+  min-height: 1.6rem;
+  padding: 0 var(--space-2);
+  font-size: 0.6875rem;
   white-space: nowrap;
 }

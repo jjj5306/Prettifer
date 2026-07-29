@@ -8,6 +8,14 @@ import { describe, expect, it, vi } from "vitest";
 import { CompositeResultHeader } from "../../../../src/desktop/renderer/composition/CompositeResultHeader.js";
 import type { CompositionState } from "../../../../src/desktop/renderer/state/app-state.js";
 
+const readyResult = {
+  baseCommit: "c".repeat(40),
+  selectedCommits: ["d".repeat(40)],
+  files: [],
+  mainlineParents: {},
+  problemFiles: [],
+  unifiedDiff: "",
+};
 const range = {
   baseRef: "main",
   baseRefCommit: "a".repeat(40),
@@ -35,6 +43,7 @@ function renderHeader(
           pendingMainlineParents={0}
           onCompose={onCompose}
           onCancel={onCancel}
+          onSelectFile={vi.fn()}
         />
       </StrictMode>,
     ),
@@ -68,6 +77,7 @@ describe("CompositeResultHeader", () => {
           pendingMainlineParents={0}
           onCompose={start.onCompose}
           onCancel={start.onCancel}
+          onSelectFile={vi.fn()}
         />
       </StrictMode>,
     );
@@ -90,6 +100,7 @@ describe("CompositeResultHeader", () => {
         selectedCommits: ["d".repeat(40), "e".repeat(40)],
         files: [],
         mainlineParents: {},
+        problemFiles: [],
         unifiedDiff: "",
       },
     }, 2);
@@ -126,5 +137,64 @@ describe("CompositeResultHeader", () => {
       "The selected commit could not be applied. Check the selection and rebuild the result.",
     );
     expect(screen.getByRole("button", { name: "Rebuild Selected Result" })).toBeEnabled();
+  });
+
+  it("marks a result with problem files as partial and jumps to the first one", async () => {
+    const user = userEvent.setup();
+    const onSelectFile = vi.fn();
+    render(
+      <CompositeResultHeader
+        composition={{
+          status: "ready",
+          requestId: "composition-1",
+          result: {
+            ...readyResult,
+            problemFiles: [
+              {
+                path: "src/broken.ts",
+                code: "CONTENT_CHOICE_REQUIRED",
+                commit: "c".repeat(40),
+                nextAction: "Select the prerequisite commits, then build the result again.",
+              },
+            ],
+          },
+        }}
+        range={range}
+        selectedCount={1}
+        pendingMainlineParents={0}
+        onCompose={vi.fn()}
+        onCancel={vi.fn()}
+        onSelectFile={onSelectFile}
+      />,
+    );
+
+    expect(screen.getByText("Partial result")).toBeVisible();
+    expect(screen.getByText(
+      "1 file needs a content choice and was left at the comparison base.",
+    )).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Review first problem file" }));
+    expect(onSelectFile).toHaveBeenCalledWith("src/broken.ts");
+  });
+
+  it("does not mark a result without problem files as partial", () => {
+    render(
+      <CompositeResultHeader
+        composition={{
+          status: "ready",
+          requestId: "composition-1",
+          result: readyResult,
+        }}
+        range={range}
+        selectedCount={1}
+        pendingMainlineParents={0}
+        onCompose={vi.fn()}
+        onCancel={vi.fn()}
+        onSelectFile={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText("Partial result")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Review first problem file" })).toBeNull();
   });
 });

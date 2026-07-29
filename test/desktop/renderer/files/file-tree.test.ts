@@ -1,16 +1,37 @@
 import { describe, expect, it } from "vitest";
 
 import { buildFileTree } from "../../../../src/desktop/renderer/files/file-tree.js";
+import type { ReviewEntry } from "../../../../src/desktop/renderer/files/review-entries.js";
+
+type ComposedFile = Extract<ReviewEntry, { kind: "file" }>["file"];
+
+/** Wraps a composed file as the review entry the tree consumes. */
+function fileEntry(file: ComposedFile): ReviewEntry {
+  return { kind: "file", path: file.path, file };
+}
 
 describe("buildFileTree", () => {
   it("groups repository-relative paths while preserving original file identities", () => {
-    const files = [
-      { path: "src/auth/login.ts", status: "modified" as const, beforeContent: "", afterContent: "" },
-      { path: "src/app.ts", status: "added" as const, beforeContent: null, afterContent: "" },
-      { path: "README.md", status: "deleted" as const, beforeContent: "", afterContent: null },
-    ];
+    const login: ComposedFile = {
+      path: "src/auth/login.ts",
+      status: "modified",
+      beforeContent: "",
+      afterContent: "",
+    };
+    const app: ComposedFile = {
+      path: "src/app.ts",
+      status: "added",
+      beforeContent: null,
+      afterContent: "",
+    };
+    const readme: ComposedFile = {
+      path: "README.md",
+      status: "deleted",
+      beforeContent: "",
+      afterContent: null,
+    };
 
-    expect(buildFileTree(files)).toEqual([
+    expect(buildFileTree([login, app, readme].map(fileEntry))).toEqual([
       {
         kind: "directory",
         name: "src",
@@ -24,14 +45,14 @@ describe("buildFileTree", () => {
               kind: "file",
               name: "login.ts",
               path: "src/auth/login.ts",
-              file: files[0],
+              entry: fileEntry(login),
             }],
           },
           {
             kind: "file",
             name: "app.ts",
             path: "src/app.ts",
-            file: files[1],
+            entry: fileEntry(app),
           },
         ],
       },
@@ -39,28 +60,26 @@ describe("buildFileTree", () => {
         kind: "file",
         name: "README.md",
         path: "README.md",
-        file: files[2],
+        entry: fileEntry(readme),
       },
     ]);
   });
 
   it("joins a directory chain that holds a single directory into one row", () => {
-    const files = [
-      {
-        path: "bundles/core/src/com/codescroll/generator.java",
-        status: "modified" as const,
-        beforeContent: "",
-        afterContent: "",
-      },
-      {
-        path: "bundles/core/src/com/codescroll/tests/generator-test.java",
-        status: "added" as const,
-        beforeContent: null,
-        afterContent: "",
-      },
-    ];
+    const generator: ComposedFile = {
+      path: "bundles/core/src/com/codescroll/generator.java",
+      status: "modified",
+      beforeContent: "",
+      afterContent: "",
+    };
+    const generatorTest: ComposedFile = {
+      path: "bundles/core/src/com/codescroll/tests/generator-test.java",
+      status: "added",
+      beforeContent: null,
+      afterContent: "",
+    };
 
-    expect(buildFileTree(files)).toEqual([{
+    expect(buildFileTree([generator, generatorTest].map(fileEntry))).toEqual([{
       kind: "directory",
       name: "bundles/core/src/com/codescroll",
       path: "bundles/core/src/com/codescroll",
@@ -69,7 +88,7 @@ describe("buildFileTree", () => {
           kind: "file",
           name: "generator.java",
           path: "bundles/core/src/com/codescroll/generator.java",
-          file: files[0],
+          entry: fileEntry(generator),
         },
         {
           kind: "directory",
@@ -79,7 +98,7 @@ describe("buildFileTree", () => {
             kind: "file",
             name: "generator-test.java",
             path: "bundles/core/src/com/codescroll/tests/generator-test.java",
-            file: files[1],
+            entry: fileEntry(generatorTest),
           }],
         },
       ],
@@ -87,30 +106,35 @@ describe("buildFileTree", () => {
   });
 
   it("keeps a directory that holds a single file as its own row", () => {
-    const file = {
+    const file: ComposedFile = {
       path: "docs/auth.md",
-      status: "modified" as const,
+      status: "modified",
       beforeContent: "",
       afterContent: "",
     };
 
-    expect(buildFileTree([file])).toEqual([{
+    expect(buildFileTree([fileEntry(file)])).toEqual([{
       kind: "directory",
       name: "docs",
       path: "docs",
-      children: [{ kind: "file", name: "auth.md", path: "docs/auth.md", file }],
+      children: [{
+        kind: "file",
+        name: "auth.md",
+        path: "docs/auth.md",
+        entry: fileEntry(file),
+      }],
     }]);
   });
 
   it("accepts Windows separators without changing the original path", () => {
-    const file = {
+    const file: ComposedFile = {
       path: "src\\app.ts",
-      status: "modified" as const,
+      status: "modified",
       beforeContent: "",
       afterContent: "",
     };
 
-    expect(buildFileTree([file])).toEqual([{
+    expect(buildFileTree([fileEntry(file)])).toEqual([{
       kind: "directory",
       name: "src",
       path: "src",
@@ -118,8 +142,37 @@ describe("buildFileTree", () => {
         kind: "file",
         name: "app.ts",
         path: "src\\app.ts",
-        file,
+        entry: fileEntry(file),
       }],
+    }]);
+  });
+
+  it("places a problem file at its path position alongside composed files", () => {
+    const composed: ComposedFile = {
+      path: "src/app.ts",
+      status: "modified",
+      beforeContent: "",
+      afterContent: "",
+    };
+    const problem: ReviewEntry = {
+      kind: "problem",
+      path: "src/broken.ts",
+      problem: {
+        path: "src/broken.ts",
+        code: "CONTENT_CHOICE_REQUIRED",
+        commit: "a".repeat(40),
+        nextAction: "Select the prerequisite commits, then build the result again.",
+      },
+    };
+
+    expect(buildFileTree([fileEntry(composed), problem])).toEqual([{
+      kind: "directory",
+      name: "src",
+      path: "src",
+      children: [
+        { kind: "file", name: "app.ts", path: "src/app.ts", entry: fileEntry(composed) },
+        { kind: "file", name: "broken.ts", path: "src/broken.ts", entry: problem },
+      ],
     }]);
   });
 });
