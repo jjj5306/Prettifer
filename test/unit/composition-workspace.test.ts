@@ -8,7 +8,11 @@ import { isContentConfigurationKey } from "../../src/composition/composition-wor
  * the matched key set would change composition results without any other test
  * noticing.
  */
+const probe: Array<string> = [];
+
 describe("isContentConfigurationKey", () => {
+  it("uses the probe", () => { expect(probe).toEqual([]); });
+
   it.each([
     "core.attributesfile",
     "core.autocrlf",
