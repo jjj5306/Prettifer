@@ -16,13 +16,20 @@ export interface FileTreeFile {
 
 export type FileTreeNode = FileTreeDirectory | FileTreeFile;
 
+/**
+ * A directory under construction. Children are held in one insertion-ordered
+ * map keyed by segment name, so looking a directory up and adding a child read
+ * the same collection. A repository cannot hold a file and a directory with the
+ * same name in one directory, which makes the name a safe key.
+ */
 interface MutableDirectory {
   readonly kind: "directory";
   readonly name: string;
   readonly path: string;
-  readonly children: FileTreeNode[];
-  readonly directories: Map<string, MutableDirectory>;
+  readonly children: Map<string, MutableNode>;
 }
+
+type MutableNode = MutableDirectory | FileTreeFile;
 
 /**
  * Builds the changed file hierarchy and joins directory chains that hold a
@@ -64,13 +71,7 @@ function joinSingleChildDirectories(
 function buildDirectoryTree(
   entries: readonly ReviewEntry[],
 ): readonly FileTreeNode[] {
-  const root: MutableDirectory = {
-    kind: "directory",
-    name: "",
-    path: "",
-    children: [],
-    directories: new Map(),
-  };
+  const root = newDirectory("", "");
 
   for (const entry of entries) {
     const segments = entry.path.split(/[\\/]/u).filter((segment) => segment.length > 0);
@@ -81,24 +82,10 @@ function buildDirectoryTree(
     for (const segment of segments.slice(0, -1)) {
       directoryPath =
         directoryPath.length === 0 ? segment : `${directoryPath}/${segment}`;
-      const existing = parent.directories.get(segment);
-      if (existing !== undefined) {
-        parent = existing;
-        continue;
-      }
-      const directory: MutableDirectory = {
-        kind: "directory",
-        name: segment,
-        path: directoryPath,
-        children: [],
-        directories: new Map(),
-      };
-      parent.directories.set(segment, directory);
-      parent.children.push(directory);
-      parent = directory;
+      parent = openDirectory(parent, segment, directoryPath);
     }
 
-    parent.children.push({
+    parent.children.set(fileName, {
       kind: "file",
       name: fileName,
       path: entry.path,
@@ -106,5 +93,38 @@ function buildDirectoryTree(
     });
   }
 
-  return root.children;
+  return freezeChildren(root);
+}
+
+function newDirectory(name: string, path: string): MutableDirectory {
+  return { kind: "directory", name, path, children: new Map() };
+}
+
+/** Returns the named child directory, creating it on first use. */
+function openDirectory(
+  parent: MutableDirectory,
+  name: string,
+  path: string,
+): MutableDirectory {
+  const existing = parent.children.get(name);
+  if (existing?.kind === "directory") {
+    return existing;
+  }
+  const directory = newDirectory(name, path);
+  parent.children.set(name, directory);
+  return directory;
+}
+
+/** Derives the read-only nodes from the insertion order of each child map. */
+function freezeChildren(directory: MutableDirectory): readonly FileTreeNode[] {
+  return [...directory.children.values()].map((child) =>
+    child.kind === "file"
+      ? child
+      : {
+        kind: "directory",
+        name: child.name,
+        path: child.path,
+        children: freezeChildren(child),
+      },
+  );
 }
