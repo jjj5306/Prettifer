@@ -73,10 +73,17 @@ export const commitPageRequestSchema = sessionIdentitySchema.extend({
   offset: z.number().int().nonnegative().default(0),
 }).strict();
 
+/** Mainline parent number per merge commit, keyed by full commit id. */
+export const mainlineParentsSchema = z.record(
+  commitIdSchema,
+  z.number().int().positive(),
+);
+
 export const compositionRequestSchema = sessionIdentitySchema.extend({
   range: repositoryRangeSchema,
   requestId: z.uuid(),
   selectedCommits: z.array(commitIdSchema).min(1),
+  mainlineParents: mainlineParentsSchema.default({}),
 }).strict();
 
 export const cancelCompositionRequestSchema = sessionIdentitySchema.extend({
@@ -120,6 +127,7 @@ export const compositeFileChangeSchema = z.union([
 export const compositeDiffResultSchema = z.object({
   baseCommit: commitIdSchema,
   selectedCommits: z.array(commitIdSchema),
+  mainlineParents: mainlineParentsSchema,
   files: z.array(compositeFileChangeSchema),
   unifiedDiff: z.string(),
 }).strict();

@@ -20,6 +20,7 @@ const request: CompositionRequest = {
     rangeRevision: `${baseCommit}:${headCommit}:${commonCommit}`,
   },
   requestId: "00000000-0000-4000-8000-000000000002",
+  mainlineParents: {},
   selectedCommits: [selectedCommit],
 };
 const readyState = {
@@ -29,6 +30,7 @@ const readyState = {
     baseCommit: commonCommit,
     selectedCommits: [selectedCommit],
     files: [],
+    mainlineParents: {},
     unifiedDiff: "",
   },
 };
@@ -71,6 +73,7 @@ describe("DesktopCompositionController", () => {
       baseRef: commonCommit,
       headRef: headCommit,
       selectedCommits: [selectedCommit],
+      mainlineParents: {},
     });
   });
 

@@ -16,19 +16,25 @@ export interface SelectionRequest {
   baseCommit: string;
   headRef: string;
   selectedCommits: readonly string[];
+  /** Mainline parent number, keyed by selected commit. Required for merges. */
+  mainlineParents?: Readonly<Record<string, number>>;
   signal?: AbortSignal;
 }
 
 export interface SelectionPlan {
   baseCommit: string;
   selectedCommits: readonly string[];
+  /** Resolved mainline parent number, keyed by full commit id. Merges only. */
+  mainlineParents: Readonly<Record<string, number>>;
 }
 
 export type SelectionErrorCode =
   | "INVALID_COMMIT"
   | "COMMIT_OUTSIDE_COMPARISON"
   | "AMBIGUOUS_SELECTION"
-  | "COMMIT_APPLY_CONFLICT";
+  | "COMMIT_APPLY_CONFLICT"
+  | "MAINLINE_PARENT_REQUIRED"
+  | "MAINLINE_PARENT_OUT_OF_RANGE";
 
 export class SelectionError extends Error {
   constructor(
@@ -88,7 +94,61 @@ export class SelectionPlanner {
         getPosition(positions, left) - getPosition(positions, right),
     );
     await this.verifyLinearAncestry(request, unique);
-    return { baseCommit: request.baseCommit, selectedCommits: unique };
+    return {
+      baseCommit: request.baseCommit,
+      selectedCommits: unique,
+      mainlineParents: await this.resolveMainlineParents(
+        request,
+        unique,
+        requestedMainlineParents(request, resolved),
+      ),
+    };
+  }
+
+  /**
+   * Keeps a mainline parent only for commits that actually have several parents,
+   * and rejects a merge whose parent is missing or outside the parent range.
+   */
+  private async resolveMainlineParents(
+    request: SelectionRequest,
+    commits: readonly string[],
+    requested: ReadonlyMap<string, number>,
+  ): Promise<Readonly<Record<string, number>>> {
+    const mainlineParents: Record<string, number> = {};
+    for (const commit of commits) {
+      const parentCount = await this.countParents(request, commit);
+      if (parentCount <= 1) {
+        continue;
+      }
+      const parent = requested.get(commit);
+      if (parent === undefined) {
+        throw new SelectionError(
+          "MAINLINE_PARENT_REQUIRED",
+          commit,
+          "Choose which parent the merge should be compared against, then build the result again.",
+        );
+      }
+      if (!Number.isInteger(parent) || parent < 1 || parent > parentCount) {
+        throw new SelectionError(
+          "MAINLINE_PARENT_OUT_OF_RANGE",
+          commit,
+          `Choose a parent between 1 and ${String(parentCount)}, then build the result again.`,
+        );
+      }
+      mainlineParents[commit] = parent;
+    }
+    return mainlineParents;
+  }
+
+  private async countParents(
+    request: SelectionRequest,
+    commit: string,
+  ): Promise<number> {
+    const result = await this.git.run(
+      ["rev-list", "--parents", "-n", "1", commit],
+      gitRunOptions(request.repositoryPath, request.signal),
+    );
+    return result.stdout.trim().split(/\s+/u).length - 1;
   }
 
   private async resolveCommit(
@@ -161,5 +221,34 @@ function createSelectionErrorMessage(
       return `The selected commit order is ambiguous: ${commit}`;
     case "COMMIT_APPLY_CONFLICT":
       return `The commit cannot be applied independently: ${commit}`;
+    case "MAINLINE_PARENT_REQUIRED":
+      return `The merge commit needs a mainline parent: ${commit}`;
+    case "MAINLINE_PARENT_OUT_OF_RANGE":
+      return `The mainline parent is outside the commit's parents: ${commit}`;
   }
+}
+
+/**
+ * Maps each resolved commit id to the mainline parent the caller asked for,
+ * accepting either the resolved id or the original selection string as the key.
+ */
+function requestedMainlineParents(
+  request: SelectionRequest,
+  resolved: readonly string[],
+): ReadonlyMap<string, number> {
+  const requested = new Map<string, number>();
+  if (request.mainlineParents === undefined) {
+    return requested;
+  }
+  for (const [index, input] of request.selectedCommits.entries()) {
+    const commit = resolved.at(index);
+    if (commit === undefined) {
+      continue;
+    }
+    const parent = request.mainlineParents[commit] ?? request.mainlineParents[input];
+    if (parent !== undefined) {
+      requested.set(commit, parent);
+    }
+  }
+  return requested;
 }
