@@ -124,11 +124,19 @@ export const compositeFileChangeSchema = z.union([
   }).strict(),
 ]);
 
+export const compositeProblemFileSchema = z.object({
+  path: compositeFilePathSchema,
+  code: z.literal("CONTENT_CHOICE_REQUIRED"),
+  commit: commitIdSchema,
+  nextAction: z.string().min(1),
+}).strict();
+
 export const compositeDiffResultSchema = z.object({
   baseCommit: commitIdSchema,
   selectedCommits: z.array(commitIdSchema),
   mainlineParents: mainlineParentsSchema,
   files: z.array(compositeFileChangeSchema),
+  problemFiles: z.array(compositeProblemFileSchema),
   unifiedDiff: z.string(),
 }).strict();
 

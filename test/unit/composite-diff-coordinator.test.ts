@@ -12,6 +12,7 @@ const result = (commit: string): CompositeDiffResult => ({
   baseCommit: "base",
   selectedCommits: [commit],
   mainlineParents: {},
+  problemFiles: [],
   files: [],
   unifiedDiff: commit,
 });

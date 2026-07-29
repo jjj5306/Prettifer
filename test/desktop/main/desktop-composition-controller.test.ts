@@ -31,6 +31,7 @@ const readyState = {
     selectedCommits: [selectedCommit],
     files: [],
     mainlineParents: {},
+    problemFiles: [],
     unifiedDiff: "",
   },
 };

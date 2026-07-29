@@ -81,6 +81,7 @@ export class DesktopCompositionController {
               ...state.result,
               selectedCommits: [...state.result.selectedCommits],
               files: state.result.files.map((file) => ({ ...file })),
+              problemFiles: state.result.problemFiles.map((file) => ({ ...file })),
             },
           };
         case "error":
