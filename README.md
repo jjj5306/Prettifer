@@ -114,6 +114,27 @@ npx openspec validate --all --strict       # OpenSpec
 Prettifer 앱이 실행 중이면 `out/desktop/prettifer-win32-x64`가 잠겨 패키징이
 실패하므로 앱을 닫고 실행합니다.
 
+### Pull Request 검사
+
+`.github/workflows/pull-request-checks.yml`이 `main`으로 향하는 Pull Request와
+`main` push에서 위 명령 중 다음을 자동으로 실행합니다.
+
+| 검사 | 실행 명령 |
+|---|---|
+| Lint, types and unit tests | `npm run lint`, `npm run typecheck`, `npm test` |
+| Electron end-to-end tests | `npm run test:desktop:e2e` |
+
+e2e가 실패하면 Playwright trace와 스크린샷이 `playwright-results` artifact로
+올라가므로 로컬에서 재현하지 않고 원인을 볼 수 있습니다.
+
+`npx openspec validate --all --strict`는 검사에 포함되지 않습니다. OpenSpec CLI가
+프로젝트 의존성이 아니라 전역 설치이고, npm 레지스트리의 `openspec` 패키지는
+이 도구가 아닌 다른 패키지이기 때문입니다. 작성자가 로컬에서 실행하고 결과를 PR
+본문에 남깁니다.
+
+검사가 통과해도 요구사항 일치, 이슈 범위와 문서 정합성은 검증되지 않습니다. 이
+항목들은 `.github/pull_request_template.md`의 자체 리뷰가 담당합니다.
+
 ### 패키지 산출물
 
 ```powershell
