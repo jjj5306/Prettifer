@@ -148,4 +148,57 @@ describe("DiffPane", () => {
       name: "Read-only diff: src/app.ts · base and selected result",
     })).toHaveFocus();
   });
+
+  it("shows the problem cause instead of a diff for a problem file", () => {
+    const loadAdapter = vi.fn();
+    render(
+      <DiffPane
+        identity={identity}
+        file={null}
+        problem={{
+          path: "src/broken.ts",
+          code: "CONTENT_CHOICE_REQUIRED",
+          commit: "c".repeat(40),
+          nextAction: "Select the prerequisite commits, then build the result again.",
+        }}
+        loadAdapter={loadAdapter}
+      />,
+    );
+
+    expect(loadAdapter).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "Problem File" })).toBeVisible();
+    expect(screen.getByText("This file needs a content choice")).toBeVisible();
+    expect(screen.getByText(
+      "Select the prerequisite commits, then build the result again.",
+    )).toBeVisible();
+    expect(screen.queryByRole("textbox")).toBeNull();
+  });
+
+  it("returns to a diff when a composed file is selected after a problem file", async () => {
+    const adapter = { show: vi.fn(), dispose: vi.fn() };
+    const loadAdapter = vi.fn().mockResolvedValue(adapter);
+    const { rerender } = render(
+      <DiffPane
+        identity={identity}
+        file={null}
+        problem={{
+          path: "src/broken.ts",
+          code: "CONTENT_CHOICE_REQUIRED",
+          commit: "c".repeat(40),
+          nextAction: "Select the prerequisite commits, then build the result again.",
+        }}
+        loadAdapter={loadAdapter}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "Problem File" })).toBeVisible();
+
+    rerender(
+      <DiffPane identity={identity} file={file} problem={null} loadAdapter={loadAdapter} />,
+    );
+
+    await waitFor(() => { expect(adapter.show).toHaveBeenCalledOnce(); });
+    expect(screen.getByRole("textbox", {
+      name: "Read-only diff: src/app.ts · base and selected result",
+    })).toBeVisible();
+  });
 });

@@ -58,12 +58,24 @@ interface CompositeFilePathChange {
   readonly status: CompositeFileStatus;
 }
 
+export type CompositeProblemCode = "CONTENT_CHOICE_REQUIRED";
+
+export interface CompositeProblemFile {
+  readonly path: string;
+  readonly code: CompositeProblemCode;
+  /** Commit whose application could not be completed for this path. */
+  readonly commit: string;
+  readonly nextAction: string;
+}
+
 export interface CompositeDiffResult {
   baseCommit: string;
   selectedCommits: readonly string[];
   /** Mainline parent used for each merge commit, keyed by full commit id. */
   mainlineParents: Readonly<Record<string, number>>;
   files: readonly CompositeFileChange[];
+  /** Paths that needed a content choice. A non-empty list means a partial result. */
+  problemFiles: readonly CompositeProblemFile[];
   unifiedDiff: string;
 }
 
@@ -160,6 +172,8 @@ export class CompositeDiffService {
     plan: SelectionPlan,
     signal: AbortSignal | undefined,
   ): Promise<CompositeDiffResult> {
+    const problemFiles = new Map<string, CompositeProblemFile>();
+    let firstConflictingCommit: string | undefined;
     for (const commit of plan.selectedCommits) {
       const mainlineParent = plan.mainlineParents[commit];
       try {
@@ -181,21 +195,31 @@ export class CompositeDiffService {
         if (error.exitCode !== 1) {
           throw error;
         }
-        const unmergedFiles = await this.git.run(
-          ["ls-files", "--unmerged", "-z"],
-          gitRunOptions(workspace.path, signal),
-        );
-        if (unmergedFiles.stdout.length === 0) {
+        const conflicts = await this.readConflicts(workspace, signal);
+        if (conflicts.size === 0) {
           throw error;
         }
-        throw new SelectionError(
-          "COMMIT_APPLY_CONFLICT",
-          commit,
-          "Select its earlier prerequisite commits, then build the result again.",
-          { cause: error },
-        );
+        await this.isolateConflicts(workspace, conflicts, commit, error, signal);
+        firstConflictingCommit ??= commit;
+        for (const path of conflicts.keys()) {
+          // The earliest conflict names the earliest missing prerequisite, which
+          // is the one the user has to select first.
+          if (problemFiles.has(path)) {
+            continue;
+          }
+          problemFiles.set(path, {
+            path,
+            code: "CONTENT_CHOICE_REQUIRED",
+            commit,
+            nextAction:
+              "Select the prerequisite commits that changed this file, then build the result again.",
+          });
+        }
       }
     }
+    // Problem paths are restored to the base so the file list and the unified
+    // diff never present content that matches no selection.
+    await this.restoreToBase(workspace, [...problemFiles.keys()], signal);
 
     const [unifiedDiff, nameStatus, numstat] = await Promise.all([
       this.git.run(
@@ -226,14 +250,119 @@ export class CompositeDiffService {
     const files = await mapWithGitConcurrency(changedPaths, (change) =>
       this.readFileChange(workspace, change, binaryPaths.has(change.path), signal),
     );
+    if (files.length === 0 && problemFiles.size > 0) {
+      // Nothing survived the conflicts, so there is no result worth reviewing.
+      throw new SelectionError(
+        "COMMIT_APPLY_CONFLICT",
+        firstConflictingCommit ?? plan.selectedCommits[0] ?? "",
+        "Select its earlier prerequisite commits, then build the result again.",
+      );
+    }
 
     return {
       baseCommit: workspace.baseCommit,
       selectedCommits: [...plan.selectedCommits],
       mainlineParents: plan.mainlineParents,
       files,
+      problemFiles: [...problemFiles.values()].sort((left, right) =>
+        comparePath(left.path, right.path),
+      ),
       unifiedDiff: unifiedDiff.stdout,
     };
+  }
+
+  /** Conflicted paths mapped to the index stages Git left behind. */
+  private async readConflicts(
+    workspace: CompositionWorkspace,
+    signal: AbortSignal | undefined,
+  ): Promise<Map<string, Set<number>>> {
+    const unmerged = await this.git.run(
+      ["ls-files", "--unmerged", "-z"],
+      gitRunOptions(workspace.path, signal),
+    );
+    const conflicts = new Map<string, Set<number>>();
+    for (const record of unmerged.stdout.split("\0")) {
+      if (record.length === 0) {
+        continue;
+      }
+      const [details, path] = record.split("\t");
+      const stage = Number(details?.trim().split(/\s+/u).at(2));
+      if (path === undefined || !Number.isInteger(stage)) {
+        throw new Error("The conflicted index entries could not be parsed.");
+      }
+      const stages = conflicts.get(path) ?? new Set<number>();
+      stages.add(stage);
+      conflicts.set(path, stages);
+    }
+    return conflicts;
+  }
+
+  /**
+   * Restores each conflicted path to the state it had before the commit was
+   * applied and clears the sequencer, so the remaining commits can still apply.
+   */
+  private async isolateConflicts(
+    workspace: CompositionWorkspace,
+    conflicts: ReadonlyMap<string, Set<number>>,
+    commit: string,
+    cause: GitCommandError,
+    signal: AbortSignal | undefined,
+  ): Promise<void> {
+    for (const [path, stages] of conflicts) {
+      if (stages.has(2)) {
+        // Stage 2 holds the content from before this commit was applied.
+        await this.git.run(
+          ["checkout", "--ours", "--", path],
+          gitRunOptions(workspace.path, signal),
+        );
+        await this.git.run(
+          ["add", "--", path],
+          gitRunOptions(workspace.path, signal),
+        );
+        continue;
+      }
+      await this.git.run(
+        ["rm", "--force", "--quiet", "--", path],
+        gitRunOptions(workspace.path, signal),
+      );
+    }
+    if ((await this.readConflicts(workspace, signal)).size > 0) {
+      throw new SelectionError(
+        "COMMIT_APPLY_CONFLICT",
+        commit,
+        "Select its earlier prerequisite commits, then build the result again.",
+        { cause },
+      );
+    }
+    await this.git.run(
+      ["cherry-pick", "--quit"],
+      gitRunOptions(workspace.path, signal),
+    );
+  }
+
+  /** Returns the given paths to their comparison base state. */
+  private async restoreToBase(
+    workspace: CompositionWorkspace,
+    paths: readonly string[],
+    signal: AbortSignal | undefined,
+  ): Promise<void> {
+    for (const path of paths) {
+      const existsInBase = await this.git.run(
+        ["cat-file", "-e", `${workspace.baseCommit}:${path}`],
+        gitRunOptions(workspace.path, signal, [0, 1, 128]),
+      );
+      if (existsInBase.exitCode === 0) {
+        await this.git.run(
+          ["checkout", workspace.baseCommit, "--", path],
+          gitRunOptions(workspace.path, signal),
+        );
+        continue;
+      }
+      await this.git.run(
+        ["rm", "--force", "--quiet", "--ignore-unmatch", "--", path],
+        gitRunOptions(workspace.path, signal),
+      );
+    }
   }
 
   private async readFileChange(

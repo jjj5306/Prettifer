@@ -81,6 +81,7 @@ export class DesktopCompositionController {
               ...state.result,
               selectedCommits: [...state.result.selectedCommits],
               files: state.result.files.map((file) => ({ ...file })),
+              problemFiles: state.result.problemFiles.map((file) => ({ ...file })),
             },
           };
         case "error":
@@ -167,7 +168,9 @@ function publicCompositionDiagnostic(diagnostic: {
     diagnostic.code === "INVALID_COMMIT" ||
     diagnostic.code === "COMMIT_OUTSIDE_COMPARISON" ||
     diagnostic.code === "AMBIGUOUS_SELECTION" ||
-    diagnostic.code === "COMMIT_APPLY_CONFLICT"
+    diagnostic.code === "COMMIT_APPLY_CONFLICT" ||
+    diagnostic.code === "MAINLINE_PARENT_REQUIRED" ||
+    diagnostic.code === "MAINLINE_PARENT_OUT_OF_RANGE"
   ) {
     return {
       code: diagnostic.code,

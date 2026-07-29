@@ -16,6 +16,7 @@ const result = {
     { path: "src/nested/m.ts", status: "modified" as const, beforeContent: "m1", afterContent: "m2" },
   ],
   mainlineParents: {},
+  problemFiles: [],
   unifiedDiff: "diff",
 };
 
@@ -188,5 +189,63 @@ describe("ChangedFilePane", () => {
 
     expect(screen.getByText(markupPath)).toBeVisible();
     expect(container.querySelector("img")).toBeNull();
+  });
+
+  it("shows a problem file at its path position in both views", async () => {
+    const user = userEvent.setup();
+    const withProblem = {
+      ...result,
+      problemFiles: [{
+        path: "src/broken.ts",
+        code: "CONTENT_CHOICE_REQUIRED" as const,
+        commit: "c".repeat(40),
+        nextAction: "Select the prerequisite commits, then build the result again.",
+      }],
+    };
+    render(
+      <ChangedFilePane
+        result={withProblem}
+        selectedFilePath={null}
+        onSelectFile={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", {
+      name: "View file: src/broken.ts (Problem)",
+    })).toBeVisible();
+    // The problem counts toward the reviewed file total.
+    expect(screen.getByText("4")).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Tree View" }));
+    expect(screen.getByRole("button", {
+      name: "View file: src/broken.ts (Problem)",
+    })).toBeVisible();
+  });
+
+  it("selects a problem file from the list", async () => {
+    const user = userEvent.setup();
+    const onSelectFile = vi.fn();
+    const withProblem = {
+      ...result,
+      files: [],
+      problemFiles: [{
+        path: "src/broken.ts",
+        code: "CONTENT_CHOICE_REQUIRED" as const,
+        commit: "c".repeat(40),
+        nextAction: "Select the prerequisite commits, then build the result again.",
+      }],
+    };
+    render(
+      <ChangedFilePane
+        result={withProblem}
+        selectedFilePath={null}
+        onSelectFile={onSelectFile}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", {
+      name: "View file: src/broken.ts (Problem)",
+    }));
+    expect(onSelectFile).toHaveBeenCalledWith("src/broken.ts");
   });
 });
