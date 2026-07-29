@@ -175,4 +175,32 @@ describe("buildFileTree", () => {
       ],
     }]);
   });
+
+  it("reuses one directory for every file under it and keeps the arrival order", () => {
+    const files: ComposedFile[] = [
+      "src/auth/login.ts",
+      "src/auth/session.ts",
+      "src/auth/nested/deep.ts",
+      "src/auth/token.ts",
+    ].map((path) => ({
+      path,
+      status: "modified" as const,
+      beforeContent: "",
+      afterContent: "",
+    }));
+
+    const [root] = buildFileTree(files.map(fileEntry));
+
+    // The chain src → auth is joined, so one row holds every child below it.
+    expect(root).toMatchObject({ kind: "directory", name: "src/auth", path: "src/auth" });
+    const children = root?.kind === "directory" ? root.children : [];
+    expect(children.map((child) => child.name)).toEqual([
+      "login.ts",
+      "session.ts",
+      "nested",
+      "token.ts",
+    ]);
+    // A shared directory must not be created twice.
+    expect(children.filter((child) => child.kind === "directory")).toHaveLength(1);
+  });
 });

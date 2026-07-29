@@ -41,15 +41,90 @@ interface RepositoryConfigEntry {
   readonly value: string;
 }
 
-const CONTENT_CONFIG_PATTERN = [
-  "^(core\\.",
-  "(attributesfile|autocrlf|bigfilethreshold|checkroundtripencoding|eol|",
-  "longpaths|safecrlf|symlinks)",
-  "|merge\\.renormalize|merge\\..*\\.(driver|recursive)",
-  "|filter\\..*\\.(clean|smudge|process|required))$",
-].join("");
-const EXTERNAL_DRIVER_PATTERN =
-  /^(?:merge\..*\.driver|filter\..*\.(?:clean|smudge|process))$/u;
+/** What applying the source content configuration changed in the workspace. */
+interface AppliedContentConfiguration {
+  /** Keys whose value the workspace did not already have. */
+  readonly changedNames: readonly string[];
+}
+
+/**
+ * Git configuration that changes file content or line endings on checkout. The
+ * temporary workspace has to reproduce these so its files match the repository.
+ * Keys are the lowercase names `git config --get-regexp` reports.
+ */
+const CONTENT_CONFIG_KEYS = [
+  "core.attributesfile",
+  "core.autocrlf",
+  "core.bigfilethreshold",
+  "core.checkroundtripencoding",
+  "core.eol",
+  "core.longpaths",
+  "core.safecrlf",
+  "core.symlinks",
+  "merge.renormalize",
+] as const;
+
+/**
+ * Content configuration that runs repository-provided code during checkout,
+ * where `*` stands for the driver or filter name. Such code may read files the
+ * selection does not change, so the workspace needs the whole working tree
+ * instead of a sparse selection.
+ */
+const EXTERNAL_DRIVER_KEY_GLOBS = [
+  "merge.*.driver",
+  "filter.*.clean",
+  "filter.*.smudge",
+  "filter.*.process",
+] as const;
+
+/** Per-driver content configuration that does not run repository code. */
+const INERT_DRIVER_KEY_GLOBS = [
+  "merge.*.recursive",
+  "filter.*.required",
+] as const;
+
+const CONTENT_CONFIG_PATTERN = toGitSearchPattern([
+  ...CONTENT_CONFIG_KEYS,
+  ...EXTERNAL_DRIVER_KEY_GLOBS,
+  ...INERT_DRIVER_KEY_GLOBS,
+]);
+const CONTENT_CONFIG_MATCHER = new RegExp(CONTENT_CONFIG_PATTERN, "u");
+const EXTERNAL_DRIVER_MATCHER = new RegExp(
+  toGitSearchPattern(EXTERNAL_DRIVER_KEY_GLOBS),
+  "u",
+);
+
+/**
+ * Builds one anchored alternation that both Git and JavaScript accept, so the
+ * declared key list is the only source for what the search matches. `*` stands
+ * for the driver or filter name; every other character is literal.
+ */
+function toGitSearchPattern(keys: readonly string[]): string {
+  const alternatives = keys.map((key) =>
+    key
+      .split("*")
+      .map((literal) => literal.replaceAll(/([.\\[\]^$?+{}()|])/gu, "\\$1"))
+      .join(".*"),
+  );
+  return `^(${alternatives.join("|")})$`;
+}
+
+/**
+ * Exported so the matched configuration keys can be verified. The pattern
+ * handed to `git config --get-regexp` is built from the same declaration.
+ */
+export function isContentConfigurationKey(name: string): boolean {
+  return CONTENT_CONFIG_MATCHER.test(name);
+}
+
+/**
+ * A repository-provided driver only takes effect on the keys the workspace did
+ * not already have, so the decision reads the applied keys rather than every
+ * key found in the source repository.
+ */
+function needsFullWorkingTree(applied: AppliedContentConfiguration): boolean {
+  return applied.changedNames.some((name) => EXTERNAL_DRIVER_MATCHER.test(name));
+}
 
 export async function removeDirectoryWithRetries(
   path: string,
@@ -106,7 +181,7 @@ export class CompositionWorkspaceManager {
         gitRunOptions(root, signal),
       );
       await this.copyRepositoryAttributes(repositoryPath, path, signal);
-      const requiresFullCheckout = await this.applyContentConfiguration(
+      const appliedConfiguration = await this.applyContentConfiguration(
         path,
         sourceConfiguration,
         signal,
@@ -117,13 +192,11 @@ export class CompositionWorkspaceManager {
         ["config", "--local", "--replace-all", "core.hooksPath", disabledHooksPath],
         gitRunOptions(path, signal),
       );
-      await this.prepareSelectedPaths(
-        path,
-        baseCommit,
-        changedPaths,
-        requiresFullCheckout,
-        signal,
-      );
+      if (needsFullWorkingTree(appliedConfiguration)) {
+        await this.checkoutFullWorkingTree(path, baseCommit, signal);
+      } else {
+        await this.checkoutSelectedPaths(path, baseCommit, changedPaths, signal);
+      }
       return await operation({ path, baseCommit });
     } finally {
       await removeDirectoryWithRetries(root, {
@@ -184,13 +257,13 @@ export class CompositionWorkspaceManager {
     workspacePath: string,
     sourceEntries: readonly RepositoryConfigEntry[],
     signal: AbortSignal | undefined,
-  ): Promise<boolean> {
+  ): Promise<AppliedContentConfiguration> {
     const workspaceEntries = new Map(
       (
         await this.readContentConfiguration(workspacePath, signal)
       ).map((entry) => [entry.name, entry.value]),
     );
-    let requiresFullCheckout = false;
+    const changedNames: string[] = [];
     for (const entry of sourceEntries) {
       if (workspaceEntries.get(entry.name) === entry.value) {
         continue;
@@ -199,9 +272,9 @@ export class CompositionWorkspaceManager {
         ["config", "--local", "--replace-all", entry.name, entry.value],
         gitRunOptions(workspacePath, signal),
       );
-      requiresFullCheckout ||= EXTERNAL_DRIVER_PATTERN.test(entry.name);
+      changedNames.push(entry.name);
     }
-    return requiresFullCheckout;
+    return { changedNames };
   }
 
   private async copyRepositoryAttributes(
@@ -231,18 +304,26 @@ export class CompositionWorkspaceManager {
     }
   }
 
-  private async prepareSelectedPaths(
+  /** Materializes every path of the comparison base in the working tree. */
+  private async checkoutFullWorkingTree(
+    workspacePath: string,
+    baseCommit: string,
+    signal: AbortSignal | undefined,
+  ): Promise<void> {
+    await this.checkoutBase(workspacePath, baseCommit, signal);
+  }
+
+  /**
+   * Materializes only the paths the selected commits change, so a large
+   * repository does not pay for its whole working tree.
+   */
+  private async checkoutSelectedPaths(
     workspacePath: string,
     baseCommit: string,
     changedPaths: readonly string[],
-    requiresFullCheckout: boolean,
     signal: AbortSignal | undefined,
   ): Promise<void> {
     const options = gitRunOptions(workspacePath, signal);
-    if (requiresFullCheckout) {
-      await this.git.run(["checkout", "--quiet", "--detach", baseCommit], options);
-      return;
-    }
     await this.git.run(["sparse-checkout", "init", "--no-cone"], options);
     await this.git.run(
       [
@@ -255,7 +336,18 @@ export class CompositionWorkspaceManager {
       ],
       options,
     );
-    await this.git.run(["checkout", "--quiet", "--detach", baseCommit], options);
+    await this.checkoutBase(workspacePath, baseCommit, signal);
+  }
+
+  private async checkoutBase(
+    workspacePath: string,
+    baseCommit: string,
+    signal: AbortSignal | undefined,
+  ): Promise<void> {
+    await this.git.run(
+      ["checkout", "--quiet", "--detach", baseCommit],
+      gitRunOptions(workspacePath, signal),
+    );
   }
 }
 
