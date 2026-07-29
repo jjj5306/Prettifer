@@ -34,6 +34,7 @@ function createController(withResult = false): AppController {
         afterContent: "after",
       },
     ],
+    mainlineParents: {},
     unifiedDiff: "diff",
   };
   return {
@@ -66,6 +67,7 @@ function createController(withResult = false): AppController {
         pagination: { status: "idle" },
       },
       selectedCommitIds: withResult ? [firstCommit.id] : [],
+      mergeParents: {},
       inspectedCommitId: null,
       composition: withResult
         ? { status: "ready", requestId: "composition-1", result }
@@ -77,6 +79,7 @@ function createController(withResult = false): AppController {
     loadMoreCommits: vi.fn(),
     toggleCommit: vi.fn(),
     inspectCommit: vi.fn(),
+    chooseMainlineParent: vi.fn(),
     composeSelection: vi.fn(),
     cancelComposition: vi.fn(),
     selectFile: vi.fn(),

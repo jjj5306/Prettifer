@@ -64,6 +64,7 @@ function createDependencies() {
         baseCommit: commonCommit,
         selectedCommits: ["d".repeat(40)],
         files: [],
+        mainlineParents: {},
         unifiedDiff: "",
       } }),
       cancel: vi.fn().mockReturnValue({ status: "success", data: null }),

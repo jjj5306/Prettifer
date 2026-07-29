@@ -28,3 +28,20 @@ export function selectSelectedFile(
     (file) => file.path === state.selectedFilePath,
   ) ?? null;
 }
+
+/**
+ * Counts selected merge commits whose mainline parent the user has not chosen
+ * yet. Composition cannot start while any of them remain.
+ */
+export function selectPendingMainlineParents(state: AppState): number {
+  if (state.range.status !== "ready") {
+    return 0;
+  }
+  const selected = new Set(state.selectedCommitIds);
+  return state.range.commits.filter(
+    (commit) =>
+      commit.isMerge &&
+      selected.has(commit.id) &&
+      state.mergeParents[commit.id] === undefined,
+  ).length;
+}

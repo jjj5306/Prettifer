@@ -7,6 +7,8 @@ interface CompositeResultHeaderProps {
   readonly composition: CompositionState;
   readonly range: RepositoryRangeDto;
   readonly selectedCount: number;
+  /** Selected merge commits that still need a mainline parent. */
+  readonly pendingMainlineParents: number;
   readonly onCompose: () => void | Promise<void>;
   readonly onCancel: () => void | Promise<void>;
 }
@@ -15,6 +17,7 @@ export const CompositeResultHeader = ({
   composition,
   range,
   selectedCount,
+  pendingMainlineParents,
   onCompose,
   onCancel,
 }: CompositeResultHeaderProps) => (
@@ -23,7 +26,11 @@ export const CompositeResultHeader = ({
       <p className={styles.eyebrow}>Composite result</p>
       <h2 id="composite-result-heading">Selected Result</h2>
     </div>
-    <OperationStatus composition={composition} selectedCount={selectedCount} />
+    <OperationStatus
+      composition={composition}
+      selectedCount={selectedCount}
+      pendingMainlineParents={pendingMainlineParents}
+    />
     {composition.status === "ready" ? (
       <dl className={styles.summary}>
         <div><dt>Range</dt><dd>{range.baseRef} → {range.headRef}</dd></div>
@@ -45,12 +52,23 @@ export const CompositeResultHeader = ({
         <div>
           <dt>Applied</dt>
           <dd className={styles.commitChain}>
-            {composition.result.selectedCommits.map((commit, index) => (
-              <span key={commit}>
-                {index === 0 ? null : <span aria-hidden="true">→</span>}
-                <code title={commit}>{commit.slice(0, 7)}</code>
-              </span>
-            ))}
+            {composition.result.selectedCommits.map((commit, index) => {
+              const mainlineParent = composition.result.mainlineParents[commit];
+              return (
+                <span key={commit}>
+                  {index === 0 ? null : <span aria-hidden="true">→</span>}
+                  <code title={commit}>{commit.slice(0, 7)}</code>
+                  {mainlineParent === undefined ? null : (
+                    <span
+                      className={styles.mainlineParent}
+                      title={`Composed against parent ${String(mainlineParent)}`}
+                    >
+                      {`parent ${String(mainlineParent)}`}
+                    </span>
+                  )}
+                </span>
+              );
+            })}
           </dd>
         </div>
       </dl>
@@ -60,7 +78,7 @@ export const CompositeResultHeader = ({
     ) : (
       <button
         type="button"
-        disabled={selectedCount === 0}
+        disabled={selectedCount === 0 || pendingMainlineParents > 0}
         onClick={() => { void onCompose(); }}
       >
         {composition.status === "idle" ? "Build Selected Result" : "Rebuild Selected Result"}

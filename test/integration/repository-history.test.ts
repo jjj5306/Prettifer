@@ -129,7 +129,7 @@ describe("RepositoryHistoryService", () => {
     expect(firstPage.commits[0]).toMatchObject({
       id: fixture.mergeCommit,
       isMerge: true,
-      selectable: false,
+      selectable: true,
       title: "merge: include history side branch",
     });
     expect(secondPage.commits).toHaveLength(5);
@@ -172,7 +172,7 @@ describe("RepositoryHistoryService", () => {
     })).rejects.toMatchObject({ code: "RANGE_STALE" });
   });
 
-  it("accepts only non-merge commits from the displayed first-parent history", async () => {
+  it("accepts every commit on the displayed first-parent history, merges included", async () => {
     const service = new RepositoryHistoryService();
     const range = await createRange(service, fixture);
     const sideCommit = fixture.git(["rev-parse", "feature/history-side"]).trim();
@@ -182,19 +182,19 @@ describe("RepositoryHistoryService", () => {
       range,
       selectedCommits: [fixture.firstFeatureCommit],
     })).resolves.toBeUndefined();
+    // A merge is on the first-parent history, so selecting it is allowed. The
+    // mainline parent it needs is validated when the result is composed.
+    await expect(service.assertCompositionInput({
+      repositoryPath: fixture.path,
+      range,
+      selectedCommits: [fixture.mergeCommit],
+    })).resolves.toBeUndefined();
+    // A commit reachable only from a side branch is still outside the range.
     await expect(service.assertCompositionInput({
       repositoryPath: fixture.path,
       range,
       selectedCommits: [sideCommit],
     })).rejects.toMatchObject({ code: "COMMIT_NOT_SELECTABLE", subject: sideCommit });
-    await expect(service.assertCompositionInput({
-      repositoryPath: fixture.path,
-      range,
-      selectedCommits: [fixture.mergeCommit],
-    })).rejects.toMatchObject({
-      code: "COMMIT_NOT_SELECTABLE",
-      subject: fixture.mergeCommit,
-    });
   });
 });
 

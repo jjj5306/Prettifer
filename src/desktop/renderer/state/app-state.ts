@@ -82,6 +82,11 @@ export interface AppState {
   readonly repository: RepositoryState;
   readonly range: RangeState;
   readonly selectedCommitIds: readonly string[];
+  /**
+   * Mainline parent number chosen for each merge commit, keyed by commit id.
+   * A selected merge commit without an entry still needs the user's choice.
+   */
+  readonly mergeParents: Readonly<Record<string, number>>;
   readonly inspectedCommitId: string | null;
   readonly composition: CompositionState;
   readonly selectedFilePath: string | null;
@@ -141,6 +146,11 @@ export type AppAction =
       diagnostic: Diagnostic;
     }>
   | Readonly<{ type: "commit/toggled"; commitId: string }>
+  | Readonly<{
+      type: "commit/mainlineParentChosen";
+      commitId: string;
+      mainlineParent: number;
+    }>
   | Readonly<{ type: "commit/inspected"; commitId: string }>
   | Readonly<{
       type: "composition/loading";
@@ -174,6 +184,7 @@ export const initialAppState: AppState = {
   repository: { status: "empty" },
   range: { status: "idle" },
   selectedCommitIds: [],
+  mergeParents: {},
   inspectedCommitId: null,
   composition: { status: "idle" },
   selectedFilePath: null,
@@ -221,6 +232,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
               headRef: action.headRef,
             },
             selectedCommitIds: [],
+            mergeParents: {},
             inspectedCommitId: null,
             composition: { status: "idle" },
             selectedFilePath: null,
@@ -289,6 +301,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         : state;
     case "commit/toggled":
       return toggleCommit(state, action.commitId);
+    case "commit/mainlineParentChosen":
+      return chooseMainlineParent(state, action.commitId, action.mainlineParent);
     case "commit/inspected":
       return hasCommit(state, action.commitId)
         ? { ...state, inspectedCommitId: action.commitId }
@@ -380,6 +394,7 @@ function resetForRepository(state: AppState, session: RepositorySession): AppSta
     repository: { status: "ready", session },
     range: { status: "idle" },
     selectedCommitIds: [],
+    mergeParents: {},
     inspectedCommitId: null,
     composition: { status: "idle" },
     selectedFilePath: null,
@@ -440,9 +455,47 @@ function toggleCommit(state: AppState, commitId: string): AppState {
     selectedCommitIds: isSelected
       ? state.selectedCommitIds.filter((id) => id !== commitId)
       : [...state.selectedCommitIds, commitId],
+    mergeParents: isSelected
+      ? withoutMergeParent(state.mergeParents, commitId)
+      : state.mergeParents,
     composition: { status: "idle" },
     selectedFilePath: null,
   };
+}
+
+function chooseMainlineParent(
+  state: AppState,
+  commitId: string,
+  mainlineParent: number,
+): AppState {
+  if (state.range.status !== "ready") {
+    return state;
+  }
+  const commit = state.range.commits.find((candidate) => candidate.id === commitId);
+  if (commit?.isMerge !== true) {
+    return state;
+  }
+  if (mainlineParent < 1 || mainlineParent > commit.parentIds.length) {
+    return state;
+  }
+  return {
+    ...state,
+    mergeParents: { ...state.mergeParents, [commitId]: mainlineParent },
+    composition: { status: "idle" },
+    selectedFilePath: null,
+  };
+}
+
+function withoutMergeParent(
+  mergeParents: Readonly<Record<string, number>>,
+  commitId: string,
+): Readonly<Record<string, number>> {
+  if (!(commitId in mergeParents)) {
+    return mergeParents;
+  }
+  return Object.fromEntries(
+    Object.entries(mergeParents).filter(([id]) => id !== commitId),
+  );
 }
 
 function hasResultFile(state: AppState, path: string): boolean {
@@ -458,6 +511,7 @@ function markRangeStale(state: AppState, diagnostic: Diagnostic): AppState {
     ...state,
     range: { status: "stale", range: state.range.range, diagnostic },
     selectedCommitIds: [],
+    mergeParents: {},
     inspectedCommitId: null,
     composition: { status: "idle" },
     selectedFilePath: null,

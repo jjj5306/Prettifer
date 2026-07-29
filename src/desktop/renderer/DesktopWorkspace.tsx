@@ -17,6 +17,7 @@ import {
 } from "./layout/use-resizable-pane.js";
 import { RepositoryToolbar } from "./repository/RepositoryToolbar.js";
 import {
+  selectPendingMainlineParents,
   selectRepositorySession,
   selectSelectedFile,
 } from "./state/app-selectors.js";
@@ -74,8 +75,10 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
             <CommitHistoryPane
               range={controller.state.range}
               selectedCommitIds={controller.state.selectedCommitIds}
+              mergeParents={controller.state.mergeParents}
               inspectedCommitId={controller.state.inspectedCommitId}
               onToggleCommit={controller.toggleCommit}
+              onChooseMainlineParent={controller.chooseMainlineParent}
               onInspectCommit={controller.inspectCommit}
               onLoadMore={controller.loadMoreCommits}
             />
@@ -85,6 +88,7 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
                   composition={controller.state.composition}
                   range={controller.state.range.range}
                   selectedCount={controller.state.selectedCommitIds.length}
+                  pendingMainlineParents={selectPendingMainlineParents(controller.state)}
                   onCompose={controller.composeSelection}
                   onCancel={controller.cancelComposition}
                 />

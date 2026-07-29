@@ -2,7 +2,11 @@ import {
   CompositionWorkspaceManager,
   type CompositionWorkspace,
 } from "./composition-workspace.js";
-import { SelectionError, SelectionPlanner } from "./selection-planner.js";
+import {
+  SelectionError,
+  SelectionPlanner,
+  type SelectionPlan,
+} from "./selection-planner.js";
 import {
   gitRunOptions,
   GitCommandError,
@@ -57,6 +61,8 @@ interface CompositeFilePathChange {
 export interface CompositeDiffResult {
   baseCommit: string;
   selectedCommits: readonly string[];
+  /** Mainline parent used for each merge commit, keyed by full commit id. */
+  mainlineParents: Readonly<Record<string, number>>;
   files: readonly CompositeFileChange[];
   unifiedDiff: string;
 }
@@ -66,6 +72,8 @@ export interface CompositeDiffRequest {
   baseRef: string;
   headRef: string;
   selectedCommits: readonly string[];
+  /** Mainline parent number, keyed by selected commit. Required for merges. */
+  mainlineParents?: Readonly<Record<string, number>>;
   signal?: AbortSignal;
 }
 
@@ -94,11 +102,14 @@ export class CompositeDiffService {
       baseCommit,
       headRef: request.headRef,
       selectedCommits: request.selectedCommits,
+      ...(request.mainlineParents === undefined
+        ? {}
+        : { mainlineParents: request.mainlineParents }),
       ...(request.signal === undefined ? {} : { signal: request.signal }),
     });
     const changedPaths = await this.findChangedPaths(
       request.repositoryPath,
-      plan.selectedCommits,
+      plan,
       request.signal,
     );
 
@@ -106,19 +117,24 @@ export class CompositeDiffService {
       request.repositoryPath,
       baseCommit,
       changedPaths,
-      (workspace) => this.composeInWorkspace(workspace, plan.selectedCommits, request.signal),
+      (workspace) => this.composeInWorkspace(workspace, plan, request.signal),
       request.signal,
     );
   }
 
+  /**
+   * A merge is compared against its chosen mainline parent, so the prepared
+   * paths match exactly what applying that merge changes.
+   */
   private async findChangedPaths(
     repositoryPath: string,
-    selectedCommits: readonly string[],
+    plan: SelectionPlan,
     signal: AbortSignal | undefined,
   ): Promise<string[]> {
     const changedPaths = await mapWithGitConcurrency(
-      selectedCommits,
+      plan.selectedCommits,
       async (commit) => {
+        const mainlineParent = plan.mainlineParents[commit];
         const result = await this.git.run(
           [
             "diff-tree",
@@ -127,8 +143,9 @@ export class CompositeDiffService {
             "--no-renames",
             "-r",
             "-z",
-            "--root",
-            commit,
+            ...(mainlineParent === undefined
+              ? ["--root", commit]
+              : [`${commit}^${String(mainlineParent)}`, commit]),
           ],
           gitRunOptions(repositoryPath, signal),
         );
@@ -140,13 +157,21 @@ export class CompositeDiffService {
 
   private async composeInWorkspace(
     workspace: CompositionWorkspace,
-    selectedCommits: readonly string[],
+    plan: SelectionPlan,
     signal: AbortSignal | undefined,
   ): Promise<CompositeDiffResult> {
-    for (const commit of selectedCommits) {
+    for (const commit of plan.selectedCommits) {
+      const mainlineParent = plan.mainlineParents[commit];
       try {
         await this.git.run(
-          ["cherry-pick", "--no-commit", commit],
+          [
+            "cherry-pick",
+            "--no-commit",
+            ...(mainlineParent === undefined
+              ? []
+              : ["-m", String(mainlineParent)]),
+            commit,
+          ],
           gitRunOptions(workspace.path, signal),
         );
       } catch (error) {
@@ -204,7 +229,8 @@ export class CompositeDiffService {
 
     return {
       baseCommit: workspace.baseCommit,
-      selectedCommits: [...selectedCommits],
+      selectedCommits: [...plan.selectedCommits],
+      mainlineParents: plan.mainlineParents,
       files,
       unifiedDiff: unifiedDiff.stdout,
     };

@@ -11,6 +11,7 @@ import { GitCommandError } from "../../src/git/git-command-runner.js";
 const result = (commit: string): CompositeDiffResult => ({
   baseCommit: "base",
   selectedCommits: [commit],
+  mainlineParents: {},
   files: [],
   unifiedDiff: commit,
 });

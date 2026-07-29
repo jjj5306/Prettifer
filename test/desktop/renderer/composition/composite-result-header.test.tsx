@@ -32,6 +32,7 @@ function renderHeader(
           composition={composition}
           range={range}
           selectedCount={selectedCount}
+          pendingMainlineParents={0}
           onCompose={onCompose}
           onCancel={onCancel}
         />
@@ -64,6 +65,7 @@ describe("CompositeResultHeader", () => {
           }}
           range={range}
           selectedCount={2}
+          pendingMainlineParents={0}
           onCompose={start.onCompose}
           onCancel={start.onCancel}
         />
@@ -87,6 +89,7 @@ describe("CompositeResultHeader", () => {
         baseCommit: range.baseCommit,
         selectedCommits: ["d".repeat(40), "e".repeat(40)],
         files: [],
+        mainlineParents: {},
         unifiedDiff: "",
       },
     }, 2);

@@ -20,6 +20,10 @@ import {
   createHistoryFixture,
   type HistoryFixture,
 } from "../support/history-fixture.js";
+import {
+  createMergeFixture,
+  type MergeFixture,
+} from "../support/merge-fixture.js";
 
 const require = createRequire(import.meta.url);
 const executablePath = require("electron") as string;
@@ -422,7 +426,7 @@ test("shows an actionable Git executable error", async () => {
   );
 });
 
-test("explains unsupported merge commits and recovers after an invalid repository", async () => {
+test("offers merge commit selection and recovers after an invalid repository", async () => {
   const fixture = await createHistoryE2eFixture();
   const invalidRepository = await createInvalidRepositoryFixture();
   const running = await launch([invalidRepository, fixture.path]);
@@ -435,10 +439,63 @@ test("explains unsupported merge commits and recovers after an invalid repositor
   await expect(running.page.getByText(fixture.path, { exact: true })).toBeVisible();
   await running.page.getByRole("button", { name: "Load Commit Range" }).click();
 
-  await expect(running.page.getByText("Merge commit · unavailable")).toBeVisible();
   await expect(running.page.getByRole("checkbox", {
-    name: "Cannot include in selected result: merge: include history side branch",
-  })).toBeDisabled();
+    name: "Include in selected result: merge: include history side branch",
+  })).toBeEnabled();
+  await expect(running.page.getByRole("combobox", {
+    name: "Mainline parent for merge commit: merge: include history side branch",
+  })).toBeVisible();
+});
+
+test("composes a merge commit against the chosen mainline parent", async () => {
+  const fixture = await createMergeE2eFixture();
+  const running = await launch([fixture.path]);
+  await openRepository(running.page, fixture.path, fixture.headRef);
+  await running.page.getByRole("button", { name: "Load Commit Range" }).click();
+
+  const mergeTitle = "merge: include side one";
+  await running.page.getByRole("checkbox", {
+    name: `Include in selected result: ${mergeTitle}`,
+  }).check();
+
+  // Until the mainline parent is chosen the result cannot be built.
+  await expect(running.page.getByText(
+    "Choose a mainline parent for the selected merge commit.",
+  )).toBeVisible();
+  await expect(
+    running.page.getByRole("button", { name: "Build Selected Result" }),
+  ).toBeDisabled();
+
+  const picker = running.page.getByRole("combobox", {
+    name: `Mainline parent for merge commit: ${mergeTitle}`,
+  });
+  await expect(picker).toHaveAttribute("aria-invalid", "true");
+  await picker.selectOption("1");
+  await expect(picker).not.toHaveAttribute("aria-invalid", "true");
+
+  await running.page.getByRole("button", { name: "Build Selected Result" }).click();
+  await expect(running.page.getByText(/Result ready · \d+ changed files/u)).toBeVisible();
+  // Parent 1 is the working branch, so the merge brings in the side branch file.
+  await expect(running.page.getByRole("button", {
+    name: /file: side-one\.txt/u,
+  })).toBeVisible();
+  await expect(
+    running.page.getByRole("region", { name: "Selected Result" }).getByText("parent 1"),
+  ).toBeVisible();
+
+  // Choosing the other parent composes the other side of the merge.
+  await picker.selectOption("2");
+  await running.page.getByRole("button", { name: "Build Selected Result" }).click();
+  await expect(running.page.getByText(/Result ready · \d+ changed files/u)).toBeVisible();
+  await expect(running.page.getByRole("button", {
+    name: /file: mainline\.txt/u,
+  })).toBeVisible();
+  await expect(
+    running.page.getByRole("region", { name: "Selected Result" }).getByText("parent 2"),
+  ).toBeVisible();
+
+  expect(running.consoleErrors).toEqual([]);
+  expect(running.pageErrors).toEqual([]);
 });
 
 test("replaces repository state without showing the previous repository", async () => {
@@ -471,6 +528,12 @@ async function createFixture(): Promise<GitFixture> {
 
 async function createHistoryE2eFixture(): Promise<HistoryFixture> {
   const fixture = await createHistoryFixture();
+  fixtures.push(fixture);
+  return fixture;
+}
+
+async function createMergeE2eFixture(): Promise<MergeFixture> {
+  const fixture = await createMergeFixture();
   fixtures.push(fixture);
   return fixture;
 }
@@ -531,10 +594,14 @@ async function launch(
   return running;
 }
 
-async function openRepository(page: Page, repositoryPath: string): Promise<void> {
+async function openRepository(
+  page: Page,
+  repositoryPath: string,
+  currentBranch = "feature/auth-session",
+): Promise<void> {
   await page.getByRole("button", { name: "Open Repository" }).click();
   await expect(page.getByText(repositoryPath, { exact: true })).toBeVisible();
-  await expect(page.getByText("Current branch: feature/auth-session")).toBeVisible();
+  await expect(page.getByText(`Current branch: ${currentBranch}`)).toBeVisible();
 }
 
 async function setViewportSize(

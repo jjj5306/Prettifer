@@ -286,10 +286,8 @@ export class RepositoryHistoryService {
         output.stdout
           .split(/\r?\n/u)
           .flatMap((line) => {
-            const [commit, ...parents] = line.trim().split(/\s+/u);
-            return commit === undefined || commit.length === 0 || parents.length > 1
-              ? []
-              : [commit];
+            const [commit] = line.trim().split(/\s+/u);
+            return commit === undefined || commit.length === 0 ? [] : [commit];
           }),
       );
       const unsupported = request.selectedCommits.find((commit) => !selectable.has(commit));
@@ -297,7 +295,7 @@ export class RepositoryHistoryService {
         throw new RepositoryHistoryError(
           "COMMIT_NOT_SELECTABLE",
           unsupported,
-          "Select non-merge commits from the first-parent history.",
+          "Select commits from the displayed first-parent history.",
         );
       }
     } catch (error) {
@@ -352,7 +350,8 @@ function parseCommits(output: string): RepositoryCommit[] {
         authorName,
         authoredAt,
         isMerge,
-        selectable: !isMerge,
+        // A merge is selectable once the user chooses its mainline parent.
+        selectable: true,
       };
     });
 }

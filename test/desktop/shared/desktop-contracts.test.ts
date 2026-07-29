@@ -81,7 +81,21 @@ describe("desktop shared contracts", () => {
       requestId: "01909ee1-2ab8-71f4-80ab-184a9459f4af",
       selectedCommits: ["d".repeat(40)],
     };
-    expect(compositionRequestSchema.parse(request)).toEqual(request);
+    // A request without merge commits gets an empty mainline parent map.
+    expect(compositionRequestSchema.parse(request)).toEqual({
+      ...request,
+      mainlineParents: {},
+    });
+    expect(compositionRequestSchema.parse({
+      ...request,
+      mainlineParents: { [request.selectedCommits[0] ?? ""]: 2 },
+    })).toMatchObject({
+      mainlineParents: { [request.selectedCommits[0] ?? ""]: 2 },
+    });
+    expect(() => compositionRequestSchema.parse({
+      ...request,
+      mainlineParents: { [request.selectedCommits[0] ?? ""]: 0 },
+    })).toThrow();
     expect(cancelCompositionRequestSchema.parse({
       repositorySessionId: session.repositorySessionId,
       sessionRevision: 1,

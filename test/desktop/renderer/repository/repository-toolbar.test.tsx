@@ -25,6 +25,7 @@ const baseState: AppState = {
   repository: { status: "empty" },
   range: { status: "idle" },
   selectedCommitIds: [],
+  mergeParents: {},
   inspectedCommitId: null,
   composition: { status: "idle" },
   selectedFilePath: null,

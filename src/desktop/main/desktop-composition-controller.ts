@@ -67,6 +67,7 @@ export class DesktopCompositionController {
         baseRef: request.range.baseCommit,
         headRef: request.range.headCommit,
         selectedCommits: request.selectedCommits,
+        mainlineParents: request.mainlineParents,
       });
       if (this.activeRequest !== requestIdentity) {
         return { status: "cancelled" };
