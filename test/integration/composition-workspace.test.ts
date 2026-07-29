@@ -122,9 +122,13 @@ describe("CompositionWorkspaceManager", () => {
       async (workspace) => {
         await expect(access(`${workspace.path}/src/auth/login.ts`)).resolves.toBeUndefined();
         await expect(access(`${workspace.path}/docs/auth.md`)).rejects.toThrow();
+        // The effective value is the requirement. Asserting the --local scope
+        // instead made the test depend on the machine's ambient Git config: when
+        // that already matches the source, the workspace correctly writes no
+        // local override and the --local read fails.
         const workspaceGit = new GitCommandRunner();
         await expect(
-          workspaceGit.run(["config", "--local", "--get", "core.autocrlf"], {
+          workspaceGit.run(["config", "--includes", "--get", "core.autocrlf"], {
             cwd: workspace.path,
           }),
         ).resolves.toMatchObject({ stdout: "false\n" });
