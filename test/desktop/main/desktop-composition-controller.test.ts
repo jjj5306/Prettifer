@@ -176,6 +176,36 @@ describe("DesktopCompositionController", () => {
 
   it.each([
     {
+      code: "MAINLINE_PARENT_REQUIRED",
+      message: "The merge commit needs a mainline parent.",
+      nextAction: "Choose the mainline parent for the merge commit, then try again.",
+    },
+    {
+      code: "MAINLINE_PARENT_OUT_OF_RANGE",
+      message: "The chosen mainline parent does not exist on the commit.",
+      nextAction: "Choose one of the commit's own parents, then try again.",
+    },
+  ])("publishes the actionable $code diagnostic with its commit", async (diagnostic) => {
+    const controller = new DesktopCompositionController(
+      { assertCompositionInput: vi.fn().mockResolvedValue(undefined) },
+      {
+        update: vi.fn().mockResolvedValue({
+          status: "error",
+          selectedCommits: [selectedCommit],
+          diagnostic: { ...diagnostic, commit: selectedCommit },
+        }),
+        cancel: vi.fn(),
+      },
+    );
+
+    await expect(controller.compose(request, "C:\\work\\repo")).resolves.toEqual({
+      status: "error",
+      diagnostic: { ...diagnostic, subject: selectedCommit },
+    });
+  });
+
+  it.each([
+    {
       code: "REPOSITORY_LOCKED",
       message: "The repository is busy with another Git operation.",
       nextAction: "Wait for other Git operations to finish, then try again.",

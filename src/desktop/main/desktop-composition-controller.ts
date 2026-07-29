@@ -167,7 +167,9 @@ function publicCompositionDiagnostic(diagnostic: {
     diagnostic.code === "INVALID_COMMIT" ||
     diagnostic.code === "COMMIT_OUTSIDE_COMPARISON" ||
     diagnostic.code === "AMBIGUOUS_SELECTION" ||
-    diagnostic.code === "COMMIT_APPLY_CONFLICT"
+    diagnostic.code === "COMMIT_APPLY_CONFLICT" ||
+    diagnostic.code === "MAINLINE_PARENT_REQUIRED" ||
+    diagnostic.code === "MAINLINE_PARENT_OUT_OF_RANGE"
   ) {
     return {
       code: diagnostic.code,
