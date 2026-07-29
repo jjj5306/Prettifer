@@ -5,16 +5,19 @@ import styles from "./CompositeResultHeader.module.css";
 interface OperationStatusProps {
   readonly composition: CompositionState;
   readonly selectedCount: number;
+  readonly pendingMainlineParents: number;
 }
 
-export const OperationStatus = ({ composition, selectedCount }: OperationStatusProps) => {
+export const OperationStatus = ({
+  composition,
+  selectedCount,
+  pendingMainlineParents,
+}: OperationStatusProps) => {
   switch (composition.status) {
     case "idle":
       return (
         <p className={styles.status} aria-live="polite">
-          {selectedCount === 0
-            ? "Select at least one supported commit."
-            : `${String(selectedCount)} commits selected.`}
+          {idleStatusMessage(selectedCount, pendingMainlineParents)}
         </p>
       );
     case "loading":
@@ -37,3 +40,18 @@ export const OperationStatus = ({ composition, selectedCount }: OperationStatusP
       );
   }
 };
+
+function idleStatusMessage(
+  selectedCount: number,
+  pendingMainlineParents: number,
+): string {
+  if (selectedCount === 0) {
+    return "Select at least one supported commit.";
+  }
+  if (pendingMainlineParents > 0) {
+    return pendingMainlineParents === 1
+      ? "Choose a mainline parent for the selected merge commit."
+      : `Choose a mainline parent for ${String(pendingMainlineParents)} selected merge commits.`;
+  }
+  return `${String(selectedCount)} commits selected.`;
+}

@@ -19,6 +19,7 @@ export interface AppController {
   readonly toggleCommit: (commitId: string) => void;
   readonly inspectCommit: (commitId: string) => void;
   readonly composeSelection: () => Promise<void>;
+  readonly chooseMainlineParent: (commitId: string, mainlineParent: number) => void;
   readonly cancelComposition: () => Promise<void>;
   readonly selectFile: (path: string) => void;
 }
@@ -195,6 +196,7 @@ export function useAppController(
         range: state.range.range,
         requestId,
         selectedCommits: [...state.selectedCommitIds],
+        mainlineParents: selectedMainlineParents(state),
       });
       if (result.status === "success") {
         dispatch({
@@ -282,6 +284,9 @@ export function useAppController(
     inspectCommit: (commitId) => {
       dispatch({ type: "commit/inspected", commitId });
     },
+    chooseMainlineParent: (commitId, mainlineParent) => {
+      dispatch({ type: "commit/mainlineParentChosen", commitId, mainlineParent });
+    },
     composeSelection,
     cancelComposition,
     selectFile: (path) => {
@@ -301,4 +306,12 @@ function connectionDiagnostic(_error: unknown): Diagnostic {
 
 function defaultRequestId(): string {
   return globalThis.crypto.randomUUID();
+}
+
+/** Keeps only the mainline parents of commits that are currently selected. */
+function selectedMainlineParents(state: AppState): Record<string, number> {
+  const selected = new Set(state.selectedCommitIds);
+  return Object.fromEntries(
+    Object.entries(state.mergeParents).filter(([commitId]) => selected.has(commitId)),
+  );
 }

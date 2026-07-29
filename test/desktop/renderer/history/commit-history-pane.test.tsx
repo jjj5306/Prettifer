@@ -26,6 +26,15 @@ const mergeCommit = {
   authorName: "Prettifer Test",
   authoredAt: "2026-07-23T00:01:00.000Z",
   isMerge: true,
+  selectable: true,
+};
+/** Reachable only from a side branch, so it cannot be composed. */
+const unselectableCommit = {
+  ...firstCommit,
+  id: "9".repeat(40),
+  shortId: "9".repeat(7),
+  title: "side branch only",
+  authoredAt: "2026-07-23T00:03:00.000Z",
   selectable: false,
 };
 const secondCommit = {
@@ -47,7 +56,7 @@ const mergeCommitCardName = [
   mergeCommit.id,
   mergeCommit.authorName,
   mergeCommit.authoredAt,
-  "Merge commits cannot be included in the selected result",
+  "Merge commit",
 ].join(" · ");
 const range = {
   baseRef: "main",
@@ -76,6 +85,8 @@ describe("CommitHistoryPane", () => {
         range={readyRange({ commits: [secondCommit, firstCommit] })}
         selectedCommitIds={[]}
         inspectedCommitId={null}
+        mergeParents={{}}
+        onChooseMainlineParent={vi.fn()}
         onToggleCommit={vi.fn()}
         onInspectCommit={vi.fn()}
         onLoadMore={vi.fn()}
@@ -95,13 +106,15 @@ describe("CommitHistoryPane", () => {
     })).toBeVisible();
   });
 
-  it("shows commit metadata, merge restrictions and a 100-item page action", () => {
+  it("shows commit metadata, a selectable merge and a 100-item page action", () => {
     render(
       <StrictMode>
         <CommitHistoryPane
           range={readyRange()}
           selectedCommitIds={[]}
           inspectedCommitId={null}
+          mergeParents={{}}
+          onChooseMainlineParent={vi.fn()}
           onToggleCommit={vi.fn()}
           onInspectCommit={vi.fn()}
           onLoadMore={vi.fn()}
@@ -112,8 +125,12 @@ describe("CommitHistoryPane", () => {
     expect(screen.getByText(firstCommit.shortId)).toBeVisible();
     expect(screen.getAllByText(firstCommit.authorName)).toHaveLength(2);
     expect(screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` })).toBeEnabled();
-    expect(screen.getByRole("checkbox", { name: `Cannot include in selected result: ${mergeCommit.title}` })).toBeDisabled();
-    expect(screen.getByText("Merge commit · unavailable")).toBeVisible();
+    expect(screen.getByRole("checkbox", {
+      name: `Include in selected result: ${mergeCommit.title}`,
+    })).toBeEnabled();
+    expect(screen.getByRole("combobox", {
+      name: `Mainline parent for merge commit: ${mergeCommit.title}`,
+    })).toBeVisible();
     expect(screen.getByRole("button", { name: "Load 100 older commits" })).toBeVisible();
   });
 
@@ -123,6 +140,8 @@ describe("CommitHistoryPane", () => {
         range={readyRange({ commits: [firstCommit] })}
         selectedCommitIds={[]}
         inspectedCommitId={null}
+        mergeParents={{}}
+        onChooseMainlineParent={vi.fn()}
         onToggleCommit={vi.fn()}
         onInspectCommit={vi.fn()}
         onLoadMore={vi.fn()}
@@ -145,6 +164,8 @@ describe("CommitHistoryPane", () => {
           range={readyRange()}
           selectedCommitIds={[firstCommit.id]}
           inspectedCommitId={mergeCommit.id}
+          mergeParents={{}}
+          onChooseMainlineParent={vi.fn()}
           onToggleCommit={onToggleCommit}
           onInspectCommit={onInspectCommit}
           onLoadMore={vi.fn()}
@@ -181,6 +202,8 @@ describe("CommitHistoryPane", () => {
           range={readyRange({ commits: [firstCommit, secondCommit] })}
           selectedCommitIds={selectedCommitIds}
           inspectedCommitId={inspectedCommitId}
+          mergeParents={{}}
+          onChooseMainlineParent={vi.fn()}
           onToggleCommit={(commitId) => {
             setSelectedCommitIds((current) => current.includes(commitId)
               ? current.filter((selected) => selected !== commitId)
@@ -221,6 +244,8 @@ describe("CommitHistoryPane", () => {
           range={readyRange()}
           selectedCommitIds={[]}
           inspectedCommitId={null}
+          mergeParents={{}}
+          onChooseMainlineParent={vi.fn()}
           onToggleCommit={vi.fn()}
           onInspectCommit={vi.fn()}
           onLoadMore={vi.fn()}
@@ -237,6 +262,8 @@ describe("CommitHistoryPane", () => {
           range={readyRange({ commits: [], nextOffset: null })}
           selectedCommitIds={[]}
           inspectedCommitId={null}
+          mergeParents={{}}
+          onChooseMainlineParent={vi.fn()}
           onToggleCommit={vi.fn()}
           onInspectCommit={vi.fn()}
           onLoadMore={vi.fn()}
@@ -258,6 +285,8 @@ describe("CommitHistoryPane", () => {
           range={readyRange()}
           selectedCommitIds={[]}
           inspectedCommitId={null}
+          mergeParents={{}}
+          onChooseMainlineParent={vi.fn()}
           onToggleCommit={onToggleCommit}
           onInspectCommit={vi.fn()}
           onLoadMore={vi.fn()}
@@ -280,6 +309,8 @@ describe("CommitHistoryPane", () => {
           range={readyRange()}
           selectedCommitIds={[]}
           inspectedCommitId={null}
+          mergeParents={{}}
+          onChooseMainlineParent={vi.fn()}
           onToggleCommit={vi.fn()}
           onInspectCommit={vi.fn()}
           onLoadMore={onLoadMore}
@@ -295,13 +326,18 @@ describe("CommitHistoryPane", () => {
           range={readyRange({ nextOffset: null })}
           selectedCommitIds={[]}
           inspectedCommitId={null}
+          mergeParents={{}}
+          onChooseMainlineParent={vi.fn()}
           onToggleCommit={vi.fn()}
           onInspectCommit={vi.fn()}
           onLoadMore={onLoadMore}
         />
       </StrictMode>,
     );
-    expect(screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` })).toHaveFocus();
+    // Display order is newest first, so the merge is the first selectable commit.
+    expect(screen.getByRole("checkbox", {
+      name: `Include in selected result: ${mergeCommit.title}`,
+    })).toHaveFocus();
   });
 
   it("restores focus to the first commit card when no commit is selectable", async () => {
@@ -309,9 +345,11 @@ describe("CommitHistoryPane", () => {
     const onLoadMore = vi.fn();
     const { rerender } = render(
       <CommitHistoryPane
-        range={readyRange({ commits: [mergeCommit] })}
+        range={readyRange({ commits: [unselectableCommit] })}
         selectedCommitIds={[]}
         inspectedCommitId={null}
+        mergeParents={{}}
+        onChooseMainlineParent={vi.fn()}
         onToggleCommit={vi.fn()}
         onInspectCommit={vi.fn()}
         onLoadMore={onLoadMore}
@@ -321,15 +359,116 @@ describe("CommitHistoryPane", () => {
 
     rerender(
       <CommitHistoryPane
-        range={readyRange({ commits: [mergeCommit], nextOffset: null })}
+        range={readyRange({ commits: [unselectableCommit], nextOffset: null })}
         selectedCommitIds={[]}
         inspectedCommitId={null}
+        mergeParents={{}}
+        onChooseMainlineParent={vi.fn()}
         onToggleCommit={vi.fn()}
         onInspectCommit={vi.fn()}
         onLoadMore={onLoadMore}
       />,
     );
 
-    expect(screen.getByRole("button", { name: mergeCommitCardName })).toHaveFocus();
+    expect(screen.getByRole("button", {
+      name: [
+        `Inspect commit: ${unselectableCommit.title}`,
+        unselectableCommit.id,
+        unselectableCommit.authorName,
+        unselectableCommit.authoredAt,
+      ].join(" · "),
+    })).toHaveFocus();
+  });
+
+  it("offers a mainline parent for each parent of a merge commit", () => {
+    render(
+      <CommitHistoryPane
+        range={readyRange()}
+        selectedCommitIds={[]}
+        inspectedCommitId={null}
+        mergeParents={{}}
+        onChooseMainlineParent={vi.fn()}
+        onToggleCommit={vi.fn()}
+        onInspectCommit={vi.fn()}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    const picker = screen.getByRole("combobox", {
+      name: `Mainline parent for merge commit: ${mergeCommit.title}`,
+    });
+    const options = Array.from(picker.querySelectorAll("option"))
+      .map((option) => option.value)
+      .filter((value) => value.length > 0);
+    expect(options).toEqual(["1", "2"]);
+    expect(screen.queryByRole("combobox", {
+      name: `Mainline parent for merge commit: ${firstCommit.title}`,
+    })).toBeNull();
+  });
+
+  it("marks a selected merge commit that still needs a mainline parent", () => {
+    render(
+      <CommitHistoryPane
+        range={readyRange()}
+        selectedCommitIds={[mergeCommit.id]}
+        inspectedCommitId={null}
+        mergeParents={{}}
+        onChooseMainlineParent={vi.fn()}
+        onToggleCommit={vi.fn()}
+        onInspectCommit={vi.fn()}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("combobox", {
+      name: `Mainline parent for merge commit: ${mergeCommit.title}`,
+    })).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("button", {
+      name: [
+        `Inspect commit: ${mergeCommit.title}`,
+        mergeCommit.id,
+        mergeCommit.authorName,
+        mergeCommit.authoredAt,
+        "Merge commit needs a mainline parent",
+      ].join(" · "),
+    })).toBeVisible();
+  });
+
+  it("reports the chosen mainline parent and keeps other selections untouched", async () => {
+    const user = userEvent.setup();
+    const onChooseMainlineParent = vi.fn();
+    const onToggleCommit = vi.fn();
+    render(
+      <CommitHistoryPane
+        range={readyRange()}
+        selectedCommitIds={[mergeCommit.id]}
+        inspectedCommitId={null}
+        mergeParents={{ [mergeCommit.id]: 2 }}
+        onChooseMainlineParent={onChooseMainlineParent}
+        onToggleCommit={onToggleCommit}
+        onInspectCommit={vi.fn()}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    const picker = screen.getByRole("combobox", {
+      name: `Mainline parent for merge commit: ${mergeCommit.title}`,
+    });
+    expect(picker).toHaveValue("2");
+    expect(picker).not.toHaveAttribute("aria-invalid");
+    expect(screen.getByRole("button", {
+      name: [
+        `Inspect commit: ${mergeCommit.title}`,
+        mergeCommit.id,
+        mergeCommit.authorName,
+        mergeCommit.authoredAt,
+        "Merge commit using parent 2",
+      ].join(" · "),
+    })).toBeVisible();
+
+    await user.selectOptions(picker, "1");
+    expect(onChooseMainlineParent).toHaveBeenCalledWith(mergeCommit.id, 1);
+    expect(onToggleCommit).not.toHaveBeenCalled();
+    expect(screen.getByText("1 selected")).toBeVisible();
   });
 });

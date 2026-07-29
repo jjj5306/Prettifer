@@ -15,6 +15,7 @@ const result = {
     { path: "src/a.ts", status: "added" as const, beforeContent: null, afterContent: "a" },
     { path: "src/nested/m.ts", status: "modified" as const, beforeContent: "m1", afterContent: "m2" },
   ],
+  mainlineParents: {},
   unifiedDiff: "diff",
 };
 

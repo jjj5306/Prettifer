@@ -206,6 +206,7 @@ describe("app reducer", () => {
           beforeContent: "old",
           afterContent: "new",
         }],
+        mainlineParents: {},
         unifiedDiff: "diff",
       },
     });
@@ -218,6 +219,7 @@ describe("app reducer", () => {
         baseCommit: commonCommit,
         selectedCommits: [commits[0]!.id],
         files: [],
+        mainlineParents: {},
         unifiedDiff: "",
       },
     });
@@ -247,6 +249,7 @@ describe("app reducer", () => {
           beforeContent: null,
           afterContent: "export {};",
         }],
+        mainlineParents: {},
         unifiedDiff: "diff",
       },
     });

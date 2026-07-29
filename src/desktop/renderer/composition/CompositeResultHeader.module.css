@@ -103,3 +103,10 @@
     align-items: stretch;
   }
 }
+
+/* Mainline parent used for a merge commit in the applied chain. */
+.mainlineParent {
+  color: var(--color-muted);
+  font-size: 0.625rem;
+  white-space: nowrap;
+}

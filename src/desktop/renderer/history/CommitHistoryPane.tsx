@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 
+import type { RepositoryCommitDto } from "../../shared/index.js";
 import type { RangeState } from "../state/app-state.js";
 import { DiagnosticMessage } from "../errors/DiagnosticMessage.js";
 import styles from "./CommitHistoryPane.module.css";
@@ -7,8 +8,10 @@ import styles from "./CommitHistoryPane.module.css";
 interface CommitHistoryPaneProps {
   readonly range: RangeState;
   readonly selectedCommitIds: readonly string[];
+  readonly mergeParents: Readonly<Record<string, number>>;
   readonly inspectedCommitId: string | null;
   readonly onToggleCommit: (commitId: string) => void;
+  readonly onChooseMainlineParent: (commitId: string, mainlineParent: number) => void;
   readonly onInspectCommit: (commitId: string) => void;
   readonly onLoadMore: () => void | Promise<void>;
 }
@@ -16,8 +19,10 @@ interface CommitHistoryPaneProps {
 export const CommitHistoryPane = ({
   range,
   selectedCommitIds,
+  mergeParents,
   inspectedCommitId,
   onToggleCommit,
+  onChooseMainlineParent,
   onInspectCommit,
   onLoadMore,
 }: CommitHistoryPaneProps) => {
@@ -141,9 +146,7 @@ export const CommitHistoryPane = ({
                     commit.id,
                     commit.authorName,
                     commit.authoredAt,
-                    ...(commit.isMerge
-                      ? ["Merge commits cannot be included in the selected result"]
-                      : []),
+                    ...mergeAccessibleState(commit, isSelected, mergeParents[commit.id]),
                   ].join(" · ")}
                   onClick={() => {
                     onInspectCommit(commit.id);
@@ -157,10 +160,15 @@ export const CommitHistoryPane = ({
                     </time>
                     <span>{commit.authorName}</span>
                   </span>
-                  {commit.isMerge ? (
-                    <span className={styles.merge}>Merge commit · unavailable</span>
-                  ) : null}
                 </button>
+                {commit.isMerge ? (
+                  <MainlineParentPicker
+                    commit={commit}
+                    isSelected={isSelected}
+                    mainlineParent={mergeParents[commit.id]}
+                    onChoose={onChooseMainlineParent}
+                  />
+                ) : null}
               </li>
             );
           })}
@@ -196,4 +204,65 @@ function authoredMonthDay(authoredAt: string): string {
     return authoredDay;
   }
   return `${month}-${dayOfMonth}`;
+}
+
+interface MainlineParentPickerProps {
+  readonly commit: RepositoryCommitDto;
+  readonly isSelected: boolean;
+  readonly mainlineParent: number | undefined;
+  readonly onChoose: (commitId: string, mainlineParent: number) => void;
+}
+
+/**
+ * A merge needs a mainline parent before it can be composed, so the choice is
+ * offered on the card itself and only matters once the merge is selected.
+ */
+const MainlineParentPicker = ({
+  commit,
+  isSelected,
+  mainlineParent,
+  onChoose,
+}: MainlineParentPickerProps) => {
+  const needsChoice = isSelected && mainlineParent === undefined;
+  return (
+    <div className={styles.mainlineParent}>
+      <label>
+        <span className={styles.mainlineParentLabel}>
+          {needsChoice ? "Parent needed" : "Parent"}
+        </span>
+        <select
+          value={mainlineParent === undefined ? "" : String(mainlineParent)}
+          aria-label={`Mainline parent for merge commit: ${commit.title}`}
+          aria-invalid={needsChoice ? "true" : undefined}
+          onChange={(event) => {
+            onChoose(commit.id, Number(event.target.value));
+          }}
+        >
+          <option value="" disabled>Choose</option>
+          {commit.parentIds.map((parentId, index) => (
+            <option key={parentId} value={String(index + 1)}>
+              {`${String(index + 1)}: ${parentId.slice(0, 7)}`}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+};
+
+/** Tells assistive technology whether a selected merge still needs a parent. */
+function mergeAccessibleState(
+  commit: RepositoryCommitDto,
+  isSelected: boolean,
+  mainlineParent: number | undefined,
+): string[] {
+  if (!commit.isMerge) {
+    return [];
+  }
+  if (!isSelected) {
+    return ["Merge commit"];
+  }
+  return mainlineParent === undefined
+    ? ["Merge commit needs a mainline parent"]
+    : [`Merge commit using parent ${String(mainlineParent)}`];
 }
