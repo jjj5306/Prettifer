@@ -421,6 +421,56 @@ test("offers merge commit selection and recovers after an invalid repository", a
   })).toBeVisible();
 });
 
+test("keeps a merge commit card inside the commit history bar", async () => {
+  const fixture = await createMergeE2eFixture();
+  const running = await launch([fixture.path]);
+  const browserWindow = await running.application.browserWindow(running.page) as JSHandle<BrowserWindow>;
+  await normalizeDisplayScale(browserWindow);
+  await setViewportSize(running.page, 1280, 720);
+  await openRepository(running.page, fixture.path, fixture.headRef);
+  await running.page.getByRole("button", { name: "Load Commit Range" }).click();
+
+  // The merge commit carries a mainline parent picker, which must not push the
+  // card past the shared bar height where the list clips it vertically.
+  const picker = running.page.getByRole("combobox", {
+    name: "Mainline parent for merge commit: merge: include side one",
+  });
+  await expect(picker).toBeVisible();
+
+  const fit = await running.page.evaluate(() => {
+    const list = document.querySelector<HTMLElement>("#commit-history ol");
+    const select = document.querySelector<HTMLElement>("#commit-history select");
+    const row = select?.closest("li");
+    if (list === null || select === null || row === null || row === undefined) {
+      throw new Error("The merge commit card could not be measured.");
+    }
+    const listBox = list.getBoundingClientRect();
+    const rowBox = row.getBoundingClientRect();
+    const selectBox = select.getBoundingClientRect();
+    return {
+      listHeight: Math.round(listBox.height),
+      listClientHeight: list.clientHeight,
+      listScrollHeight: list.scrollHeight,
+      rowHeight: Math.round(rowBox.height),
+      rowOverflowBelow: Math.round(rowBox.bottom - listBox.bottom),
+      selectOverflowBelow: Math.round(selectBox.bottom - listBox.bottom),
+      // Every card shares the bar, so a commit without a picker must fit too.
+      plainRowOverflowBelow: (() => {
+        const rows = [...list.querySelectorAll("li")]
+          .filter((candidate) => candidate.querySelector("select") === null);
+        const plain = rows[0];
+        if (plain === undefined) { return -1; }
+        return Math.round(plain.getBoundingClientRect().bottom - listBox.bottom);
+      })(),
+    };
+  });
+  // The card and its picker stay within the list box instead of being cut off.
+  expect(fit.rowOverflowBelow).toBeLessThanOrEqual(0);
+  expect(fit.selectOverflowBelow).toBeLessThanOrEqual(0);
+  expect(fit.plainRowOverflowBelow).toBeLessThanOrEqual(0);
+  expect(fit.listScrollHeight).toBeLessThanOrEqual(fit.listClientHeight);
+});
+
 test("composes a merge commit against the chosen mainline parent", async () => {
   const fixture = await createMergeE2eFixture();
   const running = await launch([fixture.path]);
