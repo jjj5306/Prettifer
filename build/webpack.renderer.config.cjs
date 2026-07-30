@@ -1,4 +1,6 @@
 const MonacoWebpackPlugin = require("monaco-editor-webpack-plugin");
+const { resolve } = require("node:path");
+
 const {
   CommonJsPackageBoundaryPlugin,
 } = require("./webpack.commonjs-package-boundary.cjs");
@@ -13,7 +15,8 @@ module.exports = {
         use: {
           loader: "ts-loader",
           options: {
-            configFile: "tsconfig.desktop.renderer.json",
+            // Absolute so the loader does not depend on the working directory.
+            configFile: resolve(__dirname, "..", "tsconfig", "desktop.renderer.json"),
             transpileOnly: true,
           },
         },

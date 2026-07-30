@@ -1,0 +1,18 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "types": [
+      "node",
+      "vitest/globals"
+    ]
+  },
+  "include": [
+    "../src/desktop/shared/**/*.ts",
+    "../src/desktop/preload/**/*.ts",
+    "../test/desktop/preload/**/*.ts"
+  ]
+}

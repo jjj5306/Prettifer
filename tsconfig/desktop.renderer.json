@@ -1,0 +1,24 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": [
+      "vitest/globals",
+      "@testing-library/jest-dom/vitest"
+    ]
+  },
+  "include": [
+    "../src/desktop/shared/**/*.ts",
+    "../src/desktop/renderer/**/*.ts",
+    "../src/desktop/renderer/**/*.tsx",
+    "../test/desktop/renderer/**/*.ts",
+    "../test/desktop/renderer/**/*.tsx"
+  ]
+}

@@ -1,3 +1,5 @@
+const { resolve } = require("node:path");
+
 const {
   CommonJsPackageBoundaryPlugin,
 } = require("./webpack.commonjs-package-boundary.cjs");
@@ -13,7 +15,8 @@ module.exports = {
         use: {
           loader: "ts-loader",
           options: {
-            configFile: "tsconfig.desktop.main.json",
+            // Absolute so the loader does not depend on the working directory.
+            configFile: resolve(__dirname, "..", "tsconfig", "desktop.main.json"),
             transpileOnly: true,
           },
         },
