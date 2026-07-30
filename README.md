@@ -134,10 +134,29 @@ Forge가 사용하는 개발 서버 API는 생성자와 `hot`, `devMiddleware.wr
 `webpack-dev-server` 고정을 제거합니다. `selfsigned` 고정은 상위의 `@noble/hashes` peer
 충돌이 해소되면 제거합니다.
 
-`brace-expansion` 권고(high)는 아직 남아 있습니다. 5.0.8이 기본 함수 export를 named export로
-바꿔서 `minimatch` 3.x·9.x가 `expand is not a function`으로 깨지므로 강제 고정할 수 없습니다.
-해소는 상위 패키지들이 `minimatch` 10.x(`@isaacs/brace-expansion` 사용)로 올라온 뒤에
-가능합니다. 추적은 [이슈 #44](https://github.com/jjj5306/Prettifer/issues/44)에서 합니다.
+### 보안 권고 기준선
+
+`npm audit`은 상위 패키지로 전파된 하나의 권고를 패키지마다 한 줄씩 세기 때문에, 권고 1건이
+수십 줄로 보입니다. 그래서 숫자를 그대로 게이트로 쓰면 새로 생긴 진짜 권고가 소음에 묻힙니다.
+
+```powershell
+npm run audit:check
+```
+
+이 명령은 권고를 **구별되는 단위로 합친 뒤** `security/audit-allowlist.json`에 없는 것만
+실패로 처리합니다. 두 방향으로 실패합니다.
+
+- 목록에 **없는** 권고가 생기면 실패합니다. 고치거나, 못 고치는 이유를 적어 항목을 추가합니다.
+- 목록에 있는 항목이 **더 이상 나타나지 않으면** 실패합니다. 상위에서 해결됐다는 뜻이므로
+  항목을 지우라는 신호입니다.
+
+각 항목에는 왜 못 고치는지(`reason`), 여기서 악용 가능한지(`notExploitableHere`), 무엇이
+바뀌면 해소되는지(`resolvesWhen`)를 적습니다.
+
+현재 목록에는 `brace-expansion` 권고 1건이 있습니다. 패치본 5.0.8이 기본 함수 export를 named
+export로 바꿔서 `minimatch` 3.x·9.x가 `expand is not a function`으로 깨지므로 강제 고정할 수
+없습니다. 이 트리의 `minimatch` 소비자 10개 중 9개가 아직 `^3.x`를 선언하며, 여기에는 eslint,
+eslint-plugin-jsx-a11y, eslint-plugin-react와 `@electron/*`의 **최신 버전**이 포함됩니다.
 
 ### 검증
 
@@ -149,6 +168,7 @@ npm run lint                               # ESLint
 npm run typecheck                          # 프로세스 경계별 TypeScript 검사
 npm run test:desktop:e2e                   # 패키징 + Playwright Electron
 npx openspec validate --all --strict       # OpenSpec
+npm run audit:check                        # 보안 권고 기준선
 ```
 
 `npm run test:desktop:e2e`는 `electron-forge package`를 먼저 실행합니다.
@@ -162,7 +182,7 @@ Prettifer 앱이 실행 중이면 `out/desktop/prettifer-win32-x64`가 잠겨 �
 
 | 검사 | 실행 명령 |
 |---|---|
-| Lint, types and unit tests | `npm run lint`, `npm run typecheck`, `npx --no -- openspec validate --all --strict`, `npm test` |
+| Lint, types and unit tests | `npm run lint`, `npm run typecheck`, `npx --no -- openspec validate --all --strict`, `npm run audit:check`, `npm test` |
 | Electron end-to-end tests | `npm run test:desktop:e2e` |
 
 e2e가 실패하면 Playwright trace와 스크린샷이 `playwright-results` artifact로
