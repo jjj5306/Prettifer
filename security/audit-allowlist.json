@@ -1,0 +1,12 @@
+[
+  {
+    "advisory": "GHSA-mh99-v99m-4gvg",
+    "package": "brace-expansion",
+    "severity": "high",
+    "title": "DoS via unbounded expansion length causing an out-of-memory process crash",
+    "reason": "No supported fix exists. The patched brace-expansion 5.0.8 replaced its default function export with a named export, so minimatch 3.x/9.x break with `TypeError: expand is not a function`. Nine of the ten minimatch consumers in this tree still declare ^3.x, including the latest eslint, eslint-plugin-jsx-a11y, eslint-plugin-react and @electron/* releases. Forcing minimatch 10.x reaches 0 advisories but breaks eslint-plugin-jsx-a11y, which calls minimatch as a default-exported function.",
+    "notExploitableHere": "The advisory needs attacker-controlled glob patterns. Every pattern in this repository comes from our own configuration (eslint.config.js, forge config, packaging patterns), and the chain is devDependency-only so it never ships in the packaged app.",
+    "resolvesWhen": "eslint, eslint-plugin-jsx-a11y, eslint-plugin-react and the @electron/* packages declare minimatch >=10 (or brace-expansion >=5.0.8).",
+    "reviewBy": "2027-01-31"
+  }
+]

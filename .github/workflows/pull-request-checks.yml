@@ -56,6 +56,11 @@ jobs:
       - name: Validate OpenSpec
         run: npx --no -- openspec validate --all --strict
 
+      # Fails only on advisories outside security/audit-allowlist.json, so the
+      # result keeps meaning something while a known one waits on upstream.
+      - name: Security advisories
+        run: npm run audit:check
+
       # Covers the renderer, main-process and integration suites.
       - name: Unit tests
         run: npm test

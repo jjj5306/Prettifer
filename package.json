@@ -11,6 +11,7 @@
     "desktop:package": "electron-forge package",
     "desktop:make": "electron-forge make --platform=win32",
     "lint": "eslint .",
+    "audit:check": "node scripts/check-audit.mjs",
     "test": "vitest run",
     "test:desktop": "npm run test:desktop:unit && npm run test:desktop:e2e",
     "test:desktop:unit": "vitest run test/desktop",
