@@ -70,9 +70,15 @@
   background: var(--color-muted);
 }
 
+/*
+ * Selection, commit and the optional mainline parent picker share one row. The
+ * commit history bar is a fixed track and the list clips vertical overflow, so a
+ * second row would cut the card in half.
+ */
 .commitRow {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
   border: 1px solid var(--color-border);
   border-radius: 0.25rem;
   background: var(--color-surface);
@@ -98,8 +104,22 @@
   accent-color: var(--color-accent);
 }
 
+/*
+ * The app styles every control for pointer use: 2.25rem minimum height, a border
+ * and generous padding. The commit strip is a fixed-height bar that clips
+ * vertical overflow, so at those sizes every card is taller than the bar and
+ * gets cut in half. Its controls opt out here.
+ *
+ * Each selector carries two classes on purpose. The app-wide rule is
+ * `.app button` (one class, one type), which outranks a single local class like
+ * `.commitButton`, so compact sizing only wins with the extra class.
+ */
+.commitRow .selection input {
+  min-height: 0;
+}
+
 /* One line per commit so the card fits the shared bar height. */
-.commitButton {
+.commitRow .commitButton {
   display: flex;
   min-width: 0;
   min-height: 0;
@@ -170,14 +190,14 @@
   }
 }
 
-/* Mainline parent choice for a merge commit, shown on its own card row. */
+/* Mainline parent choice for a merge commit, kept on the commit's own line. */
 .mainlineParent {
-  grid-column: 1 / -1;
   display: flex;
+  flex: 0 0 auto;
   min-width: 0;
   align-items: center;
-  padding: 0 var(--space-2) 0.15rem;
-  border-top: 1px solid var(--color-border);
+  padding: 0 var(--space-2);
+  border-left: 1px solid var(--color-border);
 }
 
 .mainlineParent label {
@@ -193,13 +213,13 @@
   white-space: nowrap;
 }
 
-.mainlineParent select {
+.commitRow .mainlineParent select {
   min-height: 1.35rem;
   padding: 0 0.15rem;
   font-family: var(--font-code);
   font-size: 0.625rem;
 }
 
-.mainlineParent select[aria-invalid="true"] {
+.commitRow .mainlineParent select[aria-invalid="true"] {
   border-color: var(--color-warning);
 }
