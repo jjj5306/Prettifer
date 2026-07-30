@@ -186,3 +186,16 @@ Call log:
 아닌 `page.screenshot({ fullPage: true })`가 하나 있어 함께 제거했다. 이제 프레임 합성에
 의존하는 연산은 renderer 시작 오류 경로의 진단용 스크린샷 하나뿐이며, 정상 경로에서는
 실행되지 않는다.
+
+### 검사 실행 확인 (PR #43)
+
+첫 실행은 `Install dependencies`에서 실패했다. 위에 기록한 lock 문제이며, 게이트가 로컬
+검증이 놓친 것을 잡아낸 사례다. lock을 pristine 상태에서 재생성한 뒤 두 검사 모두 통과했다.
+
+| 검사 | 결과 | 시간 |
+|---|---|---|
+| Lint, types and unit tests | pass | 3분 49초 |
+| Electron end-to-end tests | pass | 4분 18초 |
+
+새로 넣은 `Validate OpenSpec` step이 runner에서 실행되어 `Totals: 6 passed, 0 failed`를
+출력했다. 전역 설치가 없는 환경에서 고정된 프로젝트 의존성으로 CLI가 동작함을 확인한 것이다.

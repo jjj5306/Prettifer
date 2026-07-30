@@ -29,4 +29,4 @@
 - [x] 5.1 lint, typecheck와 전체 유닛 테스트를 실행한다
 - [x] 5.2 전체 e2e를 실행한다
 - [x] 5.3 OpenSpec strict 검증을 실행한다
-- [ ] 5.4 실제 Pull Request 검사에서 네 step이 모두 실행되고 통과하는지 확인한다
+- [x] 5.4 실제 Pull Request 검사에서 네 step이 모두 실행되고 통과하는지 확인한다
