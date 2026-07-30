@@ -106,6 +106,39 @@ npm ci
 npm run desktop:start
 ```
 
+### 고정한 개발 의존성
+
+`package.json`의 `overrides`는 보안 권고를 해소하기 위해 전이 의존성 버전을 고정합니다.
+각 항목은 상위 패키지가 안전한 범위를 선언하면 제거하는 것이 목표입니다.
+
+| 패키지 | 고정 버전 | 이유 |
+|---|---|---|
+| `webpack-dev-server` | `5.2.6` | 소스 노출·CSRF·DoS 권고 6건이 `<=5.2.5`에 해당합니다. `@electron-forge/plugin-webpack@7.11.2`(최신)이 `^4.0.0`을 선언하므로 그 범위 안에는 안전한 버전이 없습니다. |
+| `selfsigned` | `2.4.1` | wds 5.2.6이 선언한 `^5.5.0`을 쓰면 `pkijs` 서브트리의 `@noble/hashes` peer 충돌로 **`npm ci`가 깨집니다**(`Missing: @noble/hashes@1.4.0 from lock file`). 2.4.1은 node-forge 기반이라 그 서브트리가 사라집니다. HTTPS 개발 서버 전용 의존성이며 이 프로젝트는 그 옵션을 켜지 않습니다. |
+| `dompurify`, `tar`, `tmp`, `uuid` | 고정 | 이전 권고 대응입니다. |
+
+두 고정은 상위가 선언한 범위를 벗어나며 `selfsigned`는 다운그레이드입니다. HTTPS 개발
+서버를 쓰게 되면 `selfsigned` 고정을 먼저 재검토해야 합니다. 다음 절차로 재확인합니다.
+
+```powershell
+npm audit                                  # 권고가 남아 있는지
+npm ci                                     # lock과 package.json이 어긋나지 않는지
+npm run desktop:start                      # 개발 서버 기동 (http://localhost:3000/main_window)
+npm run test:desktop:e2e                   # 패키징 + Electron 전체 흐름
+npm run desktop:make                       # 릴리스 ZIP 산출물
+```
+
+Forge가 사용하는 개발 서버 API는 생성자와 `hot`, `devMiddleware.writeToDisk`,
+`historyApiFallback`, `port`, `setupExitSignals`, `static`, `headers`뿐입니다. Forge를 올릴
+때 이 표면이 바뀌었는지, 그리고 `^4.0.0` 선언이 안전한 범위로 갱신되었는지 확인한 뒤
+`webpack-dev-server` 고정을 제거합니다. `selfsigned` 고정은 상위의 `@noble/hashes` peer
+충돌이 해소되면 제거합니다.
+
+`brace-expansion` 권고(high)는 아직 남아 있습니다. 5.0.8이 기본 함수 export를 named export로
+바꿔서 `minimatch` 3.x·9.x가 `expand is not a function`으로 깨지므로 강제 고정할 수 없습니다.
+해소는 상위 패키지들이 `minimatch` 10.x(`@isaacs/brace-expansion` 사용)로 올라온 뒤에
+가능합니다. 추적은 [이슈 #44](https://github.com/jjj5306/Prettifer/issues/44)에서 합니다.
+
 ### 검증
 
 작업 완료 전에 다음을 모두 통과해야 합니다.
