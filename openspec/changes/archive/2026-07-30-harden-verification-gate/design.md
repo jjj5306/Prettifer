@@ -58,11 +58,28 @@ runner가 보는 종료 코드: 0
 내려받지 않겠다는 뜻이므로, 의존성이 빠지면 조용히 엉뚱한 패키지를 실행하는 대신 즉시
 실패한다.
 
-`package-lock.json`은 처음부터 다시 생성했다. 의존성만 추가했을 때와 새로 생성했을 때 모두
-`@emnapi/*`, `encoding` 항목이 빠지는데, 이는 lock을 처음 만든 npm과 지금 npm(11.6.2)의
-선택적 의존성 처리가 다르기 때문이다. CI도 Node 24(npm 11.x)를 쓰므로 같은 npm이 해석한
-lock이 더 일관된다. 기존 패키지 버전 변화는 macOS 전용 선택적 의존성 `fsevents`
-2.3.2 → 2.3.3 하나뿐이고, `npm ci`로 깨끗한 설치를 확인했다.
+`package-lock.json` 재생성은 한 번 틀렸고 CI가 잡았다. 기록해 둔다.
+
+처음에는 `package-lock.json`만 지우고 `npm install`을 했다. 그러면 남아 있는 `node_modules`가
+해석에 영향을 주어 `@emnapi/*`와 `encoding` 항목이 lock에서 빠진다. 로컬 `npm ci`는 통과했다.
+자기가 만든 lock을 자기가 해석하므로 일관되기 때문이다. 그러나 runner에서는 실패했다.
+
+```
+npm error `npm ci` can only install packages when your package.json and
+npm error package-lock.json ... are in sync.
+npm error Missing: @emnapi/core@2.0.0-alpha.3 from lock file
+npm error Missing: @emnapi/runtime@2.0.0-alpha.3 from lock file
+npm error Missing: encoding@0.1.13 from lock file
+npm error Missing: iconv-lite@0.6.3 from lock file
+```
+
+과거 실패 #28과 같은 항목이다. 즉 "로컬 `npm ci` 통과"는 이 문제에 대한 유효한 검증이 아니다.
+
+`node_modules`와 `package-lock.json`을 **모두** 지우고 다시 생성해야 한다. 그렇게 하면 네
+항목이 다시 들어온다. 다만 전체 재해석이므로 caret 범위가 그동안 올라간 만큼 전이 의존성
+12개의 버전이 함께 바뀐다(`@inquirer/core` 9.2.1 → 10.3.2, `mute-stream` 1.0.0 → 2.0.0 등).
+직접 의존성은 하나도 바뀌지 않았고, 새 취약점도 없다(추가 전후 모두 34 high, 전부 기존
+`webpack-dev-server` 계열). 이 상태로 lint, typecheck, 유닛 268개와 e2e 11개를 통과했다.
 
 ### 3. 간헐적 e2e 실패
 
