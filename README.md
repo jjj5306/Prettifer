@@ -81,15 +81,23 @@ npx openspec validate --all --strict       # 전체 검증
 
 - Node.js `22.13+` 또는 `24+`
 - Git `2.30+`
-- OpenSpec CLI `1.6.0`
 - Windows (데스크톱 앱과 Playwright Electron 검증 기준 환경)
 
 ```powershell
 node --version
 git --version
-npm install --global @fission-ai/openspec@1.6.0
-openspec --version
 ```
+
+OpenSpec CLI는 `@fission-ai/openspec@1.6.0`으로 버전이 고정된 devDependency입니다.
+`npm ci` 후 전역 설치 없이 `npx openspec`으로 실행합니다.
+
+```powershell
+npx --no -- openspec --version   # 1.6.0
+```
+
+`--no`는 레지스트리에서 내려받지 않겠다는 뜻입니다. npm에 `openspec`이라는 이름으로
+공개된 패키지는 이 도구가 아닌 다른 빈 패키지이므로, 의존성이 빠졌을 때 조용히 엉뚱한
+것을 실행하지 않고 즉시 실패하게 합니다.
 
 ### 설치와 실행
 
@@ -121,16 +129,11 @@ Prettifer 앱이 실행 중이면 `out/desktop/prettifer-win32-x64`가 잠겨 �
 
 | 검사 | 실행 명령 |
 |---|---|
-| Lint, types and unit tests | `npm run lint`, `npm run typecheck`, `npm test` |
+| Lint, types and unit tests | `npm run lint`, `npm run typecheck`, `npx --no -- openspec validate --all --strict`, `npm test` |
 | Electron end-to-end tests | `npm run test:desktop:e2e` |
 
 e2e가 실패하면 Playwright trace와 스크린샷이 `playwright-results` artifact로
 올라가므로 로컬에서 재현하지 않고 원인을 볼 수 있습니다.
-
-`npx openspec validate --all --strict`는 검사에 포함되지 않습니다. OpenSpec CLI가
-프로젝트 의존성이 아니라 전역 설치이고, npm 레지스트리의 `openspec` 패키지는
-이 도구가 아닌 다른 패키지이기 때문입니다. 작성자가 로컬에서 실행하고 결과를 PR
-본문에 남깁니다.
 
 검사가 통과해도 요구사항 일치, 이슈 범위와 문서 정합성은 검증되지 않습니다. 이
 항목들은 `.github/pull_request_template.md`의 자체 리뷰가 담당합니다.

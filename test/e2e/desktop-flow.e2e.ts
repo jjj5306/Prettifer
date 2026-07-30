@@ -143,11 +143,6 @@ test("opens a repository, selects non-contiguous commits and reviews file diff",
   expect(await running.page.evaluate(() =>
     document.fonts.check('12.5px "Geist Variable"'),
   )).toBe(true);
-  await running.page.screenshot({
-    path: test.info().outputPath("list-view-1280x720.png"),
-    fullPage: true,
-    scale: "css",
-  });
 
   await running.page.getByRole("button", { name: "Tree View" }).click();
   await expect(running.page.getByRole("button", { name: "Tree View" }))
@@ -156,27 +151,12 @@ test("opens a repository, selects non-contiguous commits and reviews file diff",
   await expect(running.page.getByRole("textbox", {
     name: "Read-only diff: docs/auth.md · base and selected result",
   })).toBeVisible();
-  await running.page.screenshot({
-    path: test.info().outputPath("tree-view-1280x720.png"),
-    fullPage: true,
-    scale: "css",
-  });
 
   await setViewportSize(running.page, 1920, 1080);
-  await running.page.screenshot({
-    path: test.info().outputPath("tree-view-1920x1080.png"),
-    fullPage: true,
-    scale: "css",
-  });
   await running.page.getByRole("button", { name: "List View" }).click();
   await expect(running.page.getByRole("button", { name: "List View" }))
     .toHaveAttribute("aria-pressed", "true");
   await expect(selectedFile).toHaveAttribute("aria-pressed", "true");
-  await running.page.screenshot({
-    path: test.info().outputPath("list-view-1920x1080.png"),
-    fullPage: true,
-    scale: "css",
-  });
 
   await browserWindow.evaluate(
     (window, zoomFactor) => { window.webContents.setZoomFactor(zoomFactor); },
@@ -198,11 +178,6 @@ test("opens a repository, selects non-contiguous commits and reviews file diff",
       .map((element) => element.getAttribute("aria-label") ?? element.textContent.trim()),
   );
   expect(clippedControls).toEqual([]);
-  await running.page.screenshot({
-    path: test.info().outputPath("list-view-200-percent.png"),
-    fullPage: true,
-    scale: "css",
-  });
 
   expect(await running.page.evaluate(() => typeof process)).toBe("undefined");
   expect(running.consoleErrors).toEqual([]);
@@ -238,11 +213,6 @@ test("reviews an added file as full contents and collapses its Tree View folder"
   await expect.poll(() => running.page.evaluate(() =>
     document.querySelectorAll(".prettifer-added-line").length,
   )).toBeGreaterThan(0);
-  await running.page.screenshot({
-    path: test.info().outputPath("added-file-1280x720.png"),
-    fullPage: true,
-    scale: "css",
-  });
 
   await running.page.getByRole("button", { name: "Tree View" }).click();
   // The single-directory chain src → auth is joined into one row.

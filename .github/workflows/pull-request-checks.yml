@@ -50,6 +50,12 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      # --no refuses to fetch from the registry, so this fails loudly if the
+      # pinned CLI is ever dropped instead of silently running the unrelated
+      # package that npm publishes under the bare name "openspec".
+      - name: Validate OpenSpec
+        run: npx --no -- openspec validate --all --strict
+
       # Covers the renderer, main-process and integration suites.
       - name: Unit tests
         run: npm test

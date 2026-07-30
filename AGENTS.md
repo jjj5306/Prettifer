@@ -68,7 +68,7 @@ GitHub 이슈에는 다음 내용을 유지한다.
 4. specs에서 요구사항과 시나리오를 정의한다.
 5. design에서 구현 방향, 제약과 설계 결정을 정리한다.
 6. tasks를 검증 가능한 구현 단위로 분해한다.
-7. `openspec validate <change-name>`으로 명세를 검증한다.
+7. `npx --no -- openspec validate <change-name>`으로 명세를 검증한다.
 8. 명세가 구현 가능한 상태가 된 후 코드를 작성한다.
 9. 구현 완료 후 tasks와 실제 결과가 일치하는지 확인한다.
 10. 검증과 리뷰가 끝난 change를 archive한다.
