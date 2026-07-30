@@ -163,6 +163,7 @@ export type ApiResult<T> =
 
 export const DESKTOP_CHANNELS = Object.freeze({
   selectRepository: "repository:select",
+  openInitialRepository: "repository:initial",
   loadRange: "repository:load-range",
   listCommits: "repository:list-commits",
   composeSelection: "composition:create",
@@ -171,6 +172,8 @@ export const DESKTOP_CHANNELS = Object.freeze({
 
 export interface DesktopApi {
   selectRepository(): Promise<ApiResult<RepositorySession>>;
+  /** Opens the repository the app was started with, if the user gave one. */
+  openInitialRepository(): Promise<ApiResult<RepositorySession>>;
   loadRange(request: RangeRequest): Promise<ApiResult<RangeResult>>;
   listCommits(request: CommitPageRequest): Promise<ApiResult<RepositoryCommitPageDto>>;
   composeSelection(request: CompositionRequest): Promise<ApiResult<CompositeDiffResultDto>>;

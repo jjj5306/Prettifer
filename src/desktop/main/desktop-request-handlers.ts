@@ -39,6 +39,7 @@ interface SessionReader {
 
 interface RepositorySelector {
   selectRepository(): Promise<ApiResult<RepositorySession>>;
+  openInitialRepository(): Promise<ApiResult<RepositorySession>>;
 }
 
 interface HistoryReader {
@@ -81,6 +82,11 @@ export function createDesktopRequestHandlers(dependencies: DesktopRequestDepende
       event,
       dependencies,
       () => dependencies.repositoryController.selectRepository(),
+    ),
+    openInitialRepository: (event: DesktopInvokeEvent) => handleRequest(
+      event,
+      dependencies,
+      () => dependencies.repositoryController.openInitialRepository(),
     ),
     loadRange: (event: DesktopInvokeEvent, input: unknown) => handleRequest(
       event,

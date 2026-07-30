@@ -78,6 +78,8 @@ export class RepositorySessionController {
     private readonly sessions: RepositorySessionManager,
     private readonly folders: FolderSelector,
     private readonly signal?: AbortSignal,
+    /** Path the app was started with, when the user passed one. */
+    private readonly initialPath: () => string | null = () => null,
   ) {}
 
   async selectRepository(): Promise<ApiResult<RepositorySession>> {
@@ -85,7 +87,23 @@ export class RepositorySessionController {
     if (selectedPath === null) {
       return { status: "cancelled" };
     }
+    return this.open(selectedPath);
+  }
 
+  /**
+   * Opens the repository the app was started with. Reports a cancellation when
+   * no path was given, which leaves the screen exactly as it starts.
+   */
+  async openInitialRepository(): Promise<ApiResult<RepositorySession>> {
+    const startupPath = this.initialPath();
+    if (startupPath === null) {
+      return { status: "cancelled" };
+    }
+    return this.open(startupPath);
+  }
+
+  /** Both paths share one validation and one diagnostic translation. */
+  private async open(selectedPath: string): Promise<ApiResult<RepositorySession>> {
     try {
       return { status: "success", data: await this.sessions.open(selectedPath, this.signal) };
     } catch (error) {

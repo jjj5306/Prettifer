@@ -19,6 +19,9 @@ export function createDesktopApi(invoke: Invoke): DesktopApi {
     selectRepository: () => invoke(
       DESKTOP_CHANNELS.selectRepository,
     ) as Promise<ApiResult<RepositorySession>>,
+    openInitialRepository: () => invoke(
+      DESKTOP_CHANNELS.openInitialRepository,
+    ) as Promise<ApiResult<RepositorySession>>,
     loadRange: (request: RangeRequest) => invoke(
       DESKTOP_CHANNELS.loadRange,
       request,
