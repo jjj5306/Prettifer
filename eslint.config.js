@@ -188,10 +188,11 @@ export default tseslint.config(
     ...tseslint.configs.disableTypeChecked,
   },
   {
-    files: ["*.config.{js,cjs}", "webpack.*.cjs", "forge.config.cjs"],
+    files: ["*.config.{js,cjs}", "build/*.cjs", "forge.config.cjs"],
     ...tseslint.configs.disableTypeChecked,
     languageOptions: {
       globals: {
+        __dirname: "readonly",
         module: "readonly",
         require: "readonly",
       },

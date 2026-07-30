@@ -209,6 +209,26 @@ npm run build:core
 node .\examples\compose-selected-commits.mjs <repoPath> <baseRef> <headRef> <commit...>
 ```
 
+## 저장소 구조
+
+루트에는 도구가 그 위치에서 찾기를 기대하는 파일만 둡니다. 나머지 설정은 역할별
+디렉터리에 있습니다.
+
+```text
+build/            webpack 설정 (forge.config.cjs가 참조)
+tsconfig/         파생 TypeScript 설정 (프로세스 경계별, 코어 빌드용)
+scripts/          저장소 확인 스크립트 (audit:check)
+security/         보안 권고 허용 목록
+docs/             개발 문서와 화면 기준 이미지
+examples/         코어 라이브러리 사용 예제
+openspec/         메인 스펙과 변경 기록
+src/  test/       제품 코드와 검증
+```
+
+루트에 남은 `tsconfig.json`은 편집기와 typed lint가 기준으로 삼는 설정이고,
+`eslint.config.js`, `vitest.config.ts`, `playwright.electron.config.ts`,
+`forge.config.cjs`는 각 도구가 루트에서 찾습니다.
+
 ## 코드 구조
 
 ```text

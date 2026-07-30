@@ -6,7 +6,7 @@
   "main": ".webpack/main",
   "scripts": {
     "build": "npm run build:core && npm run desktop:package",
-    "build:core": "tsc -p tsconfig.build.json",
+    "build:core": "tsc -p tsconfig/build.json",
     "desktop:start": "electron-forge start",
     "desktop:package": "electron-forge package",
     "desktop:make": "electron-forge make --platform=win32",
@@ -17,7 +17,7 @@
     "test:desktop:unit": "vitest run test/desktop",
     "test:desktop:e2e": "electron-forge package && playwright test --config=playwright.electron.config.ts",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.desktop.shared.json && tsc --noEmit -p tsconfig.desktop.main.json && tsc --noEmit -p tsconfig.desktop.preload.json && tsc --noEmit -p tsconfig.desktop.renderer.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig/desktop.shared.json && tsc --noEmit -p tsconfig/desktop.main.json && tsc --noEmit -p tsconfig/desktop.preload.json && tsc --noEmit -p tsconfig/desktop.renderer.json"
   },
   "engines": {
     "node": "^22.13.0 || >=24"
