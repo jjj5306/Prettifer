@@ -31,7 +31,9 @@ import {
 
 const require = createRequire(import.meta.url);
 const executablePath = require("electron") as string;
-const applicationPath = resolve(".webpack", "x64", "main", "index.js");
+// The end-to-end entry, which accepts the PRETTIFER_E2E_* seams. The production
+// entry has none of them and is what the package smoke test exercises.
+const applicationPath = resolve(".webpack", "x64", "main", "index-e2e.js");
 
 interface RunningApplication {
   readonly application: ElectronApplication;

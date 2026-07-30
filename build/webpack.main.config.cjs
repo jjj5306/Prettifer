@@ -6,7 +6,17 @@ const {
 
 module.exports = {
   devtool: "source-map",
-  entry: "./src/desktop/main/index.ts",
+  // Two main bundles from one build. The production entry ships; the end-to-end
+  // entry is removed from the package by forge.config.cjs and only the Playwright
+  // flow test launches it. Forge merges this config over its own defaults, so the
+  // filename pattern replaces its fixed "index.js".
+  entry: {
+    index: "./src/desktop/main/index.ts",
+    "index-e2e": "./src/desktop/main/index.e2e.ts",
+  },
+  output: {
+    filename: "[name].js",
+  },
   module: {
     rules: [
       {

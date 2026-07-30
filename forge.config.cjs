@@ -1,8 +1,11 @@
 const { FusesPlugin } = require("@electron-forge/plugin-fuses");
 const { PluginBase } = require("@electron-forge/plugin-base");
 const { FuseV1Options, FuseVersion } = require("@electron/fuses");
-const { readFile, writeFile } = require("node:fs/promises");
+const { readFile, rm, writeFile } = require("node:fs/promises");
 const { resolve } = require("node:path");
+
+/** Bundles the end-to-end entry produces, which must never ship. */
+const E2E_MAIN_BUNDLES = ["index-e2e.js", "index-e2e.js.map"];
 
 class PackagedMainEntryPlugin extends PluginBase {
   name = "packaged-main-entry";
@@ -18,6 +21,12 @@ class PackagedMainEntryPlugin extends PluginBase {
         const packageJson = JSON.parse(await readFile(packagePath, "utf8"));
         packageJson.main = ".webpack/main/index.js";
         await writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`, "utf8");
+
+        // The end-to-end entry exists only for Playwright. Drop it before asar so
+        // no test seam reaches a shipped build.
+        for (const bundle of E2E_MAIN_BUNDLES) {
+          await rm(resolve(buildPath, ".webpack", "main", bundle), { force: true });
+        }
       },
     };
   }
