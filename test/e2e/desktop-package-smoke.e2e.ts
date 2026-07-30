@@ -70,10 +70,6 @@ test("runs the packaged Windows app through its main flow and exits normally", a
   }).check();
   await page.getByRole("button", { name: "Build Selected Result" }).click();
   await expect(page.getByText(/Result ready · \d+ changed files/u)).toBeVisible();
-  await page.screenshot({
-    path: test.info().outputPath("packaged-composite-diff.png"),
-    fullPage: true,
-  });
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
 
