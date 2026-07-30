@@ -82,7 +82,7 @@ describe("useAppController", () => {
       openInitialRepository: vi.fn().mockResolvedValue({
         status: "error",
         diagnostic: {
-          code: "NOT_A_REPOSITORY",
+          code: "INVALID_REPOSITORY",
           message: "The folder is not a Git repository.",
           subject: "C:\\work\\plain",
           nextAction: "Open a folder that contains a Git repository.",
@@ -99,7 +99,7 @@ describe("useAppController", () => {
 
     expect(result.current.state.repository).toMatchObject({
       status: "error",
-      diagnostic: { code: "NOT_A_REPOSITORY", subject: "C:\\work\\plain" },
+      diagnostic: { code: "INVALID_REPOSITORY", subject: "C:\\work\\plain" },
     });
   });
 

@@ -130,7 +130,7 @@ describe("RepositorySessionController", () => {
 
   it("applies the same validation to a started path as to a chosen folder", async () => {
     const getRepository = vi.fn().mockRejectedValue(new RepositoryHistoryError(
-      "NOT_A_REPOSITORY",
+      "INVALID_REPOSITORY",
       "C:\\work\\plain",
       "Open a folder that contains a Git repository.",
     ));
@@ -149,7 +149,7 @@ describe("RepositorySessionController", () => {
     // The startup path is not trusted more than a folder the user picked.
     await expect(controller.openInitialRepository()).resolves.toMatchObject({
       status: "error",
-      diagnostic: { code: "NOT_A_REPOSITORY" },
+      diagnostic: { code: "INVALID_REPOSITORY" },
     });
     expect(getRepository).toHaveBeenCalledOnce();
   });
