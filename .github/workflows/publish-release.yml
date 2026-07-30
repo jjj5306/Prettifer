@@ -73,11 +73,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify the source
-        run: |
-          npm run lint
-          npm run typecheck
-          npm test
+      # One verification command per step. The default shell on a Windows runner
+      # is pwsh, where only the last command of a run block decides the step
+      # exit code, so grouping these would publish a release despite a failing
+      # lint or type check.
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
 
       - name: Build the Windows ZIP
         run: npm run desktop:make
