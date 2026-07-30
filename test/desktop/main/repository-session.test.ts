@@ -91,6 +91,69 @@ describe("RepositorySessionController", () => {
     expect(manager.require(current.repositorySessionId, current.sessionRevision)).toEqual(current);
   });
 
+  it("opens the repository the app was started with, without a folder dialog", async () => {
+    const selectFolder = vi.fn();
+    const manager = new RepositorySessionManager(
+      { getRepository: vi.fn().mockResolvedValue(repository) },
+      (path) => path,
+      () => "00000000-0000-4000-8000-000000000001",
+    );
+    const controller = new RepositorySessionController(
+      manager,
+      { selectFolder },
+      undefined,
+      () => repository.rootPath,
+    );
+
+    const result = await controller.openInitialRepository();
+
+    expect(result).toMatchObject({ status: "success" });
+    expect(selectFolder).not.toHaveBeenCalled();
+  });
+
+  it("reports a cancellation when the app was started without a repository", async () => {
+    const manager = new RepositorySessionManager(
+      { getRepository: vi.fn() },
+      (path) => path,
+      () => "00000000-0000-4000-8000-000000000001",
+    );
+    const controller = new RepositorySessionController(
+      manager,
+      { selectFolder: vi.fn() },
+      undefined,
+      () => null,
+    );
+
+    await expect(controller.openInitialRepository())
+      .resolves.toEqual({ status: "cancelled" });
+  });
+
+  it("applies the same validation to a started path as to a chosen folder", async () => {
+    const getRepository = vi.fn().mockRejectedValue(new RepositoryHistoryError(
+      "INVALID_REPOSITORY",
+      "C:\\work\\plain",
+      "Open a folder that contains a Git repository.",
+    ));
+    const manager = new RepositorySessionManager(
+      { getRepository },
+      (path) => path,
+      () => "00000000-0000-4000-8000-000000000001",
+    );
+    const controller = new RepositorySessionController(
+      manager,
+      { selectFolder: vi.fn() },
+      undefined,
+      () => "C:\\work\\plain",
+    );
+
+    // The startup path is not trusted more than a folder the user picked.
+    await expect(controller.openInitialRepository()).resolves.toMatchObject({
+      status: "error",
+      diagnostic: { code: "INVALID_REPOSITORY" },
+    });
+    expect(getRepository).toHaveBeenCalledOnce();
+  });
+
   it("returns an actionable diagnostic for an invalid folder", async () => {
     const manager = new RepositorySessionManager(
       {

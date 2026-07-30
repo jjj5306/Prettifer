@@ -9,6 +9,7 @@ describe("preload desktop API", () => {
 
     expect(Object.keys(api)).toEqual([
       "selectRepository",
+      "openInitialRepository",
       "loadRange",
       "listCommits",
       "composeSelection",

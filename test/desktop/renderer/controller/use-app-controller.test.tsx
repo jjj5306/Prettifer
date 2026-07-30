@@ -18,6 +18,7 @@ const session: RepositorySession = {
 function createApi(overrides: Partial<DesktopApi> = {}): DesktopApi {
   return {
     selectRepository: vi.fn().mockResolvedValue({ status: "cancelled" }),
+    openInitialRepository: vi.fn().mockResolvedValue({ status: "cancelled" }),
     loadRange: vi.fn().mockResolvedValue({ status: "error", diagnostic: {
       code: "NO_RANGE",
       message: "No comparison range is available.",
@@ -37,12 +38,78 @@ function createApi(overrides: Partial<DesktopApi> = {}): DesktopApi {
 const wrapper = ({ children }: PropsWithChildren) => <StrictMode>{children}</StrictMode>;
 
 describe("useAppController", () => {
+  it("opens the repository the app was started with", async () => {
+    const openInitialRepository = vi.fn().mockResolvedValue({
+      status: "success",
+      data: session,
+    });
+    const selectRepository = vi.fn();
+    const api = createApi({ openInitialRepository, selectRepository });
+    let request = 0;
+    const { result } = renderHook(
+      () => useAppController(api, () => `repository-${String(++request)}`),
+      { wrapper },
+    );
+
+    await act(() => Promise.resolve());
+
+    expect(openInitialRepository).toHaveBeenCalledOnce();
+    // No folder dialog: the path came from the command line.
+    expect(selectRepository).not.toHaveBeenCalled();
+    expect(result.current.state.repository).toMatchObject({
+      status: "ready",
+      session,
+    });
+  });
+
+  it("stays empty without an error when no repository was given", async () => {
+    const api = createApi({
+      openInitialRepository: vi.fn().mockResolvedValue({ status: "cancelled" }),
+    });
+    let request = 0;
+    const { result } = renderHook(
+      () => useAppController(api, () => `repository-${String(++request)}`),
+      { wrapper },
+    );
+
+    await act(() => Promise.resolve());
+
+    expect(result.current.state.repository).toEqual({ status: "empty" });
+  });
+
+  it("shows a diagnostic when the given repository cannot be opened", async () => {
+    const api = createApi({
+      openInitialRepository: vi.fn().mockResolvedValue({
+        status: "error",
+        diagnostic: {
+          code: "INVALID_REPOSITORY",
+          message: "The folder is not a Git repository.",
+          subject: "C:\\work\\plain",
+          nextAction: "Open a folder that contains a Git repository.",
+        },
+      }),
+    });
+    let request = 0;
+    const { result } = renderHook(
+      () => useAppController(api, () => `repository-${String(++request)}`),
+      { wrapper },
+    );
+
+    await act(() => Promise.resolve());
+
+    expect(result.current.state.repository).toMatchObject({
+      status: "error",
+      diagnostic: { code: "INVALID_REPOSITORY", subject: "C:\\work\\plain" },
+    });
+  });
+
   it("loads a selected repository from a user action", async () => {
     const api = createApi({
       selectRepository: vi.fn().mockResolvedValue({ status: "success", data: session }),
     });
+    let request = 0;
     const { result } = renderHook(
-      () => useAppController(api, () => "repository-request"),
+      () => useAppController(api, () => `repository-${String(++request)}`),
       { wrapper },
     );
 
@@ -84,8 +151,9 @@ describe("useAppController", () => {
     const api = createApi({
       selectRepository: vi.fn().mockRejectedValue(new Error("IPC unavailable")),
     });
+    let request = 0;
     const { result } = renderHook(
-      () => useAppController(api, () => "repository-request"),
+      () => useAppController(api, () => `repository-${String(++request)}`),
       { wrapper },
     );
 
@@ -187,12 +255,18 @@ describe("useAppController", () => {
     act(() => { result.current.toggleCommit(commitId); });
     act(() => { void result.current.composeSelection(); });
     expect(result.current.state.composition.status).toBe("loading");
+    // Read the active request instead of a literal: the startup open consumes an
+    // id, so a hard-coded sequence number would track an unrelated change.
+    const active = result.current.state.composition;
+    if (active.status !== "loading") {
+      throw new Error("The calculation was not running.");
+    }
 
     act(() => { result.current.toggleCommit(commitId); });
     expect(cancelComposition).toHaveBeenCalledWith({
       repositorySessionId: session.repositorySessionId,
       sessionRevision: session.sessionRevision,
-      requestId: "request-3",
+      requestId: active.requestId,
     });
     expect(result.current.state.composition).toEqual({ status: "idle" });
   });

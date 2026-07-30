@@ -106,57 +106,15 @@ npm ci
 npm run desktop:start
 ```
 
-### 고정한 개발 의존성
-
-`package.json`의 `overrides`는 보안 권고를 해소하기 위해 전이 의존성 버전을 고정합니다.
-각 항목은 상위 패키지가 안전한 범위를 선언하면 제거하는 것이 목표입니다.
-
-| 패키지 | 고정 버전 | 이유 |
-|---|---|---|
-| `webpack-dev-server` | `5.2.6` | 소스 노출·CSRF·DoS 권고 6건이 `<=5.2.5`에 해당합니다. `@electron-forge/plugin-webpack@7.11.2`(최신)이 `^4.0.0`을 선언하므로 그 범위 안에는 안전한 버전이 없습니다. |
-| `selfsigned` | `2.4.1` | wds 5.2.6이 선언한 `^5.5.0`을 쓰면 `pkijs` 서브트리의 `@noble/hashes` peer 충돌로 **`npm ci`가 깨집니다**(`Missing: @noble/hashes@1.4.0 from lock file`). 2.4.1은 node-forge 기반이라 그 서브트리가 사라집니다. HTTPS 개발 서버 전용 의존성이며 이 프로젝트는 그 옵션을 켜지 않습니다. |
-| `dompurify`, `tar`, `tmp`, `uuid` | 고정 | 이전 권고 대응입니다. |
-
-두 고정은 상위가 선언한 범위를 벗어나며 `selfsigned`는 다운그레이드입니다. HTTPS 개발
-서버를 쓰게 되면 `selfsigned` 고정을 먼저 재검토해야 합니다. 다음 절차로 재확인합니다.
+저장소 경로를 인자로 주면 폴더 선택 없이 그 저장소로 시작합니다. 패키지된 앱도 같습니다.
 
 ```powershell
-npm audit                                  # 권고가 남아 있는지
-npm ci                                     # lock과 package.json이 어긋나지 않는지
-npm run desktop:start                      # 개발 서버 기동 (http://localhost:3000/main_window)
-npm run test:desktop:e2e                   # 패키징 + Electron 전체 흐름
-npm run desktop:make                       # 릴리스 ZIP 산출물
+npm run desktop:start -- C:\work\repo
+.\out\desktop\prettifer-win32-x64\prettifer.exe C:\work\repo
 ```
 
-Forge가 사용하는 개발 서버 API는 생성자와 `hot`, `devMiddleware.writeToDisk`,
-`historyApiFallback`, `port`, `setupExitSignals`, `static`, `headers`뿐입니다. Forge를 올릴
-때 이 표면이 바뀌었는지, 그리고 `^4.0.0` 선언이 안전한 범위로 갱신되었는지 확인한 뒤
-`webpack-dev-server` 고정을 제거합니다. `selfsigned` 고정은 상위의 `@noble/hashes` peer
-충돌이 해소되면 제거합니다.
-
-### 보안 권고 기준선
-
-`npm audit`은 상위 패키지로 전파된 하나의 권고를 패키지마다 한 줄씩 세기 때문에, 권고 1건이
-수십 줄로 보입니다. 그래서 숫자를 그대로 게이트로 쓰면 새로 생긴 진짜 권고가 소음에 묻힙니다.
-
-```powershell
-npm run audit:check
-```
-
-이 명령은 권고를 **구별되는 단위로 합친 뒤** `security/audit-allowlist.json`에 없는 것만
-실패로 처리합니다. 두 방향으로 실패합니다.
-
-- 목록에 **없는** 권고가 생기면 실패합니다. 고치거나, 못 고치는 이유를 적어 항목을 추가합니다.
-- 목록에 있는 항목이 **더 이상 나타나지 않으면** 실패합니다. 상위에서 해결됐다는 뜻이므로
-  항목을 지우라는 신호입니다.
-
-각 항목에는 왜 못 고치는지(`reason`), 여기서 악용 가능한지(`notExploitableHere`), 무엇이
-바뀌면 해소되는지(`resolvesWhen`)를 적습니다.
-
-현재 목록에는 `brace-expansion` 권고 1건이 있습니다. 패치본 5.0.8이 기본 함수 export를 named
-export로 바꿔서 `minimatch` 3.x·9.x가 `expand is not a function`으로 깨지므로 강제 고정할 수
-없습니다. 이 트리의 `minimatch` 소비자 10개 중 9개가 아직 `^3.x`를 선언하며, 여기에는 eslint,
-eslint-plugin-jsx-a11y, eslint-plugin-react와 `@electron/*`의 **최신 버전**이 포함됩니다.
+인자가 없으면 저장소를 열지 않은 상태로 시작하고, 유효한 Git 저장소가 아니면 화면에
+진단을 표시합니다.
 
 ### 검증
 

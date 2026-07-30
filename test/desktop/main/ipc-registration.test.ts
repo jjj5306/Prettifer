@@ -21,6 +21,7 @@ describe("desktop IPC registration", () => {
     const handler = vi.fn().mockResolvedValue({ status: "cancelled" });
     const handlers = {
       selectRepository: handler,
+      openInitialRepository: handler,
       loadRange: handler,
       listCommits: handler,
       composeSelection: handler,
@@ -47,6 +48,7 @@ describe("desktop IPC registration", () => {
     const loadRange = vi.fn().mockResolvedValue({ status: "cancelled" });
     registerDesktopRequestHandlers(ipcMain, {
       selectRepository: vi.fn(),
+      openInitialRepository: vi.fn(),
       loadRange,
       listCommits: vi.fn(),
       composeSelection: vi.fn(),

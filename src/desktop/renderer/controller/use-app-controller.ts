@@ -1,13 +1,16 @@
-import { useReducer } from "react";
+import { useEffect, useReducer, useRef } from "react";
 
 import type {
+  ApiResult,
   DesktopApi,
   Diagnostic,
+  RepositorySession,
 } from "../../shared/index.js";
 import { selectRepositorySession } from "../state/app-selectors.js";
 import {
   appReducer,
   initialAppState,
+  type AppAction,
   type AppState,
 } from "../state/app-state.js";
 
@@ -51,23 +54,50 @@ export function useAppController(
     });
   };
 
+  /*
+   * Opens the repository the app was started with. It reuses the state
+   * transitions of a folder selection, and a run without a path argument reports
+   * a cancellation, which leaves the screen as it starts. Nothing can be running
+   * before the first effect, so there is no active calculation to cancel.
+   */
+  const startupOpened = useRef(false);
+  useEffect(() => {
+    if (startupOpened.current) {
+      return undefined;
+    }
+    startupOpened.current = true;
+    let applies = true;
+    const requestId = createRequestId();
+    dispatch({ type: "repository/selecting", requestId });
+    api.openInitialRepository().then((result) => {
+      if (applies) {
+        dispatch(repositoryResultAction(requestId, result));
+      }
+    }).catch((error: unknown) => {
+      if (applies) {
+        dispatch({
+          type: "repository/failed",
+          requestId,
+          diagnostic: connectionDiagnostic(error),
+        });
+      }
+    });
+    return () => { applies = false; };
+    // The startup repository is opened once for the lifetime of the app, so this
+    // deliberately ignores later `api` and `createRequestId` identities. Reacting
+    // to them would reopen the repository on every render (issue #53).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const openRepository = async (): Promise<void> => {
     const requestId = createRequestId();
     dispatch({ type: "repository/selecting", requestId });
     try {
       const result = await api.selectRepository();
-      switch (result.status) {
-        case "success":
-          cancelActiveForStateChange();
-          dispatch({ type: "repository/loaded", requestId, session: result.data });
-          break;
-        case "cancelled":
-          dispatch({ type: "repository/cancelled", requestId });
-          break;
-        case "error":
-          dispatch({ type: "repository/failed", requestId, diagnostic: result.diagnostic });
-          break;
+      if (result.status === "success") {
+        cancelActiveForStateChange();
       }
+      dispatch(repositoryResultAction(requestId, result));
     } catch (error) {
       dispatch({
         type: "repository/failed",
@@ -314,4 +344,19 @@ function selectedMainlineParents(state: AppState): Record<string, number> {
   return Object.fromEntries(
     Object.entries(state.mergeParents).filter(([commitId]) => selected.has(commitId)),
   );
+}
+
+/** One mapping from a repository result to a state transition. */
+function repositoryResultAction(
+  requestId: string,
+  result: ApiResult<RepositorySession>,
+): AppAction {
+  switch (result.status) {
+    case "success":
+      return { type: "repository/loaded", requestId, session: result.data };
+    case "cancelled":
+      return { type: "repository/cancelled", requestId };
+    case "error":
+      return { type: "repository/failed", requestId, diagnostic: result.diagnostic };
+  }
 }

@@ -28,6 +28,8 @@ export interface ApplicationSeams {
   readonly gitPath?: string;
   /** Awaited before each composition, so a test can observe progress states. */
   beforeComposition?(): Promise<void>;
+  /** Repository the app was started with, when the user passed a path. */
+  initialRepositoryPath?(): string | null;
 }
 
 interface ApplicationWebContents {
@@ -92,6 +94,7 @@ export async function startDesktopApplication(
     sessions,
     { selectFolder: () => seams.selectFolder() },
     lifetime.signal,
+    () => seams.initialRepositoryPath?.() ?? null,
   );
   const handlers = createDesktopRequestHandlers({
     trustedWindow: () => current === window && !window.isDestroyed()

@@ -19,6 +19,9 @@ export function registerDesktopRequestHandlers(
   ipcMain.handle(DESKTOP_CHANNELS.selectRepository, (event) =>
     handlers.selectRepository(toDesktopEvent(event)),
   );
+  ipcMain.handle(DESKTOP_CHANNELS.openInitialRepository, (event) =>
+    handlers.openInitialRepository(toDesktopEvent(event)),
+  );
   ipcMain.handle(DESKTOP_CHANNELS.loadRange, (event, input) =>
     handlers.loadRange(toDesktopEvent(event), input),
   );
