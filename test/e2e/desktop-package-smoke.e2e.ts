@@ -9,11 +9,6 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
 import { resolve } from "node:path";
 
-import {
-  createAuthHistoryFixture,
-  type GitFixture,
-} from "../support/git-fixture.js";
-
 const executablePath = process.env.PRETTIFER_PACKAGE_EXE ?? resolve(
   "out",
   "desktop",
@@ -22,7 +17,6 @@ const executablePath = process.env.PRETTIFER_PACKAGE_EXE ?? resolve(
 );
 
 let browser: Browser | undefined;
-let fixture: GitFixture | undefined;
 let packagedProcess: ChildProcess | undefined;
 
 test.afterEach(async () => {
@@ -30,22 +24,22 @@ test.afterEach(async () => {
   if (packagedProcess?.exitCode === null) {
     packagedProcess.kill();
   }
-  await fixture?.dispose();
   browser = undefined;
-  fixture = undefined;
   packagedProcess = undefined;
 });
 
-test("runs the packaged Windows app through its main flow and exits normally", async () => {
+/*
+ * Runs the shipped artifact through its production entry point: asar packaging,
+ * the applied fuses, the rewritten main path, preload wiring and the content
+ * security policy. It cannot open a repository, because the production entry has
+ * no seam for one and the folder dialog is a real OS interaction. The full review
+ * flow is covered by desktop-flow.e2e.ts against the end-to-end entry.
+ */
+test("starts the packaged Windows app and exits normally", async () => {
   test.skip(process.platform !== "win32", "Windows 패키지 smoke 테스트입니다.");
-  fixture = await createAuthHistoryFixture();
   const port = await availablePort();
   packagedProcess = spawn(executablePath, [`--remote-debugging-port=${port}`], {
-    env: {
-      ...process.env,
-      PRETTIFER_E2E: "1",
-      PRETTIFER_E2E_REPOSITORIES: JSON.stringify([fixture.path]),
-    },
+    env: { ...process.env },
     stdio: "ignore",
     windowsHide: true,
   });
@@ -62,14 +56,15 @@ test("runs the packaged Windows app through its main flow and exits normally", a
   page.on("pageerror", (error) => { pageErrors.push(error.message); });
   await page.reload({ waitUntil: "domcontentloaded" });
 
-  await page.getByRole("button", { name: "Open Repository" }).click();
-  await expect(page.getByText(fixture.path, { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Load Commit Range" }).click();
-  await page.getByRole("checkbox", {
-    name: "Include in selected result: feat(auth): validate login request",
-  }).check();
-  await page.getByRole("button", { name: "Build Selected Result" }).click();
-  await expect(page.getByText(/Result ready · \d+ changed files/u)).toBeVisible();
+  // The workbench renders from the packaged bundle and the preload API is
+  // reachable, which is what packaging can break.
+  await expect(page.getByRole("heading", { name: "Prettifer", level: 1 })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open Repository" })).toBeEnabled();
+  await expect(page.getByText("No repository open")).toBeVisible();
+  expect(await page.evaluate(() => typeof process)).toBe("undefined");
+  expect(await page.evaluate(() =>
+    typeof (window as unknown as { prettifer?: unknown }).prettifer,
+  )).toBe("object");
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
 
