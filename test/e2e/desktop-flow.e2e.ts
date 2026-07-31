@@ -234,6 +234,60 @@ test("reviews an added file as full contents and collapses its Tree View folder"
   expect(running.pageErrors).toEqual([]);
 });
 
+test("sizes tree rows to their own name and keeps list rows full width", async () => {
+  const fixture = await createFixture();
+  const running = await launch([fixture.path]);
+  const browserWindow = await running.application.browserWindow(running.page) as JSHandle<BrowserWindow>;
+  await normalizeDisplayScale(browserWindow);
+  await setViewportSize(running.page, 1600, 900);
+  await openRepository(running.page, fixture.path);
+  await running.page.getByRole("button", { name: "Load Commit Range" }).click();
+  await running.page.getByRole("checkbox", {
+    name: "Include in selected result: refactor(auth): extract credential helpers",
+  }).check();
+  await running.page.getByRole("button", { name: "Build Selected Result" }).click();
+  await expect(running.page.getByText(/Result ready · \d+ changed files/u)).toBeVisible();
+
+  const measure = async () => running.page.evaluate(() => {
+    const panel = document.querySelector<HTMLElement>("#changed-files");
+    // Only the rows inside the list, never the view toggle buttons in the header.
+    const rows = [...document.querySelectorAll<HTMLElement>("#changed-files ul button")];
+    if (panel === null || rows.length === 0) {
+      throw new Error("The changed file rows could not be measured.");
+    }
+    const available = panel.getBoundingClientRect().width;
+    return {
+      available: Math.round(available),
+      widths: rows.map((row) => Math.round(row.getBoundingClientRect().width)),
+      overflowing: rows.filter(
+        (row) => row.getBoundingClientRect().width > available,
+      ).length,
+    };
+  });
+
+  // Widen the pane the way the user does, so the rows have room to stretch into.
+  const splitter = running.page.getByRole("separator", { name: "Resize Changed Files" });
+  await splitter.focus();
+  await splitter.press("End");
+  await expect.poll(async () => (await measure()).available).toBeGreaterThan(600);
+
+  await running.page.getByRole("button", { name: "Tree View" }).click();
+  await expect(running.page.getByRole("button", { name: "Tree View" }))
+    .toHaveAttribute("aria-pressed", "true");
+  const tree = await measure();
+  // Every tree row hugs its own label instead of filling the widened panel.
+  expect(Math.max(...tree.widths)).toBeLessThan(tree.available - 40);
+  // A long name still stays inside the panel.
+  expect(tree.overflowing).toBe(0);
+
+  await running.page.getByRole("button", { name: "List View" }).click();
+  await expect(running.page.getByRole("button", { name: "List View" }))
+    .toHaveAttribute("aria-pressed", "true");
+  const list = await measure();
+  // The flat list keeps full-width rows, which this change must not alter.
+  expect(Math.min(...list.widths)).toBeGreaterThan(list.available - 40);
+});
+
 test("resizes the changed files and diff panes and keeps the width", async () => {
   const fixture = await createFixture();
   const running = await launch([fixture.path]);

@@ -166,6 +166,23 @@
   box-shadow: inset 2px 0 var(--color-accent);
 }
 
+/*
+ * In the tree a row is only as wide as its own label, so widening the pane shows
+ * the hierarchy as an outline instead of a stack of full-width bars. The flat
+ * list keeps full-width rows: it has no hierarchy to trace, and a full row is
+ * easier to scan. `max-width` keeps a long name inside the pane, where `.path`
+ * still truncates it.
+ *
+ * Two classes on purpose: the shared `width: 100%` above is a single class, so
+ * the tree only wins with the extra `.tree`.
+ */
+.tree .directory,
+.tree .file,
+.tree .selectedFile {
+  width: fit-content;
+  max-width: 100%;
+}
+
 .status {
   font-family: var(--font-code);
   font-size: 0.6875rem;
