@@ -6,7 +6,7 @@ Git 이력에서 서로 떨어진 커밋을 골라, 선택한 변경만 반영�
 이 문서는 **저장소에서 작업하는 사람과 AI 에이전트를 위한 안내**입니다.
 사용자용 설치 방법과 기능 소개는
 [공개 배포 저장소](https://github.com/jjj5306/prettifer-release)와
-[Windows v0.1.0 릴리스](https://github.com/jjj5306/prettifer-release/releases/tag/v0.1.0)를
+[최신 Windows 릴리스](https://github.com/jjj5306/prettifer-release/releases/latest)를
 참고하세요.
 
 ## 시작하기 전에 읽을 문서
@@ -228,6 +228,7 @@ typed API만 호출합니다.
 - 계산 중 사용자 branch, HEAD, staged/unstaged/untracked와 Git 메타데이터 보존
 - merge commit을 기준 부모와 함께 선택해 결과에 포함
 - 적용할 수 없는 파일만 문제로 표시하는 부분 결과 (나머지 파일은 정상 검토)
+- 저장소 경로를 명령행 인자로 받아 시작 시 열기
 
 **아직 지원하지 않음**
 
@@ -235,4 +236,5 @@ typed API만 호출합니다.
 - 조상 관계 없는 커밋의 적용 순서 확인
 - 전체 Git 그래프와 불완전 이력 진단
 - rename 추론, 루트 커밋 비교
-- 공개 CLI, 설치 프로그램, 코드 서명, 자동 업데이트
+- 저장소 열기 외의 공개 CLI 명령과 옵션
+- 설치 프로그램, 코드 서명, 자동 업데이트
