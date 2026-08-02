@@ -45,6 +45,9 @@ function createDependencies() {
       selectRepository: vi.fn().mockResolvedValue({ status: "success", data: session }),
       openInitialRepository: vi.fn().mockResolvedValue({ status: "cancelled" }),
     },
+    symbols: {
+      search: vi.fn().mockResolvedValue({ hits: [], truncated: false }),
+    },
     history: {
       createRange: vi.fn().mockResolvedValue({
         baseRef: range.baseRef,

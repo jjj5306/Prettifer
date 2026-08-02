@@ -22,6 +22,7 @@ describe("desktop IPC registration", () => {
     const handlers = {
       selectRepository: handler,
       openInitialRepository: handler,
+      searchSymbol: handler,
       loadRange: handler,
       listCommits: handler,
       composeSelection: handler,
@@ -49,6 +50,7 @@ describe("desktop IPC registration", () => {
     registerDesktopRequestHandlers(ipcMain, {
       selectRepository: vi.fn(),
       openInitialRepository: vi.fn(),
+      searchSymbol: vi.fn(),
       loadRange,
       listCommits: vi.fn(),
       composeSelection: vi.fn(),

@@ -13,6 +13,7 @@ describe("preload desktop API", () => {
       "loadRange",
       "listCommits",
       "composeSelection",
+      "searchSymbol",
       "cancelComposition",
     ]);
     expect(api).not.toHaveProperty("invoke");

@@ -3,6 +3,7 @@ import {
   commitPageRequestSchema,
   compositionRequestSchema,
   rangeRequestSchema,
+  symbolSearchRequestSchema,
   type ApiResult,
   type CancelCompositionRequest,
   type CommitPageRequest,
@@ -14,6 +15,9 @@ import {
   type RepositoryCommitPageDto,
   type RepositoryRangeDto,
   type RepositorySession,
+  type SymbolHitDto,
+  type SymbolSearchRequest,
+  type SymbolSearchResultDto,
 } from "../shared/index.js";
 import {
   RepositoryHistoryError,
@@ -57,6 +61,19 @@ interface HistoryReader {
   }): Promise<RepositoryCommitPage>;
 }
 
+/** Searches the repository for a symbol at a given commit. */
+interface SymbolSearcher {
+  search(
+    repositoryPath: string,
+    commit: string,
+    symbol: string,
+    signal?: AbortSignal,
+  ): Promise<{
+    readonly hits: readonly SymbolHitDto[];
+    readonly truncated: boolean;
+  }>;
+}
+
 interface CompositionBoundary {
   compose(
     request: CompositionRequest,
@@ -73,6 +90,7 @@ interface DesktopRequestDependencies {
   readonly repositoryController: RepositorySelector;
   readonly history: HistoryReader;
   readonly composition: CompositionBoundary;
+  readonly symbols: SymbolSearcher;
   readonly signal?: AbortSignal;
 }
 
@@ -97,6 +115,11 @@ export function createDesktopRequestHandlers(dependencies: DesktopRequestDepende
       event,
       dependencies,
       async () => listCommits(dependencies, parseRequest(commitPageRequestSchema, input)),
+    ),
+    searchSymbol: (event: DesktopInvokeEvent, input: unknown) => handleRequest(
+      event,
+      dependencies,
+      async () => searchSymbol(dependencies, parseRequest(symbolSearchRequestSchema, input)),
     ),
     composeSelection: (event: DesktopInvokeEvent, input: unknown) => handleRequest(
       event,
@@ -141,6 +164,30 @@ async function loadRange(
   return {
     status: "success",
     data: { range: toRangeDto(range), page: toCommitPageDto(page) },
+  };
+}
+
+/**
+ * Searches at the comparison base so the result matches what the review shows.
+ * Files the selection changed are searched in the renderer, which already holds
+ * their composed contents.
+ */
+async function searchSymbol(
+  dependencies: DesktopRequestDependencies,
+  request: SymbolSearchRequest,
+): Promise<ApiResult<SymbolSearchResultDto>> {
+  const session = requireSession(dependencies, request);
+  assertRangeBelongsToSession(session, request.range);
+  const result = await dependencies.symbols.search(
+    session.rootPath,
+    request.range.baseCommit,
+    request.symbol,
+    dependencies.signal,
+  );
+  // Copied so the reply crossing the boundary owns its own array.
+  return {
+    status: "success",
+    data: { hits: result.hits.map((hit) => ({ ...hit })), truncated: result.truncated },
   };
 }
 

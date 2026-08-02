@@ -19,6 +19,10 @@ function createApi(overrides: Partial<DesktopApi> = {}): DesktopApi {
   return {
     selectRepository: vi.fn().mockResolvedValue({ status: "cancelled" }),
     openInitialRepository: vi.fn().mockResolvedValue({ status: "cancelled" }),
+    searchSymbol: vi.fn().mockResolvedValue({
+      status: "success",
+      data: { hits: [], truncated: false },
+    }),
     loadRange: vi.fn().mockResolvedValue({ status: "error", diagnostic: {
       code: "NO_RANGE",
       message: "No comparison range is available.",

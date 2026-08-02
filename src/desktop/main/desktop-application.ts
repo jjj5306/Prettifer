@@ -4,6 +4,7 @@ import { CompositeDiffCoordinator } from "../../composition/composite-diff-coord
 import { CompositeDiffService } from "../../composition/composite-diff-service.js";
 import { GitCommandRunner } from "../../git/git-command-runner.js";
 import { RepositoryHistoryService } from "../../history/repository-history-service.js";
+import { SymbolSearchService } from "../../symbols/symbol-search.js";
 import { DesktopCompositionController } from "./desktop-composition-controller.js";
 import { createDesktopRequestHandlers } from "./desktop-request-handlers.js";
 import {
@@ -104,6 +105,7 @@ export async function startDesktopApplication(
     repositoryController,
     history,
     composition,
+    symbols: new SymbolSearchService(git),
     signal: lifetime.signal,
   });
   registerDesktopRequestHandlers(host.ipc, handlers);
