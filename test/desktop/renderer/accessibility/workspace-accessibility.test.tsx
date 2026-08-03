@@ -187,7 +187,7 @@ describe("desktop workspace accessibility", () => {
       screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` }),
       screen.getByRole("button", {
         name: [
-          `Inspect commit: ${firstCommit.title}`,
+          `Include in selected result: ${firstCommit.title}`,
           firstCommit.id,
           firstCommit.authorName,
           firstCommit.authoredAt,
