@@ -87,6 +87,15 @@ export async function createSymbolFixture(): Promise<SymbolFixture> {
 
   git(["switch", "-c", "feature/symbol-history"]);
 
+  // Long enough that the review can be scrolled, which a navigation must not undo.
+  const filler = Array.from(
+    { length: 60 },
+    (_unused, index) => [
+      `    public int step${String(index)}() {`,
+      `        return ${String(index)};`,
+      "    }",
+    ],
+  ).flat();
   await write("src/app/Caller.java", [
     "package app;",
     "",
@@ -97,6 +106,7 @@ export async function createSymbolFixture(): Promise<SymbolFixture> {
     "        UtVar counter = new UtVar();",
     "        return counter.total();",
     "    }",
+    ...filler,
     "}",
   ]);
   const callUtVar = commit("feat(app): call UtVar from Caller");

@@ -681,6 +681,41 @@ test("navigates from a reviewed file to a declaration outside the result and bac
   expect(fixture.git(["rev-parse", "--abbrev-ref", "HEAD"]).trim()).toBe(fixture.headRef);
 });
 
+test("keeps the review scrolled where it was when a lookup starts", async () => {
+  const fixture = await createSymbolE2eFixture();
+  const running = await launch([fixture.path]);
+  await setViewportSize(running.page, 1280, 900);
+  await openRepository(running.page, fixture.path, fixture.headRef);
+  await running.page.getByRole("button", { name: "Load Commit Range" }).click();
+  await running.page.getByRole("checkbox", {
+    name: "Include in selected result: feat(app): call UtVar from Caller",
+  }).check();
+  await running.page.getByRole("button", { name: "Build Selected Result" }).click();
+  await expect(running.page.getByText("Loading diff editor…")).toBeHidden();
+
+  const reviewed = running.page.locator(".monaco-diff-editor .modified");
+  const token = reviewed.locator("span", { hasText: /^total$/u }).first();
+  await expect(token).toBeVisible();
+  // The cursor stays on the symbol while the view scrolls away from it.
+  await token.click();
+  await reviewed.locator(".view-lines").hover();
+  const topLine = reviewed.locator(".margin-view-overlays .line-numbers").first();
+  // Far enough down that a reset to the top is unmistakable.
+  await expect.poll(async () => {
+    await running.page.mouse.wheel(0, 600);
+    return Number(await topLine.innerText());
+  }).toBeGreaterThan(10);
+  const scrolledTo = await topLine.innerText();
+
+  await running.page.keyboard.press("Shift+F12");
+  await expect(running.page.getByRole("heading", { name: "References to total" }))
+    .toBeVisible();
+
+  // The lookup rebuilt no editor, so the review is where the user left it.
+  await expect(reviewed.locator(".margin-view-overlays .line-numbers").first())
+    .toHaveText(scrolledTo);
+});
+
 test("lists the references of a symbol and moves to the chosen one", async () => {
   const fixture = await createSymbolE2eFixture();
   const running = await launch([fixture.path]);
