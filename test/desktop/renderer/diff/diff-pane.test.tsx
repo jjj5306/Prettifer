@@ -380,4 +380,66 @@ describe("DiffPane", () => {
 
     expect(screen.getByTitle("README.md")).toHaveTextContent("README.md");
   });
+
+  it("keeps the editor across renders that only replace the symbol handler", async () => {
+    const adapter = {
+      show: vi.fn(),
+      showDocument: vi.fn(),
+      reveal: vi.fn(),
+      dispose: vi.fn(),
+    };
+    const loadAdapter = vi.fn().mockResolvedValue(adapter);
+    const { rerender } = render(
+      <DiffPane
+        identity={identity}
+        file={file}
+        onSymbol={() => undefined}
+        loadAdapter={loadAdapter}
+      />,
+    );
+    await waitFor(() => { expect(adapter.show).toHaveBeenCalledOnce(); });
+
+    // The parent rebuilds this arrow on every render; the editor must not care.
+    for (let index = 0; index < 3; index += 1) {
+      rerender(
+        <DiffPane
+          identity={identity}
+          file={file}
+          onSymbol={() => undefined}
+          loadAdapter={loadAdapter}
+        />,
+      );
+    }
+
+    // One editor, never disposed: a rebuilt editor would lose the scroll position.
+    expect(adapter.show).toHaveBeenCalledOnce();
+    expect(adapter.dispose).not.toHaveBeenCalled();
+    expect(loadAdapter).toHaveBeenCalledOnce();
+  });
+
+  it("routes a symbol request to the handler of the current render", async () => {
+    const adapter = {
+      show: vi.fn(),
+      showDocument: vi.fn(),
+      reveal: vi.fn(),
+      dispose: vi.fn(),
+    };
+    const loadAdapter = vi.fn().mockResolvedValue(adapter);
+    const first = vi.fn();
+    const second = vi.fn();
+    const { rerender } = render(
+      <DiffPane identity={identity} file={file} onSymbol={first} loadAdapter={loadAdapter} />,
+    );
+    await waitFor(() => { expect(adapter.show).toHaveBeenCalledOnce(); });
+    rerender(
+      <DiffPane identity={identity} file={file} onSymbol={second} loadAdapter={loadAdapter} />,
+    );
+
+    // The editor still holds the hook it was given first.
+    const hooks = adapter.show.mock.calls[0]?.[3] as { onSymbol: (s: string, m: string) => void };
+    hooks.onSymbol("UtVar", "definition");
+
+    expect(second).toHaveBeenCalledWith("UtVar", "definition");
+    expect(first).not.toHaveBeenCalled();
+  });
 });

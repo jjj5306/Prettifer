@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { CompositeDiffResultDto } from "../../shared/index.js";
 import type { ExternalFileState, ReviewPosition } from "../state/app-state.js";
@@ -7,6 +7,7 @@ import {
   type DiffIdentity,
   type DiffViewHooks,
   type MonacoApi,
+  type SymbolRequestHandler,
   type SymbolRequestMode,
 } from "./MonacoDiffAdapter.js";
 import styles from "./DiffPane.module.css";
@@ -66,6 +67,18 @@ export const DiffPane = ({
 }: DiffPaneProps) => {
   const hostRef = useRef<HTMLDivElement>(null);
   const adapterRef = useRef<DiffAdapter | null>(null);
+  /*
+   * The editor is told about symbol requests through a stable function that reads
+   * the current handler. Passing the handler itself would tie the editor's life to
+   * the identity of a callback the parent rebuilds on every render, and rebuilding
+   * the editor throws away the scroll position (issue #61).
+   */
+  const onSymbolRef = useRef(onSymbol);
+  useEffect(() => { onSymbolRef.current = onSymbol; }, [onSymbol]);
+  const forwardSymbol = useCallback<SymbolRequestHandler>((symbol, mode) => {
+    onSymbolRef.current?.(symbol, mode);
+  }, []);
+  const wantsSymbols = onSymbol !== undefined;
   const [retry, setRetry] = useState(0);
   const [outcome, setOutcome] = useState<LoadOutcome | null>(null);
   const { repositorySessionId, requestId } = identity;
@@ -95,7 +108,7 @@ export const DiffPane = ({
       }
       adapter = loadedAdapter;
       adapterRef.current = loadedAdapter;
-      const hooks = onSymbol === undefined ? {} : { onSymbol };
+      const hooks = wantsSymbols ? { onSymbol: forwardSymbol } : {};
       const identityForModel = { repositorySessionId, requestId };
       if (target.kind === "document") {
         loadedAdapter.showDocument(
@@ -129,7 +142,7 @@ export const DiffPane = ({
     };
     // `target` is rebuilt on every render, so `currentKey` stands for it here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentKey, loadAdapter, onSymbol, repositorySessionId, requestId, retry]);
+  }, [currentKey, forwardSymbol, loadAdapter, repositorySessionId, requestId, retry, wantsSymbols]);
 
   /*
    * Revealing waits for the editor to exist, and runs again when a navigation
