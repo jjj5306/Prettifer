@@ -149,6 +149,29 @@ e2e가 실패하면 Playwright trace와 스크린샷이 `playwright-results` art
 검사가 통과해도 요구사항 일치, 이슈 범위와 문서 정합성은 검증되지 않습니다. 이
 항목들은 `.github/pull_request_template.md`의 자체 리뷰가 담당합니다.
 
+### 릴리스
+
+버전을 올리고 태그를 밀면 `.github/workflows/publish-release.yml`이 Windows ZIP을 만들어
+[공개 배포 저장소](https://github.com/jjj5306/prettifer-release)의 릴리스로 올립니다.
+
+```powershell
+npm version 0.3.0 --no-git-tag-version   # package.json과 lock 갱신
+# CHANGELOG.md에 ## v0.3.0 절을 추가하고 함께 커밋한다
+git tag v0.3.0
+git push origin v0.3.0
+```
+
+릴리스 노트는 `.github/release-notes-template.md`에 `CHANGELOG.md`의 해당 버전 절을 넣어
+만듭니다. **그 절이 없으면 게시가 실패합니다.** 무엇이 바뀌었는지 적히지 않은 릴리스는 없는 편이
+낫기 때문입니다. 태그와 `package.json` 버전이 다르면 그 단계에서 먼저 실패합니다.
+
+```powershell
+node scripts/changelog-section.mjs 0.3.0    # 그 절만 확인
+```
+
+`CHANGELOG.md`는 내려받는 사람을 위해 씁니다. 화면에서 무엇이 달라졌는지를 쓰고, 내부 이슈 번호,
+브랜치 이름, 파일 경로는 넣지 않습니다.
+
 ### 패키지 산출물
 
 ```powershell
@@ -182,6 +205,8 @@ examples/         코어 라이브러리 사용 예제
 openspec/         메인 스펙과 변경 기록
 src/  test/       제품 코드와 검증
 ```
+
+`CHANGELOG.md`도 루트에 둡니다. 배포 워크플로가 그 위치에서 버전 절을 찾습니다.
 
 루트에 남은 `tsconfig.json`은 편집기와 typed lint가 기준으로 삼는 설정이고,
 `eslint.config.js`, `vitest.config.ts`, `playwright.electron.config.ts`,

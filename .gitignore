@@ -22,3 +22,7 @@ dist/
 coverage/
 test-results/
 *.tsbuildinfo
+
+# Written while publishing a release
+release-notes.md
+release-changes.md
