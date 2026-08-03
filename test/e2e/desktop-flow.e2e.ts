@@ -95,9 +95,8 @@ test("opens a repository, selects non-contiguous commits and reviews file diff",
     name: "Read-only diff: docs/auth.md · base and selected result",
   })).toBeVisible();
   await expect(running.page.getByText("Loading diff editor…")).toBeHidden();
-  await expect(running.page.getByText(
-    "Base on the left · selected result on the right",
-  )).toBeVisible();
+  // The heading names the file under review, which symbol navigation changes.
+  await expect(reviewedPath(running.page, "docs/auth.md")).toBeVisible();
   const selectedFile = running.page.getByRole("button", {
     name: /Currently viewing file: docs\/auth\.md/u,
   });
@@ -212,9 +211,9 @@ test("reviews an added file as full contents and collapses its Tree View folder"
     name: "Read-only added file: src/auth/credentials.ts"
       + " · full contents added by the selected result",
   })).toBeVisible();
-  await expect(running.page.getByText(
-    "Base on the left · selected result on the right",
-  )).toBeHidden();
+  // The heading follows the review to the added file.
+  await expect(reviewedPath(running.page, "src/auth/credentials.ts")).toBeVisible();
+  await expect(reviewedPath(running.page, "docs/auth.md")).toBeHidden();
   await expect(running.page.getByText("Loading diff editor…")).toBeHidden();
   await expect.poll(() => running.page.evaluate(() =>
     document.querySelectorAll(".prettifer-added-line").length,
@@ -650,6 +649,14 @@ test("navigates from a reviewed file to a declaration outside the result and bac
   const reviewed = running.page.locator(".monaco-diff-editor .modified");
   const token = reviewed.locator("span", { hasText: /^UtVar$/u }).first();
   await expect(token).toBeVisible();
+
+  // Holding Ctrl over an identifier says it can be followed, before any click.
+  await running.page.keyboard.down("Control");
+  await token.hover();
+  await expect(reviewed.locator(".prettifer-symbol-link")).toHaveCount(1);
+  await running.page.keyboard.up("Control");
+  await expect(reviewed.locator(".prettifer-symbol-link")).toHaveCount(0);
+
   await token.click({ modifiers: ["Control"] });
 
   await expect(running.page.getByRole("heading", {
@@ -658,6 +665,9 @@ test("navigates from a reviewed file to a declaration outside the result and bac
   await expect(running.page.getByRole("textbox", {
     name: "Read-only file outside the selected result: src/model/UtVar.java · contents at the comparison base",
   })).toBeVisible();
+  await expect(reviewedPath(running.page, "src/model/UtVar.java")).toBeVisible();
+  // The declaration line is marked, so the arrival is shown rather than implied.
+  await expect(running.page.locator(".prettifer-target-line").first()).toBeVisible();
 
   // The way back returns to the reviewed diff.
   await running.page.getByRole("button", { name: "Back" }).click();
@@ -808,6 +818,11 @@ async function launch(
   const running = { application, consoleErrors, page, pageErrors };
   observations.push(running);
   return running;
+}
+
+/** The path the review pane names; the changed-file list carries the same title. */
+function reviewedPath(page: Page, path: string) {
+  return page.locator("#diff-review").getByTitle(path, { exact: true });
 }
 
 async function openRepository(

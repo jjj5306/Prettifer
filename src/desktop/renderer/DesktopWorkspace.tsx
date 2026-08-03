@@ -128,7 +128,7 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
                         file={selectedFile}
                         problem={selectSelectedProblemFile(controller.state)}
                         externalFile={controller.state.externalFile}
-                        revealLine={controller.state.revealLine}
+                        reveal={controller.state.reveal}
                         onSymbol={(symbol, mode) => { void controller.lookUpSymbol(symbol, mode); }}
                       />
                     </DiffErrorBoundary>

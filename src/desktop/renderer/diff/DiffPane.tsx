@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { CompositeDiffResultDto } from "../../shared/index.js";
-import type { ExternalFileState } from "../state/app-state.js";
+import type { ExternalFileState, ReviewPosition } from "../state/app-state.js";
 import {
   MonacoDiffAdapter,
   type DiffIdentity,
@@ -28,7 +28,7 @@ interface DiffAdapter {
     contents: string,
     hooks?: DiffViewHooks,
   ): void;
-  reveal(line: number): void;
+  reveal(line: number, column?: number): void;
   dispose(): void;
 }
 
@@ -40,8 +40,8 @@ interface DiffPaneProps {
   readonly problem?: CompositeProblemFile | null;
   /** A file a navigation reached outside the selected result. */
   readonly externalFile?: ExternalFileState;
-  /** Line a navigation asked to show, 1-based. */
-  readonly revealLine?: number | null;
+  /** Position a navigation asked to show. */
+  readonly reveal?: ReviewPosition | null;
   readonly onSymbol?: (symbol: string, mode: SymbolRequestMode) => void;
   readonly loadAdapter?: () => Promise<DiffAdapter>;
 }
@@ -60,7 +60,7 @@ export const DiffPane = ({
   file,
   problem = null,
   externalFile = { status: "idle" },
-  revealLine = null,
+  reveal = null,
   onSymbol,
   loadAdapter = loadMonacoAdapter,
 }: DiffPaneProps) => {
@@ -136,11 +136,11 @@ export const DiffPane = ({
    * asks for another line of the file that is already open.
    */
   useEffect(() => {
-    if (revealLine === null || outcome?.key !== currentKey || outcome.status !== "ready") {
+    if (reveal === null || outcome?.key !== currentKey || outcome.status !== "ready") {
       return;
     }
-    adapterRef.current?.reveal(revealLine);
-  }, [currentKey, outcome, revealLine]);
+    adapterRef.current?.reveal(reveal.line, reveal.column);
+  }, [currentKey, outcome, reveal]);
 
   if (externalFile.status === "loading") {
     return (
@@ -174,7 +174,7 @@ export const DiffPane = ({
       >
         <div className={styles.headingRow}>
           <h2 id="diff-heading">{view.heading}</h2>
-          <p>{view.description}</p>
+          <ReviewedPath path={view.path} />
         </div>
         {status === "loading" ? (
           <p aria-live="polite">Loading diff editor…</p>
@@ -240,6 +240,23 @@ export const DiffPane = ({
   );
 };
 
+/**
+ * The path of the file under review. Symbol navigation changes it under the user,
+ * so the file name never truncates: only the directories above it give way when
+ * the panel is narrow.
+ */
+const ReviewedPath = ({ path }: { readonly path: string }) => {
+  const separator = path.lastIndexOf("/");
+  const directory = separator < 0 ? "" : path.slice(0, separator + 1);
+  const name = separator < 0 ? path : path.slice(separator + 1);
+  return (
+    <p className={styles.reviewedPath} title={path}>
+      <span className={styles.pathDirectory}>{directory}</span>
+      <span className={styles.pathName}>{name}</span>
+    </p>
+  );
+};
+
 /** The panel frame shared by every state that is not an editor. */
 const ReviewPanel = ({
   heading,
@@ -281,8 +298,8 @@ function reviewTarget(
 interface ReviewView {
   readonly heading: string;
   readonly path: string;
-  readonly description: string;
   readonly editorLabel: string;
+  /** Says what the editor holds; kept in the accessible name, not on screen. */
   readonly editorContext: string;
 }
 
@@ -291,7 +308,6 @@ function targetView(target: ReviewTarget): ReviewView {
     return {
       heading: "Outside the Selected Result",
       path: target.path,
-      description: "Comparison base · this file is not part of the selection",
       editorLabel: "Read-only file outside the selected result",
       editorContext: "contents at the comparison base",
     };
@@ -304,14 +320,12 @@ function reviewView(file: CompositeFile): Omit<ReviewView, "path"> {
   if (file.status === "added") {
     return {
       heading: "Added File",
-      description: "New file · every line is part of the selected result",
       editorLabel: "Read-only added file",
       editorContext: "full contents added by the selected result",
     };
   }
   return {
     heading: "Side-by-side Diff",
-    description: "Base on the left · selected result on the right",
     editorLabel: "Read-only diff",
     editorContext: "base and selected result",
   };

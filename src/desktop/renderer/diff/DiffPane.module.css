@@ -24,6 +24,31 @@
 }
 
 /*
+ * The reviewed path. The file name keeps its full width and only the directories
+ * above it truncate, because the name is what identifies the file being reviewed.
+ */
+.reviewedPath {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  font-family: var(--font-code);
+}
+
+.pathDirectory {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pathName {
+  flex: 0 0 auto;
+  color: var(--color-focus);
+  white-space: nowrap;
+}
+
+/*
  * The host always occupies the flexible row so the editor fills the panel even
  * when the loading and error rows are absent.
  */
@@ -41,6 +66,23 @@
 /* Monaco decoration class applied to every line of an added file. */
 :global(.prettifer-added-line) {
   background: rgb(91 185 140 / 16%);
+}
+
+/*
+ * Shown only while the modifier is held, on the identifier a click would follow.
+ * The pointer and underline are the whole point: without them nothing on screen
+ * says the symbol can be followed.
+ */
+:global(.prettifer-symbol-link) {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--color-accent);
+  text-underline-offset: 0.15em;
+}
+
+/* Where a navigation landed. It stays so the arrival survives a scroll away. */
+:global(.prettifer-target-line) {
+  background: rgb(143 128 250 / 18%);
 }
 
 .error {

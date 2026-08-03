@@ -76,7 +76,7 @@ function createController(withResult = false): AppController {
       selectedFilePath: withResult ? "src/app.ts" : null,
       symbolLookup: { status: "idle" },
       externalFile: { status: "idle" },
-      revealLine: null,
+      reveal: null,
       navigationHistory: [],
     },
     openRepository: vi.fn(),

@@ -42,7 +42,11 @@ describe("DiffPane", () => {
     expect(screen.getByRole("textbox", {
       name: "Read-only diff: src/app.ts · base and selected result",
     })).toBeVisible();
-    expect(screen.getByText("Base on the left · selected result on the right")).toBeVisible();
+    // The heading names the file under review instead of describing the layout.
+    expect(screen.getByTitle("src/app.ts")).toBeVisible();
+    expect(screen.queryByText(
+      "Base on the left · selected result on the right",
+    )).toBeNull();
   });
 
   it("reviews an added file as full contents instead of a base comparison", async () => {
@@ -64,15 +68,10 @@ describe("DiffPane", () => {
       expect(adapter.show).toHaveBeenCalledWith(expect.any(HTMLElement), identity, addedFile, {});
     });
     expect(screen.getByRole("heading", { name: "Added File" })).toBeVisible();
-    expect(screen.getByText(
-      "New file · every line is part of the selected result",
-    )).toBeVisible();
+    expect(screen.getByTitle("src/new.ts")).toBeVisible();
     expect(screen.getByRole("textbox", {
       name: "Read-only added file: src/new.ts · full contents added by the selected result",
     })).toBeVisible();
-    expect(screen.queryByText(
-      "Base on the left · selected result on the right",
-    )).toBeNull();
   });
 
   it("shows a readable binary state without loading Monaco", () => {
@@ -220,7 +219,7 @@ describe("DiffPane", () => {
             path: "src/UtVar.java",
             contents: "public class UtVar {}",
           }}
-          revealLine={12}
+          reveal={{ path: "src/UtVar.java", line: 12, column: 14 }}
           loadAdapter={loadAdapter}
         />
       </StrictMode>,
@@ -238,10 +237,8 @@ describe("DiffPane", () => {
     // The selected result file is not shown while a file outside it is open.
     expect(adapter.show).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: "Outside the Selected Result" })).toBeVisible();
-    expect(screen.getByText(
-      "Comparison base · this file is not part of the selection",
-    )).toBeVisible();
-    await waitFor(() => { expect(adapter.reveal).toHaveBeenCalledWith(12); });
+    expect(screen.getByTitle("src/UtVar.java")).toBeVisible();
+    await waitFor(() => { expect(adapter.reveal).toHaveBeenCalledWith(12, 14); });
   });
 
   it("reveals another line of the file already open without reloading it", async () => {
@@ -253,16 +250,16 @@ describe("DiffPane", () => {
     };
     const loadAdapter = vi.fn().mockResolvedValue(adapter);
     const { rerender } = render(
-      <DiffPane identity={identity} file={file} revealLine={4} loadAdapter={loadAdapter} />,
+      <DiffPane identity={identity} file={file} reveal={{ path: file.path, line: 4, column: 1 }} loadAdapter={loadAdapter} />,
     );
-    await waitFor(() => { expect(adapter.reveal).toHaveBeenCalledWith(4); });
+    await waitFor(() => { expect(adapter.reveal).toHaveBeenCalledWith(4, 1); });
     const loads = loadAdapter.mock.calls.length;
 
     rerender(
-      <DiffPane identity={identity} file={file} revealLine={9} loadAdapter={loadAdapter} />,
+      <DiffPane identity={identity} file={file} reveal={{ path: file.path, line: 9, column: 7 }} loadAdapter={loadAdapter} />,
     );
 
-    await waitFor(() => { expect(adapter.reveal).toHaveBeenCalledWith(9); });
+    await waitFor(() => { expect(adapter.reveal).toHaveBeenCalledWith(9, 7); });
     expect(loadAdapter.mock.calls).toHaveLength(loads);
   });
 
@@ -325,5 +322,62 @@ describe("DiffPane", () => {
     hooks.onSymbol("UtVar", "references");
 
     expect(onSymbol).toHaveBeenCalledWith("UtVar", "references");
+  });
+
+  it("names the file under review and follows the review to another file", async () => {
+    const adapter = {
+      show: vi.fn(),
+      showDocument: vi.fn(),
+      reveal: vi.fn(),
+      dispose: vi.fn(),
+    };
+    const loadAdapter = vi.fn().mockResolvedValue(adapter);
+    const { rerender } = render(
+      <DiffPane identity={identity} file={file} loadAdapter={loadAdapter} />,
+    );
+    // The directory and the file name are separate so the name never truncates.
+    expect(screen.getByText("src/")).toBeVisible();
+    expect(screen.getByText("app.ts")).toBeVisible();
+
+    rerender(
+      <DiffPane
+        identity={identity}
+        file={{
+          path: "src/deep/nested/other.ts",
+          status: "modified",
+          beforeContent: "a",
+          afterContent: "b",
+        }}
+        loadAdapter={loadAdapter}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTitle("src/deep/nested/other.ts")).toBeVisible();
+    });
+    expect(screen.getByText("other.ts")).toBeVisible();
+    expect(screen.queryByTitle("src/app.ts")).toBeNull();
+  });
+
+  it("names a file with no directory by its name alone", () => {
+    render(
+      <DiffPane
+        identity={identity}
+        file={{
+          path: "README.md",
+          status: "modified",
+          beforeContent: "a",
+          afterContent: "b",
+        }}
+        loadAdapter={vi.fn().mockResolvedValue({
+          show: vi.fn(),
+          showDocument: vi.fn(),
+          reveal: vi.fn(),
+          dispose: vi.fn(),
+        })}
+      />,
+    );
+
+    expect(screen.getByTitle("README.md")).toHaveTextContent("README.md");
   });
 });
