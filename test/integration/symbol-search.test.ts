@@ -29,10 +29,15 @@ describe("SymbolSearchService against this repository", () => {
     const git = new GitCommandRunner();
     const head = (await git.run(["rev-parse", "HEAD"], { cwd: process.cwd() })).stdout.trim();
 
+    // Built from the commit being searched. A written-out name would be committed
+    // in this very file, and the search would rightly find it; no file in a commit
+    // can contain that commit's own id.
+    const absent = `absent_${head}`;
+
     await expect(new SymbolSearchService(git).search(
       process.cwd(),
       head,
-      "thisSymbolDoesNotExistAnywhere",
+      absent,
     )).resolves.toEqual({ hits: [], truncated: false });
   });
 });

@@ -16,6 +16,7 @@ import {
   type PaneWidthLimits,
 } from "./layout/use-resizable-pane.js";
 import { RepositoryToolbar } from "./repository/RepositoryToolbar.js";
+import { SymbolPanel } from "./symbols/SymbolPanel.js";
 import {
   selectPendingMainlineParents,
   selectRepositorySession,
@@ -116,17 +117,29 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
                     controls="changed-files"
                     pane={changedFilesWidth}
                   />
-                  <DiffErrorBoundary onRecover={() => undefined}>
-                    <DiffPane
-                      identity={{
-                        repositorySessionId: repositorySession?.repositorySessionId
-                          ?? "expired-session",
-                        requestId: controller.state.composition.requestId,
-                      }}
-                      file={selectedFile}
-                      problem={selectSelectedProblemFile(controller.state)}
+                  <div className={styles.reviewColumn}>
+                    <DiffErrorBoundary onRecover={() => undefined}>
+                      <DiffPane
+                        identity={{
+                          repositorySessionId: repositorySession?.repositorySessionId
+                            ?? "expired-session",
+                          requestId: controller.state.composition.requestId,
+                        }}
+                        file={selectedFile}
+                        problem={selectSelectedProblemFile(controller.state)}
+                        externalFile={controller.state.externalFile}
+                        revealLine={controller.state.revealLine}
+                        onSymbol={(symbol, mode) => { void controller.lookUpSymbol(symbol, mode); }}
+                      />
+                    </DiffErrorBoundary>
+                    <SymbolPanel
+                      lookup={controller.state.symbolLookup}
+                      canGoBack={controller.state.navigationHistory.length > 0}
+                      onGoToHit={controller.goToHit}
+                      onDismiss={controller.dismissSymbolLookup}
+                      onGoBack={controller.goBack}
                     />
-                  </DiffErrorBoundary>
+                  </div>
                 </div>
               ) : null}
             </div>

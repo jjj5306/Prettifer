@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createDesktopRequestHandlers } from "../../../src/desktop/main/desktop-request-handlers.js";
 import { RepositorySessionError } from "../../../src/desktop/main/repository-session.js";
+import { BaseFileError } from "../../../src/symbols/base-file-reader.js";
 
 const repositorySessionId = "00000000-0000-4000-8000-000000000001";
 const requestId = "00000000-0000-4000-8000-000000000002";
@@ -47,6 +48,12 @@ function createDependencies() {
     },
     symbols: {
       search: vi.fn().mockResolvedValue({ hits: [], truncated: false }),
+    },
+    baseFiles: {
+      read: vi.fn().mockResolvedValue({
+        path: "src/UtVar.java",
+        contents: "public class UtVar {}",
+      }),
     },
     history: {
       createRange: vi.fn().mockResolvedValue({
@@ -250,5 +257,114 @@ describe("desktop request handlers", () => {
       diagnostic: { code: "INVALID_REQUEST" },
     });
     expect(dependencies.composition.compose).not.toHaveBeenCalled();
+  });
+
+  it("searches for a symbol at the comparison base of the requested range", async () => {
+    const dependencies = createDependencies();
+    dependencies.symbols.search.mockResolvedValue({
+      hits: [{
+        path: "src/UtVar.java",
+        line: 12,
+        text: "public class UtVar {",
+        isDeclaration: true,
+      }],
+      truncated: false,
+    });
+    const handlers = createDesktopRequestHandlers(dependencies);
+
+    const result = await handlers.searchSymbol(trustedEvent, {
+      repositorySessionId,
+      sessionRevision: 1,
+      range,
+      symbol: "UtVar",
+    });
+
+    expect(result).toMatchObject({ status: "success" });
+    expect(dependencies.symbols.search).toHaveBeenCalledWith(
+      session.rootPath,
+      range.baseCommit,
+      "UtVar",
+      undefined,
+    );
+  });
+
+  it("rejects a symbol that is not an identifier before searching", async () => {
+    const dependencies = createDependencies();
+    const handlers = createDesktopRequestHandlers(dependencies);
+
+    await expect(handlers.searchSymbol(trustedEvent, {
+      repositorySessionId,
+      sessionRevision: 1,
+      range,
+      symbol: "UtVar(); rm -rf",
+    })).resolves.toMatchObject({
+      status: "error",
+      diagnostic: { code: "INVALID_REQUEST" },
+    });
+    expect(dependencies.symbols.search).not.toHaveBeenCalled();
+  });
+
+  it("reads a navigation target at the comparison base", async () => {
+    const dependencies = createDependencies();
+    const handlers = createDesktopRequestHandlers(dependencies);
+
+    const result = await handlers.readBaseFile(trustedEvent, {
+      repositorySessionId,
+      sessionRevision: 1,
+      range,
+      path: "src/UtVar.java",
+    });
+
+    expect(result).toEqual({
+      status: "success",
+      data: { path: "src/UtVar.java", contents: "public class UtVar {}" },
+    });
+    expect(dependencies.baseFiles.read).toHaveBeenCalledWith(
+      session.rootPath,
+      range.baseCommit,
+      "src/UtVar.java",
+      undefined,
+    );
+  });
+
+  it("keeps a file that cannot be read as an actionable diagnostic", async () => {
+    const dependencies = createDependencies();
+    dependencies.baseFiles.read.mockRejectedValue(new BaseFileError(
+      "BASE_FILE_BINARY",
+      "docs/logo.png",
+      "Open the file in a viewer for its format.",
+      "That file is binary, so it has no text to review.",
+    ));
+    const handlers = createDesktopRequestHandlers(dependencies);
+
+    await expect(handlers.readBaseFile(trustedEvent, {
+      repositorySessionId,
+      sessionRevision: 1,
+      range,
+      path: "docs/logo.png",
+    })).resolves.toMatchObject({
+      status: "error",
+      diagnostic: { code: "BASE_FILE_BINARY", subject: "docs/logo.png" },
+    });
+  });
+
+  it("refuses to read a file outside the session range", async () => {
+    const dependencies = createDependencies();
+    const handlers = createDesktopRequestHandlers(dependencies);
+
+    await expect(handlers.readBaseFile(trustedEvent, {
+      repositorySessionId,
+      sessionRevision: 1,
+      range: {
+        ...range,
+        headCommit: "e".repeat(40),
+        rangeRevision: `${baseCommit}:${"e".repeat(40)}:${commonCommit}`,
+      },
+      path: "src/UtVar.java",
+    })).resolves.toMatchObject({
+      status: "error",
+      diagnostic: { code: "RANGE_EXPIRED" },
+    });
+    expect(dependencies.baseFiles.read).not.toHaveBeenCalled();
   });
 });

@@ -15,6 +15,7 @@ describe("preload desktop API", () => {
       "composeSelection",
       "searchSymbol",
       "cancelComposition",
+      "readBaseFile",
     ]);
     expect(api).not.toHaveProperty("invoke");
     expect(api).not.toHaveProperty("send");

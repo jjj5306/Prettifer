@@ -46,9 +46,13 @@ module.exports = {
   plugins: [
     new CommonJsPackageBoundaryPlugin(),
     new MonacoWebpackPlugin({
+      // Java and C/C++ are the review targets symbol navigation was built for.
+      // Monaco only contributes tokenizers for them; the symbol search is ours.
       languages: [
+        "cpp",
         "css",
         "html",
+        "java",
         "javascript",
         "json",
         "markdown",

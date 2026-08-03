@@ -193,6 +193,23 @@
   background: var(--color-border);
 }
 
+/*
+ * The review and the symbol lookup share one column: the lookup is about the file
+ * under review, and it takes only the height it needs.
+ */
+.reviewColumn {
+  display: grid;
+  /*
+   * One declared row only: the lookup lands in an implicit row when it is open,
+   * so a closed lookup leaves no empty track and no gap taking height from the
+   * review.
+   */
+  grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  gap: 1px;
+}
+
 /* The first column follows the splitter; the splitter itself is the middle column. */
 .resultGrid {
   display: grid;

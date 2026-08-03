@@ -27,6 +27,7 @@ describe("desktop IPC registration", () => {
       listCommits: handler,
       composeSelection: handler,
       cancelComposition: handler,
+      readBaseFile: handler,
     };
 
     registerDesktopRequestHandlers(ipcMain, handlers);
@@ -55,6 +56,7 @@ describe("desktop IPC registration", () => {
       listCommits: vi.fn(),
       composeSelection: vi.fn(),
       cancelComposition: vi.fn(),
+      readBaseFile: vi.fn(),
     });
     const input = {
       repositorySessionId: "00000000-0000-4000-8000-000000000001",

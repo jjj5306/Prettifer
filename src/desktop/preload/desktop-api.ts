@@ -1,6 +1,8 @@
 import {
   DESKTOP_CHANNELS,
   type ApiResult,
+  type BaseFileDto,
+  type BaseFileRequest,
   type CancelCompositionRequest,
   type CommitPageRequest,
   type CompositeDiffResultDto,
@@ -44,5 +46,9 @@ export function createDesktopApi(invoke: Invoke): DesktopApi {
       DESKTOP_CHANNELS.cancelComposition,
       request,
     ) as Promise<ApiResult<null>>,
+    readBaseFile: (request: BaseFileRequest) => invoke(
+      DESKTOP_CHANNELS.readBaseFile,
+      request,
+    ) as Promise<ApiResult<BaseFileDto>>,
   });
 }

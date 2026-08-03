@@ -112,6 +112,20 @@ export const symbolSearchResultSchema = z.object({
   truncated: z.boolean(),
 }).strict();
 
+/**
+ * A navigation can land on a file the selection never changed, which is not in
+ * the composed result. Such a file is read at the comparison base.
+ */
+export const baseFileRequestSchema = sessionIdentitySchema.extend({
+  range: repositoryRangeSchema,
+  path: compositeFilePathSchema,
+}).strict();
+
+export const baseFileSchema = z.object({
+  path: compositeFilePathSchema,
+  contents: z.string(),
+}).strict();
+
 
 const textFileFields = {
   path: compositeFilePathSchema,
@@ -181,6 +195,8 @@ export type RangeResult = z.infer<typeof rangeResultSchema>;
 export type SymbolSearchRequest = z.infer<typeof symbolSearchRequestSchema>;
 export type SymbolHitDto = z.infer<typeof symbolHitSchema>;
 export type SymbolSearchResultDto = z.infer<typeof symbolSearchResultSchema>;
+export type BaseFileRequest = z.infer<typeof baseFileRequestSchema>;
+export type BaseFileDto = z.infer<typeof baseFileSchema>;
 export type ApiResult<T> =
   | Readonly<{ status: "success"; data: T }>
   | Readonly<{ status: "cancelled" }>
@@ -194,6 +210,7 @@ export const DESKTOP_CHANNELS = Object.freeze({
   composeSelection: "composition:create",
   cancelComposition: "composition:cancel",
   searchSymbol: "symbols:search",
+  readBaseFile: "files:read-base",
 });
 
 export interface DesktopApi {
@@ -206,4 +223,6 @@ export interface DesktopApi {
   searchSymbol(request: SymbolSearchRequest): Promise<ApiResult<SymbolSearchResultDto>>;
   composeSelection(request: CompositionRequest): Promise<ApiResult<CompositeDiffResultDto>>;
   cancelComposition(request: CancelCompositionRequest): Promise<ApiResult<null>>;
+  /** Reads one file at the range's comparison base, for navigation outside the result. */
+  readBaseFile(request: BaseFileRequest): Promise<ApiResult<BaseFileDto>>;
 }

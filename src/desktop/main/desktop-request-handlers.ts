@@ -1,10 +1,13 @@
 import {
+  baseFileRequestSchema,
   cancelCompositionRequestSchema,
   commitPageRequestSchema,
   compositionRequestSchema,
   rangeRequestSchema,
   symbolSearchRequestSchema,
   type ApiResult,
+  type BaseFileDto,
+  type BaseFileRequest,
   type CancelCompositionRequest,
   type CommitPageRequest,
   type CompositeDiffResultDto,
@@ -24,6 +27,7 @@ import {
   type RepositoryCommitPage,
   type RepositoryRange,
 } from "../../history/repository-history-service.js";
+import { BaseFileError } from "../../symbols/base-file-reader.js";
 import { RepositorySessionError } from "./repository-session.js";
 import { applicationUrlsMatch } from "./application-url.js";
 
@@ -74,6 +78,16 @@ interface SymbolSearcher {
   }>;
 }
 
+/** Reads one file at a commit, for a navigation that leaves the result. */
+interface BaseFileSource {
+  read(
+    repositoryPath: string,
+    commit: string,
+    path: string,
+    signal?: AbortSignal,
+  ): Promise<BaseFileDto>;
+}
+
 interface CompositionBoundary {
   compose(
     request: CompositionRequest,
@@ -91,6 +105,7 @@ interface DesktopRequestDependencies {
   readonly history: HistoryReader;
   readonly composition: CompositionBoundary;
   readonly symbols: SymbolSearcher;
+  readonly baseFiles: BaseFileSource;
   readonly signal?: AbortSignal;
 }
 
@@ -120,6 +135,11 @@ export function createDesktopRequestHandlers(dependencies: DesktopRequestDepende
       event,
       dependencies,
       async () => searchSymbol(dependencies, parseRequest(symbolSearchRequestSchema, input)),
+    ),
+    readBaseFile: (event: DesktopInvokeEvent, input: unknown) => handleRequest(
+      event,
+      dependencies,
+      async () => readBaseFile(dependencies, parseRequest(baseFileRequestSchema, input)),
     ),
     composeSelection: (event: DesktopInvokeEvent, input: unknown) => handleRequest(
       event,
@@ -189,6 +209,26 @@ async function searchSymbol(
     status: "success",
     data: { hits: result.hits.map((hit) => ({ ...hit })), truncated: result.truncated },
   };
+}
+
+/**
+ * Reads a file at the comparison base. A symbol search covers the whole
+ * repository, so a navigation can land on a file the selection never changed;
+ * the base is the revision the review compares against.
+ */
+async function readBaseFile(
+  dependencies: DesktopRequestDependencies,
+  request: BaseFileRequest,
+): Promise<ApiResult<BaseFileDto>> {
+  const session = requireSession(dependencies, request);
+  assertRangeBelongsToSession(session, request.range);
+  const file = await dependencies.baseFiles.read(
+    session.rootPath,
+    request.range.baseCommit,
+    request.path,
+    dependencies.signal,
+  );
+  return { status: "success", data: { path: file.path, contents: file.contents } };
 }
 
 async function listCommits(
@@ -326,7 +366,8 @@ function toDiagnostic(error: unknown): Diagnostic {
   if (
     error instanceof RequestBoundaryError ||
     error instanceof RepositorySessionError ||
-    error instanceof RepositoryHistoryError
+    error instanceof RepositoryHistoryError ||
+    error instanceof BaseFileError
   ) {
     return {
       code: error.code,

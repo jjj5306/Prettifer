@@ -28,6 +28,10 @@ import {
   createConflictFixture,
   type ConflictFixture,
 } from "../support/conflict-fixture.js";
+import {
+  createSymbolFixture,
+  type SymbolFixture,
+} from "../support/symbol-fixture.js";
 
 const require = createRequire(import.meta.url);
 const executablePath = require("electron") as string;
@@ -625,6 +629,79 @@ test("reviews a partial result and jumps to its problem file", async () => {
   expect(fixture.git(["rev-parse", "--abbrev-ref", "HEAD"]).trim()).toBe(fixture.headRef);
 });
 
+test("navigates from a reviewed file to a declaration outside the result and back", async () => {
+  const fixture = await createSymbolE2eFixture();
+  const running = await launch([fixture.path]);
+  await setViewportSize(running.page, 1280, 900);
+  await openRepository(running.page, fixture.path, fixture.headRef);
+  await running.page.getByRole("button", { name: "Load Commit Range" }).click();
+  await running.page.getByRole("checkbox", {
+    name: "Include in selected result: feat(app): call UtVar from Caller",
+  }).check();
+  await running.page.getByRole("button", { name: "Build Selected Result" }).click();
+  await expect(running.page.getByText(/Result ready · \d+ changed files/u)).toBeVisible();
+  await expect(running.page.getByRole("textbox", {
+    name: "Read-only diff: src/app/Caller.java · base and selected result",
+  })).toBeVisible();
+  await expect(running.page.getByText("Loading diff editor…")).toBeHidden();
+
+  // Ctrl+Click on the constructed class asks for its declaration. `UtVar.java`
+  // is not part of the result, so the declaration is read at the comparison base.
+  const reviewed = running.page.locator(".monaco-diff-editor .modified");
+  const token = reviewed.locator("span", { hasText: /^UtVar$/u }).first();
+  await expect(token).toBeVisible();
+  await token.click({ modifiers: ["Control"] });
+
+  await expect(running.page.getByRole("heading", {
+    name: "Outside the Selected Result",
+  })).toBeVisible();
+  await expect(running.page.getByRole("textbox", {
+    name: "Read-only file outside the selected result: src/model/UtVar.java · contents at the comparison base",
+  })).toBeVisible();
+
+  // The way back returns to the reviewed diff.
+  await running.page.getByRole("button", { name: "Back" }).click();
+  await expect(running.page.getByRole("textbox", {
+    name: "Read-only diff: src/app/Caller.java · base and selected result",
+  })).toBeVisible();
+  await expect(running.page.getByRole("button", { name: "Back" })).toBeHidden();
+
+  // The user repository is untouched by the search and by the navigation.
+  expect(fixture.git(["status", "--porcelain"])).toBe("");
+  expect(fixture.git(["rev-parse", "--abbrev-ref", "HEAD"]).trim()).toBe(fixture.headRef);
+});
+
+test("lists the references of a symbol and moves to the chosen one", async () => {
+  const fixture = await createSymbolE2eFixture();
+  const running = await launch([fixture.path]);
+  await setViewportSize(running.page, 1280, 900);
+  await openRepository(running.page, fixture.path, fixture.headRef);
+  await running.page.getByRole("button", { name: "Load Commit Range" }).click();
+  await running.page.getByRole("checkbox", {
+    name: "Include in selected result: feat(app): call UtVar from Caller",
+  }).check();
+  await running.page.getByRole("button", { name: "Build Selected Result" }).click();
+  await expect(running.page.getByText("Loading diff editor…")).toBeHidden();
+
+  const reviewed = running.page.locator(".monaco-diff-editor .modified");
+  const token = reviewed.locator("span", { hasText: /^total$/u }).first();
+  await expect(token).toBeVisible();
+  await token.click();
+  await running.page.keyboard.press("Shift+F12");
+
+  const matches = running.page.getByRole("list", { name: "Symbol matches" });
+  await expect(running.page.getByRole("heading", { name: "References to total" })).toBeVisible();
+  // The declaration in the unchanged file and the call in the reviewed file.
+  await expect(matches.getByRole("button", { name: /src\/model\/UtVar\.java:4/u })).toBeVisible();
+  await expect(matches.getByRole("button", { name: /src\/app\/Caller\.java:8/u })).toBeVisible();
+
+  await matches.getByRole("button", { name: /src\/model\/UtVar\.java:4/u }).click();
+  await expect(running.page.getByRole("textbox", {
+    name: "Read-only file outside the selected result: src/model/UtVar.java · contents at the comparison base",
+  })).toBeVisible();
+  expect(fixture.git(["status", "--porcelain"])).toBe("");
+});
+
 test("replaces repository state without showing the previous repository", async () => {
   const first = await createFixture();
   const second = await createFixture();
@@ -667,6 +744,12 @@ async function createMergeE2eFixture(): Promise<MergeFixture> {
 
 async function createConflictE2eFixture(): Promise<ConflictFixture> {
   const fixture = await createConflictFixture();
+  fixtures.push(fixture);
+  return fixture;
+}
+
+async function createSymbolE2eFixture(): Promise<SymbolFixture> {
+  const fixture = await createSymbolFixture();
   fixtures.push(fixture);
   return fixture;
 }

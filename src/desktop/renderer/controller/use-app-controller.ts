@@ -6,12 +6,16 @@ import type {
   Diagnostic,
   RepositorySession,
 } from "../../shared/index.js";
+import { symbolLanguageForPath } from "../../../symbols/language-support.js";
 import { selectRepositorySession } from "../state/app-selectors.js";
+import { mergeSymbolHits } from "../symbols/merge-hits.js";
 import {
   appReducer,
   initialAppState,
+  resultHoldsPath,
   type AppAction,
   type AppState,
+  type SymbolLookupMode,
 } from "../state/app-state.js";
 
 export interface AppController {
@@ -25,6 +29,11 @@ export interface AppController {
   readonly chooseMainlineParent: (commitId: string, mainlineParent: number) => void;
   readonly cancelComposition: () => Promise<void>;
   readonly selectFile: (path: string) => void;
+  /** Finds where a symbol is declared and used, for the file under review. */
+  readonly lookUpSymbol: (symbol: string, mode: SymbolLookupMode) => Promise<void>;
+  readonly goToHit: (path: string, line: number) => void;
+  readonly dismissSymbolLookup: () => void;
+  readonly goBack: () => void;
 }
 
 export function useAppController(
@@ -263,6 +272,117 @@ export function useAppController(
     }
   };
 
+  /*
+   * Searches the comparison base in the main process, then replaces the hits of
+   * every file the selection changed with hits from the composed contents. That
+   * way the list describes the result under review, not the base, and the
+   * composed contents never cross the process boundary a second time.
+   */
+  const lookUpSymbol = async (symbol: string, mode: SymbolLookupMode): Promise<void> => {
+    const session = selectRepositorySession(state.repository);
+    const path = state.selectedFilePath;
+    if (
+      session === null ||
+      path === null ||
+      state.range.status !== "ready" ||
+      state.composition.status !== "ready"
+    ) {
+      return;
+    }
+    if (symbolLanguageForPath(path) === null) {
+      dispatch({ type: "symbol/unsupported", path });
+      return;
+    }
+    const { result } = state.composition;
+    dispatch({ type: "symbol/looking", symbol, mode });
+    try {
+      const found = await api.searchSymbol({
+        repositorySessionId: session.repositorySessionId,
+        sessionRevision: session.sessionRevision,
+        range: state.range.range,
+        symbol,
+      });
+      if (found.status === "success") {
+        const merged = mergeSymbolHits(found.data.hits, result, symbol);
+        const hits = mode === "definition"
+          ? merged.filter((hit) => hit.isDeclaration)
+          : merged;
+        const only = hits.length === 1 ? hits[0] : undefined;
+        if (mode === "definition" && only !== undefined) {
+          // One declaration is not a choice, so go there instead of listing it.
+          dispatch({ type: "symbol/dismissed" });
+          goToHit(only.path, only.line);
+        } else {
+          dispatch({
+            type: "symbol/found",
+            symbol,
+            mode,
+            hits,
+            truncated: found.data.truncated,
+          });
+        }
+      } else if (found.status === "error") {
+        dispatch({ type: "symbol/failed", symbol, diagnostic: found.diagnostic });
+      } else {
+        dispatch({ type: "symbol/dismissed" });
+      }
+    } catch (error) {
+      dispatch({ type: "symbol/failed", symbol, diagnostic: connectionDiagnostic(error) });
+    }
+  };
+
+  /*
+   * Opens a file the selection never changed. The symbol search covers the whole
+   * repository, so most declarations live outside the result; such a file is read
+   * at the comparison base, the same revision the review compares against.
+   */
+  const openBaseFile = async (
+    path: string,
+    line: number,
+    remember: boolean,
+  ): Promise<void> => {
+    const session = selectRepositorySession(state.repository);
+    if (session === null || state.range.status !== "ready") {
+      return;
+    }
+    dispatch({ type: "external/opening", path, line, remember });
+    try {
+      const result = await api.readBaseFile({
+        repositorySessionId: session.repositorySessionId,
+        sessionRevision: session.sessionRevision,
+        range: state.range.range,
+        path,
+      });
+      if (result.status === "success") {
+        dispatch({ type: "external/opened", path, contents: result.data.contents });
+      } else if (result.status === "error") {
+        dispatch({ type: "external/failed", path, diagnostic: result.diagnostic });
+      }
+    } catch (error) {
+      dispatch({ type: "external/failed", path, diagnostic: connectionDiagnostic(error) });
+    }
+  };
+
+  const goToHit = (path: string, line: number): void => {
+    if (resultHoldsPath(state, path)) {
+      dispatch({ type: "symbol/navigated", path, line });
+      return;
+    }
+    void openBaseFile(path, line, true);
+  };
+
+  const goBack = (): void => {
+    const previous = state.navigationHistory.at(-1);
+    if (previous === undefined) {
+      return;
+    }
+    dispatch({ type: "symbol/back" });
+    if (!resultHoldsPath(state, previous.path)) {
+      // The position was just popped, so it must not be pushed again.
+      void openBaseFile(previous.path, previous.line, false);
+    }
+  };
+
   const cancelComposition = async (): Promise<void> => {
     const session = selectRepositorySession(state.repository);
     if (session === null || state.composition.status !== "loading") {
@@ -322,6 +442,12 @@ export function useAppController(
     selectFile: (path) => {
       dispatch({ type: "file/selected", path });
     },
+    lookUpSymbol,
+    goToHit,
+    dismissSymbolLookup: () => {
+      dispatch({ type: "symbol/dismissed" });
+    },
+    goBack,
   };
 }
 
