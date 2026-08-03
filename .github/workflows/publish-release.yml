@@ -70,11 +70,9 @@ jobs:
           "tag=$tag" | Add-Content $env:GITHUB_OUTPUT
           "version=$version" | Add-Content $env:GITHUB_OUTPUT
 
+      # Before spending minutes on a build that cannot be published.
       - name: Check the changelog for this version
-        shell: pwsh
-        run: |
-          node scripts/changelog-section.mjs '${{ steps.release.outputs.version }}'
-          if ($LASTEXITCODE -ne 0) { throw "Add the section, then tag again." }
+        run: node scripts/changelog-section.mjs ${{ steps.release.outputs.version }}
 
       - name: Install dependencies
         run: npm ci
@@ -113,6 +111,8 @@ jobs:
           "sha256=$hash" | Add-Content $env:GITHUB_OUTPUT
           "directory=$staging" | Add-Content $env:GITHUB_OUTPUT
 
+      # One renderer for the workflow and for re-rendering an old release, so a
+      # note published later cannot drift from what this job would have written.
       - name: Write the release notes
         env:
           TAG: ${{ steps.release.outputs.tag }}
@@ -120,35 +120,8 @@ jobs:
           SHA256: ${{ steps.assets.outputs.sha256 }}
           SOURCE_REPOSITORY: ${{ github.repository }}
           SOURCE_SHA: ${{ github.sha }}
-        shell: pwsh
-        run: |
-          # A release that does not say what changed is worse than none, so the
-          # section for this version must exist. The script exits non-zero if not.
-          # It writes a file instead of printing, because a pipe on this runner
-          # would re-encode every character outside ASCII.
-          node scripts/changelog-section.mjs $env:VERSION release-changes.md
-          if ($LASTEXITCODE -ne 0) {
-            throw "CHANGELOG.md has no usable section for $env:VERSION."
-          }
-          $changes = (Get-Content release-changes.md -Raw -Encoding utf8).TrimEnd()
-          $notes = Get-Content .github/release-notes-template.md -Raw
-          $replacements = @{
-            '{{TAG}}' = $env:TAG
-            '{{VERSION}}' = $env:VERSION
-            '{{CHANGES}}' = $changes
-            '{{SHA256}}' = $env:SHA256
-            '{{RELEASE_REPOSITORY}}' = $env:RELEASE_REPOSITORY
-            '{{SOURCE_REPOSITORY}}' = $env:SOURCE_REPOSITORY
-            '{{SHORT_SHA}}' = $env:SOURCE_SHA.Substring(0, 7)
-            '{{SHA}}' = $env:SOURCE_SHA
-          }
-          foreach ($placeholder in $replacements.Keys) {
-            $notes = $notes.Replace($placeholder, $replacements[$placeholder])
-          }
-          if ($notes -match '\{\{[A-Z_]+\}\}') {
-            throw "The release notes still contain an unreplaced placeholder."
-          }
-          $notes | Set-Content release-notes.md -Encoding utf8NoBOM
+          OUT: release-notes.md
+        run: node scripts/release-notes.mjs
 
       - name: Publish to the distribution repository
         env:

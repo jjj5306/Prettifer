@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 /* global process */
 /**
- * Writes the CHANGELOG section of one version, for the release notes.
+ * Prints the CHANGELOG section of one version, so a release stops before the
+ * build rather than after it when the section is missing.
  *
- * A release that says nothing about what changed is worse than no release note,
- * so a missing or empty section exits non-zero and stops the publish.
+ *   node scripts/changelog-section.mjs 0.3.0 [outputFile] [changelogFile]
  *
- * The section is written to a file rather than to stdout: a pipe on a Windows
- * runner re-encodes anything outside ASCII, which would mangle punctuation and
- * any language other than English.
- *
- * Usage: node scripts/changelog-section.mjs 0.3.0 [outputFile] [changelogFile]
+ * With an output path the section is written to that file instead of printed: a
+ * pipe on a Windows runner re-encodes anything outside ASCII, which would mangle
+ * punctuation and any language other than English.
  */
 import { readFile, writeFile } from "node:fs/promises";
+
+import { changelogSection } from "./lib/changelog.mjs";
 
 const [version, output, file = "CHANGELOG.md"] = process.argv.slice(2);
 
@@ -24,22 +24,11 @@ const changelog = await readFile(file, "utf8").catch((error) => {
   fail(`${file} could not be read: ${String(error)}`);
 });
 
-/*
- * Sections are `## vMAJOR.MINOR.PATCH`. Splitting on the heading keeps the body
- * intact, including the nested `###` headings inside a section.
- */
-const heading = `## v${version}`;
-const start = changelog.split("\n").findIndex((line) => line.trim() === heading);
-if (start < 0) {
-  fail(`${file} has no "${heading}" section. Add one before releasing ${version}.`);
-}
-
-const lines = changelog.split("\n").slice(start + 1);
-const end = lines.findIndex((line) => line.startsWith("## "));
-const section = (end < 0 ? lines : lines.slice(0, end)).join("\n").trim();
-
-if (section.length === 0) {
-  fail(`The "${heading}" section of ${file} is empty.`);
+let section;
+try {
+  section = changelogSection(changelog, version);
+} catch (error) {
+  fail(error instanceof Error ? error.message : String(error));
 }
 
 if (output === undefined) {
