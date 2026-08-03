@@ -39,10 +39,12 @@ interface FakeEditor {
   onKeyUp: (listener: Listener<never>) => { dispose: Mock<() => void> };
   onMouseDown: (listener: Listener<never>) => { dispose: Mock<() => void> };
   onMouseMove: (listener: Listener<never>) => { dispose: Mock<() => void> };
+  onMouseLeave: (listener: () => void) => { dispose: Mock<() => void> };
   keyListeners: Listener<never>[];
   keyUpListeners: Listener<never>[];
   mouseListeners: Listener<never>[];
   moveListeners: Listener<never>[];
+  leaveListeners: (() => void)[];
   collections: FakeCollection[];
   position: { lineNumber: number; column: number } | null;
   model: FakeModel | null;
@@ -92,10 +94,15 @@ function createMonaco() {
         editor.moveListeners.push(listener);
         return { dispose: vi.fn(() => undefined) };
       },
+      onMouseLeave: (listener) => {
+        editor.leaveListeners.push(listener);
+        return { dispose: vi.fn(() => undefined) };
+      },
       keyListeners: [],
       keyUpListeners: [],
       mouseListeners: [],
       moveListeners: [],
+      leaveListeners: [],
       collections: [],
       position: null,
       model: null,
@@ -575,14 +582,17 @@ describe("MonacoDiffAdapter", () => {
   function reviewing(onSymbol = vi.fn()) {
     const fixture = createMonaco();
     const adapter = new MonacoDiffAdapter(fixture.monaco);
-    adapter.show(document.createElement("div"), identity, {
+    // Attached to the document so document-level key events reach the adapter.
+    const host = document.createElement("div");
+    document.body.append(host);
+    adapter.show(host, identity, {
       path: "src/Caller.java",
       status: "modified",
       beforeContent: "class Caller {}",
       afterContent: "class Caller { UtVar value; }",
     }, { onSymbol });
     const modified = fixture.editors[0]!.modified;
-    return { fixture, adapter, modified, onSymbol };
+    return { fixture, adapter, modified, onSymbol, host };
   }
 
   it("marks the identifier under the pointer while the modifier is held", () => {
@@ -705,5 +715,67 @@ describe("MonacoDiffAdapter", () => {
     adapter.reveal(1);
 
     expect(modified.setPosition).toHaveBeenCalledWith({ lineNumber: 1, column: 1 });
+  });
+
+  it("takes the mark away when the modifier is released outside the editor", () => {
+    const { modified, adapter } = reviewing();
+    const [linkMark] = modified.collections;
+    modified.moveListeners[0]?.({
+      event: { leftButton: false, ctrlKey: true, metaKey: false },
+      target: { position: { lineNumber: 1, column: 16 } },
+    } as never);
+    expect(linkMark?.decorations).toHaveLength(1);
+
+    // The editor never had keyboard focus, so only the document sees this.
+    document.dispatchEvent(new KeyboardEvent("keyup", { ctrlKey: false }));
+
+    expect(linkMark?.decorations).toEqual([]);
+    adapter.dispose();
+  });
+
+  it("marks on a modifier press the editor never received", () => {
+    const { modified, adapter } = reviewing();
+    const [linkMark] = modified.collections;
+    modified.moveListeners[0]?.({
+      event: { leftButton: false, ctrlKey: false, metaKey: false },
+      target: { position: { lineNumber: 1, column: 16 } },
+    } as never);
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { ctrlKey: true }));
+
+    expect(linkMark?.decorations).toHaveLength(1);
+    adapter.dispose();
+  });
+
+  it("stops watching the modifier once the view is gone", () => {
+    const { modified, adapter } = reviewing();
+    const [linkMark] = modified.collections;
+    modified.moveListeners[0]?.({
+      event: { leftButton: false, ctrlKey: false, metaKey: false },
+      target: { position: { lineNumber: 1, column: 16 } },
+    } as never);
+    adapter.dispose();
+    linkMark?.set.mockClear();
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { ctrlKey: true }));
+
+    expect(linkMark?.set).not.toHaveBeenCalled();
+  });
+
+  it("takes the mark away when the pointer leaves the editor", () => {
+    const { modified, adapter } = reviewing();
+    const [linkMark] = modified.collections;
+    modified.moveListeners[0]?.({
+      event: { leftButton: false, ctrlKey: true, metaKey: false },
+      target: { position: { lineNumber: 1, column: 16 } },
+    } as never);
+
+    modified.leaveListeners[0]?.();
+
+    expect(linkMark?.decorations).toEqual([]);
+    // A modifier press with the pointer away must not bring the mark back.
+    document.dispatchEvent(new KeyboardEvent("keydown", { ctrlKey: true }));
+    expect(linkMark?.decorations).toEqual([]);
+    adapter.dispose();
   });
 });

@@ -109,6 +109,7 @@ interface CodeEditor extends Disposable {
   onKeyUp(listener: (event: EditorKeyboardEvent) => void): Disposable;
   onMouseDown(listener: (event: EditorMouseEvent) => void): Disposable;
   onMouseMove(listener: (event: EditorMouseEvent) => void): Disposable;
+  onMouseLeave(listener: () => void): Disposable;
 }
 
 interface MonacoUri {
@@ -199,7 +200,7 @@ export class MonacoDiffAdapter {
       editor.setModel(model);
       this.reviewEditor = editor;
       this.createMarks(editor);
-      this.resources = [...this.attachSymbolHooks(editor, hooks), editor, model];
+      this.resources = [...this.attachSymbolHooks(host, editor, hooks), editor, model];
     } catch (error) {
       editor?.dispose();
       model?.dispose();
@@ -243,6 +244,7 @@ export class MonacoDiffAdapter {
    * revision the user is not reviewing.
    */
   private attachSymbolHooks(
+    host: HTMLElement,
     editor: CodeEditor,
     hooks: DiffViewHooks,
   ): readonly Disposable[] {
@@ -251,6 +253,9 @@ export class MonacoDiffAdapter {
       return [];
     }
     return [
+      // Watched on the document, not the editor: the mark has to appear and go
+      // away with the modifier whether or not the editor holds keyboard focus.
+      ...this.watchModifier(host, editor),
       editor.onKeyDown((event) => {
         this.markLinkTarget(editor, event);
         if (event.keyCode !== this.monaco.KeyCode.F12) {
@@ -260,11 +265,15 @@ export class MonacoDiffAdapter {
         event.stopPropagation();
         requestSymbolAt(editor, editor.getPosition(), event.shiftKey ? "references" : "definition", onSymbol);
       }),
-      // Releasing the modifier has to take the mark away again.
       editor.onKeyUp((event) => { this.markLinkTarget(editor, event); }),
       editor.onMouseMove((event) => {
         this.hoverPosition = event.target.position;
         this.markLinkTarget(editor, event.event);
+      }),
+      // A pointer that has left the editor is not over any identifier.
+      editor.onMouseLeave(() => {
+        this.hoverPosition = null;
+        this.linkMark?.clear();
       }),
       editor.onMouseDown((event) => {
         if (!event.event.leftButton || !(event.event.ctrlKey || event.event.metaKey)) {
@@ -273,6 +282,22 @@ export class MonacoDiffAdapter {
         requestSymbolAt(editor, event.target.position, "definition", onSymbol);
       }),
     ];
+  }
+
+  /** Follows the modifier on the document, so focus never decides the mark. */
+  private watchModifier(host: HTMLElement, editor: CodeEditor): readonly Disposable[] {
+    const owner = host.ownerDocument;
+    const onModifier = (event: KeyboardEvent): void => {
+      this.markLinkTarget(editor, event);
+    };
+    owner.addEventListener("keydown", onModifier);
+    owner.addEventListener("keyup", onModifier);
+    return [{
+      dispose: () => {
+        owner.removeEventListener("keydown", onModifier);
+        owner.removeEventListener("keyup", onModifier);
+      },
+    }];
   }
 
   /**
@@ -329,7 +354,7 @@ export class MonacoDiffAdapter {
       editor.createDecorationsCollection([addedLineDecoration(model.getLineCount())]);
       this.reviewEditor = editor;
       this.createMarks(editor);
-      return [...this.attachSymbolHooks(editor, hooks), editor, model];
+      return [...this.attachSymbolHooks(host, editor, hooks), editor, model];
     } catch (error) {
       editor?.dispose();
       model?.dispose();
@@ -370,7 +395,7 @@ export class MonacoDiffAdapter {
       this.reviewEditor = modified;
       this.createMarks(modified);
       return [
-        ...this.attachSymbolHooks(modified, hooks),
+        ...this.attachSymbolHooks(host, modified, hooks),
         editor,
         originalModel,
         resultModel,
