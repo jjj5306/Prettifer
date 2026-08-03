@@ -59,6 +59,7 @@ description: Prettifer 현재 브랜치의 변경을 OpenSpec과 GitHub 이슈�
 - 자체 리뷰 항목의 통과 여부와 실제 발견 사항을 기록한다.
 - 실행한 검증 명령과 결과를 기록한다.
 - 남은 위험과 후속 작업을 기록한다.
+- 본문 말투는 `AGENTS.md` 11장을 따른다.
 
 ## Merge Gate
 
