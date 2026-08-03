@@ -74,6 +74,7 @@ export const commitPageRequestSchema = sessionIdentitySchema.extend({
 }).strict();
 
 /** Mainline parent number per merge commit, keyed by full commit id. */
+/** Mainline parent number per merge commit, keyed by full commit id. */
 export const mainlineParentsSchema = z.record(
   commitIdSchema,
   z.number().int().positive(),
@@ -91,6 +92,41 @@ export const cancelCompositionRequestSchema = sessionIdentitySchema.extend({
 }).strict();
 
 const compositeFilePathSchema = z.string().min(1);
+
+/** A symbol lookup asks for one identifier at the range's comparison base. */
+export const symbolSearchRequestSchema = sessionIdentitySchema.extend({
+  range: repositoryRangeSchema,
+  symbol: z.string().trim().regex(/^[A-Za-z_$][A-Za-z0-9_$]*$/u),
+}).strict();
+
+export const symbolHitSchema = z.object({
+  path: compositeFilePathSchema,
+  line: z.number().int().positive(),
+  text: z.string(),
+  isDeclaration: z.boolean(),
+}).strict();
+
+export const symbolSearchResultSchema = z.object({
+  hits: z.array(symbolHitSchema),
+  /** True when the limit cut the list, so the screen can say so. */
+  truncated: z.boolean(),
+}).strict();
+
+/**
+ * A navigation can land on a file the selection never changed, which is not in
+ * the composed result. Such a file is read at the comparison base.
+ */
+export const baseFileRequestSchema = sessionIdentitySchema.extend({
+  range: repositoryRangeSchema,
+  path: compositeFilePathSchema,
+}).strict();
+
+export const baseFileSchema = z.object({
+  path: compositeFilePathSchema,
+  contents: z.string(),
+}).strict();
+
+
 const textFileFields = {
   path: compositeFilePathSchema,
   binary: z.never().optional(),
@@ -156,6 +192,11 @@ export type CompositionRequest = z.infer<typeof compositionRequestSchema>;
 export type CancelCompositionRequest = z.infer<typeof cancelCompositionRequestSchema>;
 export type CompositeDiffResultDto = z.infer<typeof compositeDiffResultSchema>;
 export type RangeResult = z.infer<typeof rangeResultSchema>;
+export type SymbolSearchRequest = z.infer<typeof symbolSearchRequestSchema>;
+export type SymbolHitDto = z.infer<typeof symbolHitSchema>;
+export type SymbolSearchResultDto = z.infer<typeof symbolSearchResultSchema>;
+export type BaseFileRequest = z.infer<typeof baseFileRequestSchema>;
+export type BaseFileDto = z.infer<typeof baseFileSchema>;
 export type ApiResult<T> =
   | Readonly<{ status: "success"; data: T }>
   | Readonly<{ status: "cancelled" }>
@@ -168,6 +209,8 @@ export const DESKTOP_CHANNELS = Object.freeze({
   listCommits: "repository:list-commits",
   composeSelection: "composition:create",
   cancelComposition: "composition:cancel",
+  searchSymbol: "symbols:search",
+  readBaseFile: "files:read-base",
 });
 
 export interface DesktopApi {
@@ -176,6 +219,10 @@ export interface DesktopApi {
   openInitialRepository(): Promise<ApiResult<RepositorySession>>;
   loadRange(request: RangeRequest): Promise<ApiResult<RangeResult>>;
   listCommits(request: CommitPageRequest): Promise<ApiResult<RepositoryCommitPageDto>>;
+  /** Finds a symbol across the repository at the range's comparison base. */
+  searchSymbol(request: SymbolSearchRequest): Promise<ApiResult<SymbolSearchResultDto>>;
   composeSelection(request: CompositionRequest): Promise<ApiResult<CompositeDiffResultDto>>;
   cancelComposition(request: CancelCompositionRequest): Promise<ApiResult<null>>;
+  /** Reads one file at the range's comparison base, for navigation outside the result. */
+  readBaseFile(request: BaseFileRequest): Promise<ApiResult<BaseFileDto>>;
 }

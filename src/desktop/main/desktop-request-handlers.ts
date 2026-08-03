@@ -1,9 +1,13 @@
 import {
+  baseFileRequestSchema,
   cancelCompositionRequestSchema,
   commitPageRequestSchema,
   compositionRequestSchema,
   rangeRequestSchema,
+  symbolSearchRequestSchema,
   type ApiResult,
+  type BaseFileDto,
+  type BaseFileRequest,
   type CancelCompositionRequest,
   type CommitPageRequest,
   type CompositeDiffResultDto,
@@ -14,12 +18,16 @@ import {
   type RepositoryCommitPageDto,
   type RepositoryRangeDto,
   type RepositorySession,
+  type SymbolHitDto,
+  type SymbolSearchRequest,
+  type SymbolSearchResultDto,
 } from "../shared/index.js";
 import {
   RepositoryHistoryError,
   type RepositoryCommitPage,
   type RepositoryRange,
 } from "../../history/repository-history-service.js";
+import { BaseFileError } from "../../symbols/base-file-reader.js";
 import { RepositorySessionError } from "./repository-session.js";
 import { applicationUrlsMatch } from "./application-url.js";
 
@@ -57,6 +65,29 @@ interface HistoryReader {
   }): Promise<RepositoryCommitPage>;
 }
 
+/** Searches the repository for a symbol at a given commit. */
+interface SymbolSearcher {
+  search(
+    repositoryPath: string,
+    commit: string,
+    symbol: string,
+    signal?: AbortSignal,
+  ): Promise<{
+    readonly hits: readonly SymbolHitDto[];
+    readonly truncated: boolean;
+  }>;
+}
+
+/** Reads one file at a commit, for a navigation that leaves the result. */
+interface BaseFileSource {
+  read(
+    repositoryPath: string,
+    commit: string,
+    path: string,
+    signal?: AbortSignal,
+  ): Promise<BaseFileDto>;
+}
+
 interface CompositionBoundary {
   compose(
     request: CompositionRequest,
@@ -73,6 +104,8 @@ interface DesktopRequestDependencies {
   readonly repositoryController: RepositorySelector;
   readonly history: HistoryReader;
   readonly composition: CompositionBoundary;
+  readonly symbols: SymbolSearcher;
+  readonly baseFiles: BaseFileSource;
   readonly signal?: AbortSignal;
 }
 
@@ -97,6 +130,16 @@ export function createDesktopRequestHandlers(dependencies: DesktopRequestDepende
       event,
       dependencies,
       async () => listCommits(dependencies, parseRequest(commitPageRequestSchema, input)),
+    ),
+    searchSymbol: (event: DesktopInvokeEvent, input: unknown) => handleRequest(
+      event,
+      dependencies,
+      async () => searchSymbol(dependencies, parseRequest(symbolSearchRequestSchema, input)),
+    ),
+    readBaseFile: (event: DesktopInvokeEvent, input: unknown) => handleRequest(
+      event,
+      dependencies,
+      async () => readBaseFile(dependencies, parseRequest(baseFileRequestSchema, input)),
     ),
     composeSelection: (event: DesktopInvokeEvent, input: unknown) => handleRequest(
       event,
@@ -142,6 +185,50 @@ async function loadRange(
     status: "success",
     data: { range: toRangeDto(range), page: toCommitPageDto(page) },
   };
+}
+
+/**
+ * Searches at the comparison base so the result matches what the review shows.
+ * Files the selection changed are searched in the renderer, which already holds
+ * their composed contents.
+ */
+async function searchSymbol(
+  dependencies: DesktopRequestDependencies,
+  request: SymbolSearchRequest,
+): Promise<ApiResult<SymbolSearchResultDto>> {
+  const session = requireSession(dependencies, request);
+  assertRangeBelongsToSession(session, request.range);
+  const result = await dependencies.symbols.search(
+    session.rootPath,
+    request.range.baseCommit,
+    request.symbol,
+    dependencies.signal,
+  );
+  // Copied so the reply crossing the boundary owns its own array.
+  return {
+    status: "success",
+    data: { hits: result.hits.map((hit) => ({ ...hit })), truncated: result.truncated },
+  };
+}
+
+/**
+ * Reads a file at the comparison base. A symbol search covers the whole
+ * repository, so a navigation can land on a file the selection never changed;
+ * the base is the revision the review compares against.
+ */
+async function readBaseFile(
+  dependencies: DesktopRequestDependencies,
+  request: BaseFileRequest,
+): Promise<ApiResult<BaseFileDto>> {
+  const session = requireSession(dependencies, request);
+  assertRangeBelongsToSession(session, request.range);
+  const file = await dependencies.baseFiles.read(
+    session.rootPath,
+    request.range.baseCommit,
+    request.path,
+    dependencies.signal,
+  );
+  return { status: "success", data: { path: file.path, contents: file.contents } };
 }
 
 async function listCommits(
@@ -279,7 +366,8 @@ function toDiagnostic(error: unknown): Diagnostic {
   if (
     error instanceof RequestBoundaryError ||
     error instanceof RepositorySessionError ||
-    error instanceof RepositoryHistoryError
+    error instanceof RepositoryHistoryError ||
+    error instanceof BaseFileError
   ) {
     return {
       code: error.code,

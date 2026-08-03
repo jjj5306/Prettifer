@@ -1,6 +1,8 @@
 import {
   DESKTOP_CHANNELS,
   type ApiResult,
+  type BaseFileDto,
+  type BaseFileRequest,
   type CancelCompositionRequest,
   type CommitPageRequest,
   type CompositeDiffResultDto,
@@ -10,6 +12,8 @@ import {
   type RangeResult,
   type RepositoryCommitPageDto,
   type RepositorySession,
+  type SymbolSearchRequest,
+  type SymbolSearchResultDto,
 } from "../shared/index.js";
 
 type Invoke = (channel: string, input?: unknown) => Promise<unknown>;
@@ -34,9 +38,17 @@ export function createDesktopApi(invoke: Invoke): DesktopApi {
       DESKTOP_CHANNELS.composeSelection,
       request,
     ) as Promise<ApiResult<CompositeDiffResultDto>>,
+    searchSymbol: (request: SymbolSearchRequest) => invoke(
+      DESKTOP_CHANNELS.searchSymbol,
+      request,
+    ) as Promise<ApiResult<SymbolSearchResultDto>>,
     cancelComposition: (request: CancelCompositionRequest) => invoke(
       DESKTOP_CHANNELS.cancelComposition,
       request,
     ) as Promise<ApiResult<null>>,
+    readBaseFile: (request: BaseFileRequest) => invoke(
+      DESKTOP_CHANNELS.readBaseFile,
+      request,
+    ) as Promise<ApiResult<BaseFileDto>>,
   });
 }

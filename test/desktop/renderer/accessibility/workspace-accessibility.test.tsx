@@ -74,6 +74,10 @@ function createController(withResult = false): AppController {
         ? { status: "ready", requestId: "composition-1", result }
         : { status: "idle" },
       selectedFilePath: withResult ? "src/app.ts" : null,
+      symbolLookup: { status: "idle" },
+      externalFile: { status: "idle" },
+      revealLine: null,
+      navigationHistory: [],
     },
     openRepository: vi.fn(),
     loadRange: vi.fn(),
@@ -84,6 +88,10 @@ function createController(withResult = false): AppController {
     composeSelection: vi.fn(),
     cancelComposition: vi.fn(),
     selectFile: vi.fn(),
+    lookUpSymbol: vi.fn().mockResolvedValue(undefined),
+    goToHit: vi.fn(),
+    dismissSymbolLookup: vi.fn(),
+    goBack: vi.fn(),
   };
 }
 

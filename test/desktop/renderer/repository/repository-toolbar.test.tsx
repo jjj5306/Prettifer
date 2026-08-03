@@ -29,6 +29,10 @@ const baseState: AppState = {
   inspectedCommitId: null,
   composition: { status: "idle" },
   selectedFilePath: null,
+  symbolLookup: { status: "idle" },
+  externalFile: { status: "idle" },
+  revealLine: null,
+  navigationHistory: [],
 };
 
 describe("RepositoryToolbar", () => {

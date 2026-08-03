@@ -1,0 +1,98 @@
+.panel {
+  composes: surface from "../PanelSurface.module.css";
+  grid-template-rows: auto minmax(0, 1fr);
+  /* Kept short so the review it belongs to stays the larger half of the screen. */
+  max-height: 16rem;
+}
+
+.panel h2 {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.panel p {
+  margin: 0;
+}
+
+.headingRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--space-1);
+}
+
+.notice {
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+}
+
+.hits {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.hits li {
+  min-width: 0;
+}
+
+/*
+ * Two classes on purpose: the global `.app button` rule is a two-part selector,
+ * so a single class here would lose its padding, border and height.
+ */
+.hits .hit {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(6rem, auto) minmax(0, 1fr);
+  width: 100%;
+  min-width: 0;
+  min-height: 1.9rem;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.2rem var(--space-2);
+  border-color: transparent;
+  background: transparent;
+  text-align: left;
+}
+
+.kind {
+  color: var(--color-muted);
+  font-family: var(--font-code);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* A declaration is what most navigations are after, so it carries the accent. */
+.declaration {
+  color: var(--color-accent);
+}
+
+.location {
+  overflow: hidden;
+  color: var(--color-focus);
+  font-family: var(--font-code);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.line {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-muted);
+  font-family: var(--font-code);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

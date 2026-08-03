@@ -34,6 +34,12 @@ export function registerDesktopRequestHandlers(
   ipcMain.handle(DESKTOP_CHANNELS.cancelComposition, (event, input) =>
     handlers.cancelComposition(toDesktopEvent(event), input),
   );
+  ipcMain.handle(DESKTOP_CHANNELS.searchSymbol, (event, input) =>
+    handlers.searchSymbol(toDesktopEvent(event), input),
+  );
+  ipcMain.handle(DESKTOP_CHANNELS.readBaseFile, (event, input) =>
+    handlers.readBaseFile(toDesktopEvent(event), input),
+  );
 }
 
 export function removeDesktopRequestHandlers(

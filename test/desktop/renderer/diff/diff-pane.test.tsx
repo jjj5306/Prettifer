@@ -37,7 +37,7 @@ describe("DiffPane", () => {
     );
     expect(screen.getByText("Loading diff editor…")).toBeVisible();
     await waitFor(() => {
-      expect(adapter.show).toHaveBeenCalledWith(expect.any(HTMLElement), identity, file);
+      expect(adapter.show).toHaveBeenCalledWith(expect.any(HTMLElement), identity, file, {});
     });
     expect(screen.getByRole("textbox", {
       name: "Read-only diff: src/app.ts · base and selected result",
@@ -61,7 +61,7 @@ describe("DiffPane", () => {
     );
 
     await waitFor(() => {
-      expect(adapter.show).toHaveBeenCalledWith(expect.any(HTMLElement), identity, addedFile);
+      expect(adapter.show).toHaveBeenCalledWith(expect.any(HTMLElement), identity, addedFile, {});
     });
     expect(screen.getByRole("heading", { name: "Added File" })).toBeVisible();
     expect(screen.getByText(
@@ -200,5 +200,130 @@ describe("DiffPane", () => {
     expect(screen.getByRole("textbox", {
       name: "Read-only diff: src/app.ts · base and selected result",
     })).toBeVisible();
+  });
+
+  it("shows a file outside the result as its comparison base contents", async () => {
+    const adapter = {
+      show: vi.fn(),
+      showDocument: vi.fn(),
+      reveal: vi.fn(),
+      dispose: vi.fn(),
+    };
+    const loadAdapter = vi.fn().mockResolvedValue(adapter);
+    render(
+      <StrictMode>
+        <DiffPane
+          identity={identity}
+          file={file}
+          externalFile={{
+            status: "ready",
+            path: "src/UtVar.java",
+            contents: "public class UtVar {}",
+          }}
+          revealLine={12}
+          loadAdapter={loadAdapter}
+        />
+      </StrictMode>,
+    );
+
+    await waitFor(() => {
+      expect(adapter.showDocument).toHaveBeenCalledWith(
+        expect.any(HTMLElement),
+        identity,
+        "src/UtVar.java",
+        "public class UtVar {}",
+        {},
+      );
+    });
+    // The selected result file is not shown while a file outside it is open.
+    expect(adapter.show).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "Outside the Selected Result" })).toBeVisible();
+    expect(screen.getByText(
+      "Comparison base · this file is not part of the selection",
+    )).toBeVisible();
+    await waitFor(() => { expect(adapter.reveal).toHaveBeenCalledWith(12); });
+  });
+
+  it("reveals another line of the file already open without reloading it", async () => {
+    const adapter = {
+      show: vi.fn(),
+      showDocument: vi.fn(),
+      reveal: vi.fn(),
+      dispose: vi.fn(),
+    };
+    const loadAdapter = vi.fn().mockResolvedValue(adapter);
+    const { rerender } = render(
+      <DiffPane identity={identity} file={file} revealLine={4} loadAdapter={loadAdapter} />,
+    );
+    await waitFor(() => { expect(adapter.reveal).toHaveBeenCalledWith(4); });
+    const loads = loadAdapter.mock.calls.length;
+
+    rerender(
+      <DiffPane identity={identity} file={file} revealLine={9} loadAdapter={loadAdapter} />,
+    );
+
+    await waitFor(() => { expect(adapter.reveal).toHaveBeenCalledWith(9); });
+    expect(loadAdapter.mock.calls).toHaveLength(loads);
+  });
+
+  it("says a file outside the result is opening, and why it could not be", () => {
+    const loadAdapter = vi.fn();
+    const { rerender } = render(
+      <DiffPane
+        identity={identity}
+        file={file}
+        externalFile={{ status: "loading", path: "src/UtVar.java" }}
+        loadAdapter={loadAdapter}
+      />,
+    );
+    expect(screen.getByText("Opening the file at the comparison base…")).toBeVisible();
+    expect(loadAdapter).not.toHaveBeenCalled();
+
+    rerender(
+      <DiffPane
+        identity={identity}
+        file={file}
+        externalFile={{
+          status: "error",
+          path: "docs/logo.png",
+          diagnostic: {
+            code: "BASE_FILE_BINARY",
+            message: "That file is binary, so it has no text to review.",
+            nextAction: "Open the file in a viewer for its format.",
+          },
+        }}
+        loadAdapter={loadAdapter}
+      />,
+    );
+
+    expect(screen.getByText("This file could not be opened")).toBeVisible();
+    expect(screen.getByText("Open the file in a viewer for its format.")).toBeVisible();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(loadAdapter).not.toHaveBeenCalled();
+  });
+
+  it("passes a symbol request from the editor on unchanged", async () => {
+    const adapter = {
+      show: vi.fn(),
+      showDocument: vi.fn(),
+      reveal: vi.fn(),
+      dispose: vi.fn(),
+    };
+    const loadAdapter = vi.fn().mockResolvedValue(adapter);
+    const onSymbol = vi.fn();
+    render(
+      <DiffPane
+        identity={identity}
+        file={file}
+        onSymbol={onSymbol}
+        loadAdapter={loadAdapter}
+      />,
+    );
+
+    await waitFor(() => { expect(adapter.show).toHaveBeenCalledOnce(); });
+    const hooks = adapter.show.mock.calls[0]?.[3] as { onSymbol: typeof onSymbol };
+    hooks.onSymbol("UtVar", "references");
+
+    expect(onSymbol).toHaveBeenCalledWith("UtVar", "references");
   });
 });
