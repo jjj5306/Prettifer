@@ -114,6 +114,11 @@ export const CommitHistoryPane = ({
           {commitsInDisplayOrder.map((commit) => {
             const isInspected = inspectedCommitId === commit.id;
             const isSelected = selected.has(commit.id);
+            // The card and the checkbox both choose the commit, so they say the
+            // same thing to assistive technology.
+            const selectionLabel = commit.selectable
+              ? `Include in selected result: ${commit.title}`
+              : `Cannot include in selected result: ${commit.title}`;
             return (
               <li
                 key={commit.id}
@@ -127,11 +132,9 @@ export const CommitHistoryPane = ({
                   <input
                     ref={commit.id === firstSelectableCommitId ? firstCommitRef : undefined}
                     type="checkbox"
-                    checked={selected.has(commit.id)}
+                    checked={isSelected}
                     disabled={!commit.selectable}
-                    aria-label={commit.selectable
-                      ? `Include in selected result: ${commit.title}`
-                      : `Cannot include in selected result: ${commit.title}`}
+                    aria-label={selectionLabel}
                     onChange={() => { onToggleCommit(commit.id); }}
                   />
                 </label>
@@ -141,15 +144,23 @@ export const CommitHistoryPane = ({
                   title={commit.title}
                   className={styles.commitButton}
                   aria-current={isInspected ? "true" : undefined}
+                  aria-pressed={commit.selectable ? isSelected : undefined}
                   aria-label={[
-                    `Inspect commit: ${commit.title}`,
+                    selectionLabel,
                     commit.id,
                     commit.authorName,
                     commit.authoredAt,
                     ...mergeAccessibleState(commit, isSelected, mergeParents[commit.id]),
                   ].join(" · ")}
                   onClick={() => {
+                    // The card is the wide target for choosing, and it is the
+                    // only control that moves the inspected mark, so a click
+                    // does both. The checkbox leaves the mark where it was,
+                    // which is what keeps the two states distinguishable.
                     onInspectCommit(commit.id);
+                    if (commit.selectable) {
+                      onToggleCommit(commit.id);
+                    }
                   }}
                 >
                   <span className={styles.commitTitle}>{commit.title}</span>

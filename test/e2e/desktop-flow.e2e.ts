@@ -75,9 +75,12 @@ test("opens a repository, selects non-contiguous commits and reviews file diff",
   await running.page.getByRole("checkbox", {
     name: "Include in selected result: docs(auth): explain session lifecycle",
   }).check();
-  await running.page.getByRole("checkbox", {
-    name: "Include in selected result: feat(auth): validate login request",
-  }).check();
+  // The commit card selects too, so one of the two goes through the card.
+  const loginCommitCard = running.page.getByRole("button", {
+    name: /^Include in selected result: feat\(auth\): validate login request ·/u,
+  });
+  await loginCommitCard.click();
+  await expect(loginCommitCard).toHaveAttribute("aria-pressed", "true");
   await expect(
     running.page.getByRole("region", { name: "Commit History" }).getByText("2 selected"),
   ).toBeVisible();
