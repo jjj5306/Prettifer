@@ -37,7 +37,7 @@ describe("DiffPane", () => {
     );
     expect(screen.getByText("Loading diff editor…")).toBeVisible();
     await waitFor(() => {
-      expect(adapter.show).toHaveBeenCalledWith(expect.any(HTMLElement), identity, file, {});
+      expect(adapter.show).toHaveBeenCalledWith(expect.any(HTMLElement), identity, file, { view: "sideBySide" });
     });
     expect(screen.getByRole("textbox", {
       name: "Read-only diff: src/app.ts · base and selected result",
@@ -65,7 +65,7 @@ describe("DiffPane", () => {
     );
 
     await waitFor(() => {
-      expect(adapter.show).toHaveBeenCalledWith(expect.any(HTMLElement), identity, addedFile, {});
+      expect(adapter.show).toHaveBeenCalledWith(expect.any(HTMLElement), identity, addedFile, { view: "sideBySide" });
     });
     expect(screen.getByRole("heading", { name: "Added File" })).toBeVisible();
     expect(screen.getByTitle("src/new.ts")).toBeVisible();
@@ -231,7 +231,7 @@ describe("DiffPane", () => {
         identity,
         "src/UtVar.java",
         "public class UtVar {}",
-        {},
+        { view: "sideBySide" },
       );
     });
     // The selected result file is not shown while a file outside it is open.
@@ -443,5 +443,131 @@ describe("DiffPane", () => {
 
     expect(second).toHaveBeenCalledWith("UtVar", "definition", "construction");
     expect(first).not.toHaveBeenCalled();
+  });
+
+  /** An adapter whose calls a test can read back. */
+  function createAdapter() {
+    return {
+      show: vi.fn(),
+      showDocument: vi.fn(),
+      reveal: vi.fn(),
+      setView: vi.fn(),
+      dispose: vi.fn(),
+    };
+  }
+
+  it("offers the layout toggle on a comparison, with side-by-side selected", async () => {
+    const adapter = createAdapter();
+    render(
+      <DiffPane
+        identity={identity}
+        file={file}
+        loadAdapter={vi.fn().mockResolvedValue(adapter)}
+      />,
+    );
+
+    await waitFor(() => { expect(adapter.show).toHaveBeenCalledOnce(); });
+    expect(screen.getByRole("button", { name: "Side-by-side" }))
+      .toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Inline" }))
+      .toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("changes the layout without loading the editor again", async () => {
+    const user = userEvent.setup();
+    const adapter = createAdapter();
+    const loadAdapter = vi.fn().mockResolvedValue(adapter);
+    render(<DiffPane identity={identity} file={file} loadAdapter={loadAdapter} />);
+    await waitFor(() => { expect(adapter.show).toHaveBeenCalledOnce(); });
+
+    await user.click(screen.getByRole("button", { name: "Inline" }));
+
+    expect(adapter.setView).toHaveBeenLastCalledWith("inline");
+    expect(screen.getByRole("button", { name: "Inline" }))
+      .toHaveAttribute("aria-pressed", "true");
+    // The editor is untouched, so the reader keeps their place.
+    expect(loadAdapter).toHaveBeenCalledOnce();
+    expect(adapter.show).toHaveBeenCalledOnce();
+    expect(adapter.dispose).not.toHaveBeenCalled();
+  });
+
+  it("keeps the chosen layout when another file is reviewed", async () => {
+    const user = userEvent.setup();
+    const adapter = createAdapter();
+    const { rerender } = render(
+      <DiffPane
+        identity={identity}
+        file={file}
+        loadAdapter={vi.fn().mockResolvedValue(adapter)}
+      />,
+    );
+    await waitFor(() => { expect(adapter.show).toHaveBeenCalledOnce(); });
+    await user.click(screen.getByRole("button", { name: "Inline" }));
+
+    rerender(
+      <DiffPane
+        identity={identity}
+        file={{
+          path: "src/other.ts",
+          status: "modified",
+          beforeContent: "a",
+          afterContent: "b",
+        }}
+        loadAdapter={vi.fn().mockResolvedValue(adapter)}
+      />,
+    );
+
+    await waitFor(() => { expect(adapter.show).toHaveBeenCalledTimes(2); });
+    expect(adapter.show.mock.calls[1]?.[3]).toEqual({ view: "inline" });
+    expect(screen.getByRole("button", { name: "Inline" }))
+      .toHaveAttribute("aria-pressed", "true");
+  });
+
+  it.each([
+    ["an added file", {
+      path: "src/new.ts",
+      status: "added" as const,
+      beforeContent: null,
+      afterContent: "added",
+    }],
+    ["a binary file", {
+      path: "docs/logo.png",
+      status: "modified" as const,
+      binary: true as const,
+      beforeContent: null,
+      afterContent: null,
+    }],
+  ])("offers no layout toggle for %s", async (_name, target) => {
+    const adapter = createAdapter();
+    render(
+      <DiffPane
+        identity={identity}
+        file={target}
+        loadAdapter={vi.fn().mockResolvedValue(adapter)}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole("group", { name: "Diff layout" })).toBeNull();
+    });
+  });
+
+  it("offers no layout toggle for a file outside the result", async () => {
+    const adapter = createAdapter();
+    render(
+      <DiffPane
+        identity={identity}
+        file={file}
+        externalFile={{
+          status: "ready",
+          path: "src/UtVar.java",
+          contents: "public class UtVar {}",
+        }}
+        loadAdapter={vi.fn().mockResolvedValue(adapter)}
+      />,
+    );
+
+    await waitFor(() => { expect(adapter.showDocument).toHaveBeenCalledOnce(); });
+    expect(screen.queryByRole("group", { name: "Diff layout" })).toBeNull();
   });
 });

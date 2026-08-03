@@ -49,6 +49,9 @@ interface EditorMouseEvent {
   readonly target: { readonly position: EditorPosition | null };
 }
 
+/** How a comparison is laid out. Inline runs deletions and additions together. */
+export type DiffView = "sideBySide" | "inline";
+
 /** What the user asked of the symbol under the cursor. */
 export type SymbolRequestMode = "definition" | "references";
 
@@ -61,6 +64,8 @@ export type SymbolRequestHandler = (
 
 export interface DiffViewHooks {
   readonly onSymbol?: SymbolRequestHandler;
+  /** Layout of a comparison, side by side unless a view is given. */
+  readonly view?: DiffView;
 }
 
 interface DiffEditor extends Disposable {
@@ -69,6 +74,8 @@ interface DiffEditor extends Disposable {
     readonly modified: TextModel;
   }): void;
   getModifiedEditor(): CodeEditor;
+  /** Changes options in place, keeping the models and the scroll position. */
+  updateOptions(options: { readonly renderSideBySide: boolean }): void;
 }
 
 interface DecorationRange {
@@ -163,6 +170,8 @@ export class MonacoDiffAdapter {
   private targetMark: DecorationsCollection | undefined;
   /** Where the pointer last was, so a modifier press alone can mark a symbol. */
   private hoverPosition: EditorPosition | null = null;
+  /** Held so a view change updates options instead of rebuilding the editor. */
+  private comparisonEditor: DiffEditor | undefined;
 
   constructor(private readonly monaco: MonacoApi) {}
 
@@ -238,9 +247,21 @@ export class MonacoDiffAdapter {
     }
     this.resources = [];
     this.reviewEditor = undefined;
+    this.comparisonEditor = undefined;
     this.linkMark = undefined;
     this.targetMark = undefined;
     this.hoverPosition = null;
+  }
+
+  /**
+   * Lays the comparison out again without rebuilding it. Rebuilding would throw
+   * away the scroll position, which is the one thing a reader must not lose when
+   * they only asked for a different arrangement of the same content.
+   *
+   * A view with nothing to compare against ignores this.
+   */
+  setView(view: DiffView): void {
+    this.comparisonEditor?.updateOptions({ renderSideBySide: view !== "inline" });
   }
 
   /**
@@ -389,7 +410,7 @@ export class MonacoDiffAdapter {
       editor = this.monaco.editor.createDiffEditor(host, {
         ...baseEditorOptions,
         originalEditable: false,
-        renderSideBySide: true,
+        renderSideBySide: hooks.view !== "inline",
         renderIndicators: true,
         // Lets the user drag the divider between the base and the result.
         enableSplitViewResizing: true,
@@ -399,6 +420,7 @@ export class MonacoDiffAdapter {
       editor.setModel({ original: originalModel, modified: resultModel });
       const modified = editor.getModifiedEditor();
       this.reviewEditor = modified;
+      this.comparisonEditor = editor;
       this.createMarks(modified);
       return [
         ...this.attachSymbolHooks(host, modified, hooks),

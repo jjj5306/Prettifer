@@ -5,6 +5,7 @@ import type { ExternalFileState, ReviewPosition } from "../state/app-state.js";
 import {
   MonacoDiffAdapter,
   type DiffIdentity,
+  type DiffView,
   type DiffViewHooks,
   type MonacoApi,
   type SymbolRequestHandler,
@@ -15,6 +16,7 @@ type CompositeFile = CompositeDiffResultDto["files"][number];
 type TextCompositeFile = Exclude<CompositeFile, { binary: true }>;
 
 interface DiffAdapter {
+  setView(view: DiffView): void;
   show(
     host: HTMLElement,
     identity: DiffIdentity,
@@ -79,6 +81,17 @@ export const DiffPane = ({
   }, []);
   const wantsSymbols = onSymbol !== undefined;
   const [retry, setRetry] = useState(0);
+  /*
+   * The chosen layout lives here, beside the review it belongs to, the same way
+   * the changed-file panel keeps its own Tree or List choice.
+   */
+  const [view, setView] = useState<DiffView>("sideBySide");
+  /*
+   * Read when an editor is created, so the current layout applies to a file that
+   * opens later. It is deliberately not an effect dependency: changing the view
+   * updates options on the editor that already exists.
+   */
+  const viewRef = useRef(view);
   const [outcome, setOutcome] = useState<LoadOutcome | null>(null);
   const { repositorySessionId, requestId } = identity;
   // A file outside the result replaces the diff, so it decides the target first.
@@ -107,7 +120,9 @@ export const DiffPane = ({
       }
       adapter = loadedAdapter;
       adapterRef.current = loadedAdapter;
-      const hooks = wantsSymbols ? { onSymbol: forwardSymbol } : {};
+      const hooks = wantsSymbols
+        ? { onSymbol: forwardSymbol, view: viewRef.current }
+        : { view: viewRef.current };
       const identityForModel = { repositorySessionId, requestId };
       if (target.kind === "document") {
         loadedAdapter.showDocument(
@@ -154,6 +169,12 @@ export const DiffPane = ({
     adapterRef.current?.reveal(reveal.line, reveal.column);
   }, [currentKey, outcome, reveal]);
 
+  // Laying the comparison out again keeps the editor, and with it the position.
+  useEffect(() => {
+    viewRef.current = view;
+    adapterRef.current?.setView(view);
+  }, [view]);
+
   if (externalFile.status === "loading") {
     return (
       <ReviewPanel heading="Outside the Selected Result" subheading={externalFile.path}>
@@ -176,7 +197,9 @@ export const DiffPane = ({
 
   if (target !== null) {
     const status = outcome?.key === currentKey ? outcome.status : "loading";
-    const view = targetView(target);
+    const shown = targetView(target);
+    // Only a comparison has two sides to arrange.
+    const comparable = target.kind === "diff" && target.file.status !== "added";
     return (
       <section
         id="diff-review"
@@ -185,8 +208,11 @@ export const DiffPane = ({
         tabIndex={-1}
       >
         <div className={styles.headingRow}>
-          <h2 id="diff-heading">{view.heading}</h2>
-          <ReviewedPath path={view.path} />
+          <h2 id="diff-heading">{shown.heading}</h2>
+          <ReviewedPath path={shown.path} />
+          {comparable ? (
+            <DiffViewToggle view={view} onChange={setView} />
+          ) : null}
         </div>
         {status === "loading" ? (
           <p aria-live="polite">Loading diff editor…</p>
@@ -206,7 +232,7 @@ export const DiffPane = ({
           aria-multiline="true"
           aria-readonly="true"
           tabIndex={0}
-          aria-label={`${view.editorLabel}: ${view.path} · ${view.editorContext}`}
+          aria-label={`${shown.editorLabel}: ${shown.path} · ${shown.editorContext}`}
         />
       </section>
     );
@@ -251,6 +277,62 @@ export const DiffPane = ({
     </section>
   );
 };
+
+/** Chooses how a comparison is laid out, beside the file it belongs to. */
+const DiffViewToggle = ({
+  view,
+  onChange,
+}: {
+  readonly view: DiffView;
+  readonly onChange: (view: DiffView) => void;
+}) => (
+  <div className={styles.viewToggle} role="group" aria-label="Diff layout">
+    <button
+      type="button"
+      title="Side-by-side"
+      aria-label="Side-by-side"
+      aria-pressed={view === "sideBySide"}
+      className={view === "sideBySide" ? styles.activeView : undefined}
+      onClick={() => { onChange("sideBySide"); }}
+    >
+      <LayoutIcon view="sideBySide" />
+    </button>
+    <button
+      type="button"
+      title="Inline"
+      aria-label="Inline"
+      aria-pressed={view === "inline"}
+      className={view === "inline" ? styles.activeView : undefined}
+      onClick={() => { onChange("inline"); }}
+    >
+      <LayoutIcon view="inline" />
+    </button>
+  </div>
+);
+
+const LayoutIcon = ({ view }: Readonly<{ view: DiffView }>) => (
+  <svg
+    aria-hidden="true"
+    viewBox="0 0 16 16"
+    width="15"
+    height="15"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.4"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    {view === "sideBySide" ? (
+      <>
+        <path d="M2.5 3h4.5v10H2.5zM9 3h4.5v10H9z" />
+      </>
+    ) : (
+      <>
+        <path d="M2.5 3h11M2.5 6.5h11M2.5 10h11M2.5 13.5h11" />
+      </>
+    )}
+  </svg>
+);
 
 /**
  * The path of the file under review. Symbol navigation changes it under the user,

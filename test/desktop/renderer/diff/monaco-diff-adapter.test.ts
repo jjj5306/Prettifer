@@ -56,7 +56,11 @@ const F12 = 70;
 
 function createMonaco() {
   const models: FakeModel[] = [];
-  const editors: (FakeEditor & { modified: FakeEditor })[] = [];
+  const editors: (FakeEditor & {
+    modified: FakeEditor;
+    updateOptions: Mock<(options: never) => void>;
+    updatedOptions: { renderSideBySide: boolean }[];
+  })[] = [];
   const addedEditors: FakeEditor[] = [];
 
   function createEditor(options: unknown): FakeEditor {
@@ -138,6 +142,10 @@ function createMonaco() {
           const editor = Object.assign(createEditor(options), {
             modified,
             getModifiedEditor: () => modified,
+            updateOptions: vi.fn((next: { renderSideBySide: boolean }) => {
+              editor.updatedOptions.push(next);
+            }),
+            updatedOptions: [] as { renderSideBySide: boolean }[],
           });
           // Monaco hands each side of the pair to its own editor.
           editor.setModel = vi.fn((pair: never) => {
@@ -373,6 +381,8 @@ describe("MonacoDiffAdapter", () => {
       const editor = Object.assign(fixture.createEditor(options), {
         modified,
         getModifiedEditor: () => modified,
+        updateOptions: vi.fn(() => undefined),
+        updatedOptions: [] as { renderSideBySide: boolean }[],
       });
       editor.setModel = vi.fn(() => { throw new Error("set diff model failed"); });
       fixture.editors.push(editor);
@@ -778,5 +788,68 @@ describe("MonacoDiffAdapter", () => {
     document.dispatchEvent(new KeyboardEvent("keydown", { ctrlKey: true }));
     expect(linkMark?.decorations).toEqual([]);
     adapter.dispose();
+  });
+
+  it("lays a comparison out side by side unless a view says otherwise", () => {
+    const fixture = createMonaco();
+    const adapter = new MonacoDiffAdapter(fixture.monaco);
+
+    adapter.show(document.createElement("div"), identity, {
+      path: "src/app.ts",
+      status: "modified",
+      beforeContent: "before",
+      afterContent: "after",
+    });
+
+    expect(fixture.editors[0]?.options).toMatchObject({ renderSideBySide: true });
+  });
+
+  it("opens a comparison inline when asked", () => {
+    const fixture = createMonaco();
+    const adapter = new MonacoDiffAdapter(fixture.monaco);
+
+    adapter.show(document.createElement("div"), identity, {
+      path: "src/app.ts",
+      status: "modified",
+      beforeContent: "before",
+      afterContent: "after",
+    }, { view: "inline" });
+
+    expect(fixture.editors[0]?.options).toMatchObject({ renderSideBySide: false });
+  });
+
+  it("changes the layout without rebuilding the editor", () => {
+    const { fixture, adapter } = reviewing();
+    const editor = fixture.editors[0]!;
+
+    adapter.setView("inline");
+    adapter.setView("sideBySide");
+
+    expect(editor.updatedOptions).toEqual([
+      { renderSideBySide: false },
+      { renderSideBySide: true },
+    ]);
+    // One editor throughout: rebuilding would lose the scroll position.
+    expect(fixture.editors).toHaveLength(1);
+    expect(editor.dispose).not.toHaveBeenCalled();
+  });
+
+  it("ignores a layout change where there is nothing to compare", () => {
+    const fixture = createMonaco();
+    const adapter = new MonacoDiffAdapter(fixture.monaco);
+    adapter.showDocument(document.createElement("div"), identity, "a.ts", "one");
+
+    expect(() => { adapter.setView("inline"); }).not.toThrow();
+    expect(fixture.editors).toHaveLength(0);
+  });
+
+  it("forgets the comparison once the view is gone", () => {
+    const { fixture, adapter } = reviewing();
+    const editor = fixture.editors[0]!;
+    adapter.dispose();
+
+    adapter.setView("inline");
+
+    expect(editor.updatedOptions).toEqual([]);
   });
 });
