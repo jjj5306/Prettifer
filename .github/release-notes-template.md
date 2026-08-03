@@ -5,6 +5,8 @@ Git `2.30+` must be available on `PATH`.
 
 Installation, usage and troubleshooting: [README](https://github.com/{{RELEASE_REPOSITORY}}#readme)
 
+{{CHANGES}}
+
 ### Verify the download
 
 ```powershell
