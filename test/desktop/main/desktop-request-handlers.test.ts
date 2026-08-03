@@ -266,7 +266,7 @@ describe("desktop request handlers", () => {
         path: "src/UtVar.java",
         line: 12,
         text: "public class UtVar {",
-        isDeclaration: true,
+        kind: "type",
       }],
       truncated: false,
     });

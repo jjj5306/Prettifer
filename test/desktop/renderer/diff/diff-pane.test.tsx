@@ -319,9 +319,9 @@ describe("DiffPane", () => {
 
     await waitFor(() => { expect(adapter.show).toHaveBeenCalledOnce(); });
     const hooks = adapter.show.mock.calls[0]?.[3] as { onSymbol: typeof onSymbol };
-    hooks.onSymbol("UtVar", "references");
+    hooks.onSymbol("UtVar", "references", "plain");
 
-    expect(onSymbol).toHaveBeenCalledWith("UtVar", "references");
+    expect(onSymbol).toHaveBeenCalledWith("UtVar", "references", "plain");
   });
 
   it("names the file under review and follows the review to another file", async () => {
@@ -436,10 +436,12 @@ describe("DiffPane", () => {
     );
 
     // The editor still holds the hook it was given first.
-    const hooks = adapter.show.mock.calls[0]?.[3] as { onSymbol: (s: string, m: string) => void };
-    hooks.onSymbol("UtVar", "definition");
+    const hooks = adapter.show.mock.calls[0]?.[3] as {
+      onSymbol: (s: string, m: string, u: string) => void;
+    };
+    hooks.onSymbol("UtVar", "definition", "construction");
 
-    expect(second).toHaveBeenCalledWith("UtVar", "definition");
+    expect(second).toHaveBeenCalledWith("UtVar", "definition", "construction");
     expect(first).not.toHaveBeenCalled();
   });
 });

@@ -8,6 +8,7 @@ import type {
   SymbolHitDto,
 } from "../../shared/index.js";
 import { symbolLanguageForPath } from "../../../symbols/language-support.js";
+import { preferredDeclarations, type SymbolUsage } from "../../../symbols/definition-choice.js";
 import { findOccurrences } from "../../../symbols/occurrences.js";
 import { selectRepositorySession } from "../state/app-selectors.js";
 import { mergeSymbolHits } from "../symbols/merge-hits.js";
@@ -33,7 +34,11 @@ export interface AppController {
   readonly cancelComposition: () => Promise<void>;
   readonly selectFile: (path: string) => void;
   /** Finds where a symbol is declared and used, for the file under review. */
-  readonly lookUpSymbol: (symbol: string, mode: SymbolLookupMode) => Promise<void>;
+  readonly lookUpSymbol: (
+    symbol: string,
+    mode: SymbolLookupMode,
+    usage: SymbolUsage,
+  ) => Promise<void>;
   readonly goToHit: (hit: SymbolHitDto, symbol: string) => void;
   readonly dismissSymbolLookup: () => void;
   readonly goBack: () => void;
@@ -281,7 +286,11 @@ export function useAppController(
    * way the list describes the result under review, not the base, and the
    * composed contents never cross the process boundary a second time.
    */
-  const lookUpSymbol = async (symbol: string, mode: SymbolLookupMode): Promise<void> => {
+  const lookUpSymbol = async (
+    symbol: string,
+    mode: SymbolLookupMode,
+    usage: SymbolUsage,
+  ): Promise<void> => {
     const session = selectRepositorySession(state.repository);
     const path = state.selectedFilePath;
     if (
@@ -307,8 +316,14 @@ export function useAppController(
       });
       if (found.status === "success") {
         const merged = mergeSymbolHits(found.data.hits, result, symbol);
+        /*
+         * A definition lookup keeps only the kind that answers where the user
+         * pointed, so a class is not buried under its constructors and a method
+         * is not buried under local variables of the same name. A reference list
+         * keeps everything: showing all of it is the point.
+         */
         const hits = mode === "definition"
-          ? merged.filter((hit) => hit.isDeclaration)
+          ? preferredDeclarations(merged, usage)
           : merged;
         const only = hits.length === 1 ? hits[0] : undefined;
         if (mode === "definition" && only !== undefined) {

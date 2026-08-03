@@ -65,12 +65,24 @@ export async function createSymbolFixture(): Promise<SymbolFixture> {
     git(["add", name]);
   };
 
+  // A class and two constructors of the same name, so a definition lookup has to
+  // choose which one the reader meant.
   await write("src/model/UtVar.java", [
     "package model;",
     "",
     "public class UtVar {",
+    "    private final int seed;",
+    "",
+    "    public UtVar() {",
+    "        this.seed = 1;",
+    "    }",
+    "",
+    "    public UtVar(int seed) {",
+    "        this.seed = seed;",
+    "    }",
+    "",
     "    public int total() {",
-    "        return 1;",
+    "        return seed;",
     "    }",
     "}",
   ]);

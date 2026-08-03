@@ -15,10 +15,12 @@ describe("SymbolSearchService against this repository", () => {
       "startDesktopApplication",
     );
 
-    const declaration = result.hits.find((hit) => hit.isDeclaration);
+    const declaration = result.hits.find((hit) => hit.kind !== null);
     expect(declaration?.path).toBe("src/desktop/main/desktop-application.ts");
+    // An exported function reads as a method, not as a type or a variable.
+    expect(declaration?.kind).toBe("method");
     // The uses in the entry point and the tests are reported as references.
-    expect(result.hits.filter((hit) => !hit.isDeclaration).length).toBeGreaterThan(0);
+    expect(result.hits.filter((hit) => hit.kind === null).length).toBeGreaterThan(0);
     expect(result.hits.every((hit) => hit.line > 0)).toBe(true);
 
     const after = await git.run(["status", "--porcelain"], { cwd: process.cwd() });

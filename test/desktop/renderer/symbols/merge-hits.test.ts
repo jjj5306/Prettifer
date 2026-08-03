@@ -21,8 +21,8 @@ const hit = (
   path: string,
   line: number,
   text: string,
-  isDeclaration = false,
-): SymbolHitDto => ({ path, line, text, isDeclaration });
+  kind: SymbolHitDto["kind"] = null,
+): SymbolHitDto => ({ path, line, text, kind });
 
 describe("mergeSymbolHits", () => {
   it("keeps repository hits for files the selection did not change", () => {
@@ -35,7 +35,7 @@ describe("mergeSymbolHits", () => {
 
   it("replaces stale repository hits with the composed contents of a changed file", () => {
     const hits = mergeSymbolHits(
-      [hit("src/UtVar.java", 4, "class UtVar {}", true)],
+      [hit("src/UtVar.java", 4, "class UtVar {}", "type")],
       result([{
         path: "src/UtVar.java",
         status: "modified",
@@ -45,7 +45,7 @@ describe("mergeSymbolHits", () => {
       "UtVar",
     );
 
-    expect(hits).toEqual([hit("src/UtVar.java", 2, "public class UtVar {", true)]);
+    expect(hits).toEqual([hit("src/UtVar.java", 2, "public class UtVar {", "type")]);
   });
 
   it("orders hits by path and then line", () => {
@@ -96,6 +96,6 @@ describe("mergeSymbolHits", () => {
       status: "modified",
       beforeContent: "",
       afterContent: "    compute(total);",
-    }]), "total")).toEqual([hit("src/Caller.java", 1, "    compute(total);", false)]);
+    }]), "total")).toEqual([hit("src/Caller.java", 1, "    compute(total);", null)]);
   });
 });

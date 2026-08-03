@@ -129,7 +129,9 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
                         problem={selectSelectedProblemFile(controller.state)}
                         externalFile={controller.state.externalFile}
                         reveal={controller.state.reveal}
-                        onSymbol={(symbol, mode) => { void controller.lookUpSymbol(symbol, mode); }}
+                        onSymbol={(symbol, mode, usage) => {
+                          void controller.lookUpSymbol(symbol, mode, usage);
+                        }}
                       />
                     </DiffErrorBoundary>
                     <SymbolPanel

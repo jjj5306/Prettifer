@@ -8,7 +8,6 @@ import {
   type DiffViewHooks,
   type MonacoApi,
   type SymbolRequestHandler,
-  type SymbolRequestMode,
 } from "./MonacoDiffAdapter.js";
 import styles from "./DiffPane.module.css";
 
@@ -43,7 +42,7 @@ interface DiffPaneProps {
   readonly externalFile?: ExternalFileState;
   /** Position a navigation asked to show. */
   readonly reveal?: ReviewPosition | null;
-  readonly onSymbol?: (symbol: string, mode: SymbolRequestMode) => void;
+  readonly onSymbol?: SymbolRequestHandler;
   readonly loadAdapter?: () => Promise<DiffAdapter>;
 }
 
@@ -75,8 +74,8 @@ export const DiffPane = ({
    */
   const onSymbolRef = useRef(onSymbol);
   useEffect(() => { onSymbolRef.current = onSymbol; }, [onSymbol]);
-  const forwardSymbol = useCallback<SymbolRequestHandler>((symbol, mode) => {
-    onSymbolRef.current?.(symbol, mode);
+  const forwardSymbol = useCallback<SymbolRequestHandler>((symbol, mode, usage) => {
+    onSymbolRef.current?.(symbol, mode, usage);
   }, []);
   const wantsSymbols = onSymbol !== undefined;
   const [retry, setRetry] = useState(0);

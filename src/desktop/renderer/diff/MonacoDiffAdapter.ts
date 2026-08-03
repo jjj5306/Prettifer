@@ -1,4 +1,5 @@
 import type { CompositeDiffResultDto } from "../../shared/index.js";
+import { usageAt, type SymbolUsage } from "../../../symbols/definition-choice.js";
 import { symbolAt } from "../../../symbols/symbol-at.js";
 
 type CompositeFile = CompositeDiffResultDto["files"][number];
@@ -51,7 +52,12 @@ interface EditorMouseEvent {
 /** What the user asked of the symbol under the cursor. */
 export type SymbolRequestMode = "definition" | "references";
 
-export type SymbolRequestHandler = (symbol: string, mode: SymbolRequestMode) => void;
+export type SymbolRequestHandler = (
+  symbol: string,
+  mode: SymbolRequestMode,
+  /** What the place the symbol was picked from says about it. */
+  usage: SymbolUsage,
+) => void;
 
 export interface DiffViewHooks {
   readonly onSymbol?: SymbolRequestHandler;
@@ -430,9 +436,13 @@ function requestSymbolAt(
   mode: SymbolRequestMode,
   onSymbol: SymbolRequestHandler,
 ): void {
-  const found = position === null ? null : symbolAtPosition(editor, position);
+  if (position === null) {
+    return;
+  }
+  const found = symbolAtPosition(editor, position);
+  const line = editor.getModel()?.getLineContent(position.lineNumber) ?? "";
   if (found !== null) {
-    onSymbol(found.name, mode);
+    onSymbol(found.name, mode, usageAt(line, found.startColumn));
   }
 }
 

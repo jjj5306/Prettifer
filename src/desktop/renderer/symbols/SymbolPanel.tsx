@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-import type { SymbolHitDto } from "../../shared/index.js";
+import type { DeclarationKindDto, SymbolHitDto } from "../../shared/index.js";
 import type { SymbolLookupState } from "../state/app-state.js";
 import styles from "./SymbolPanel.module.css";
 
@@ -137,11 +137,12 @@ const PanelBody = ({
                   onKeyDown={onEscape}
                 >
                   <span
-                    className={hit.isDeclaration
-                      ? `${styles.kind} ${styles.declaration}`
-                      : styles.kind}
+                    className={hit.kind === null
+                      ? styles.kind
+                      : `${styles.kind} ${styles.declaration}`}
+                    title={hit.kind === null ? "Reference" : KIND_TITLES[hit.kind]}
                   >
-                    {hit.isDeclaration ? "def" : "ref"}
+                    {hit.kind === null ? "ref" : KIND_LABELS[hit.kind]}
                   </span>
                   <span className={styles.location}>{hit.path}:{hit.line}</span>
                   <span className={styles.line}>{hit.text.trim()}</span>
@@ -152,6 +153,27 @@ const PanelBody = ({
         </>
       );
   }
+};
+
+/** Short enough for the column, long enough to tell a class from a constructor. */
+const KIND_LABELS: Readonly<Record<DeclarationKindDto, string>> = {
+  type: "type",
+  constructor: "ctor",
+  method: "func",
+  field: "field",
+  variable: "var",
+  alias: "alias",
+  macro: "macro",
+};
+
+const KIND_TITLES: Readonly<Record<DeclarationKindDto, string>> = {
+  type: "Type declaration",
+  constructor: "Constructor",
+  method: "Method or function",
+  field: "Field",
+  variable: "Variable",
+  alias: "Type alias",
+  macro: "Macro",
 };
 
 function heading(lookup: SymbolLookupState): string {

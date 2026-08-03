@@ -82,7 +82,7 @@ const hit = {
   path: "src/UtVar.java",
   line: 12,
   text: "public class UtVar {}",
-  isDeclaration: true,
+  kind: "type" as const,
 };
 
 describe("symbol lookup state", () => {

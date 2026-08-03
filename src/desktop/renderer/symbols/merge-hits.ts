@@ -1,5 +1,5 @@
 import type { CompositeDiffResultDto, SymbolHitDto } from "../../shared/index.js";
-import { declaresSymbol } from "../../../symbols/declarations.js";
+import { declarationKindOf } from "../../../symbols/declarations.js";
 import { symbolLanguageForPath } from "../../../symbols/language-support.js";
 import { findOccurrences } from "../../../symbols/occurrences.js";
 
@@ -48,6 +48,6 @@ function hitsInResultFile(
     path: file.path,
     line: occurrence.line,
     text: occurrence.text,
-    isDeclaration: declaresSymbol(language, occurrence.text, symbol),
+    kind: declarationKindOf(language, occurrence.text, symbol),
   }));
 }

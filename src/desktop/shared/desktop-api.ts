@@ -99,11 +99,22 @@ export const symbolSearchRequestSchema = sessionIdentitySchema.extend({
   symbol: z.string().trim().regex(/^[A-Za-z_$][A-Za-z0-9_$]*$/u),
 }).strict();
 
+/** What a line declares. `null` means the line only mentions the symbol. */
+export const declarationKindSchema = z.enum([
+  "type",
+  "constructor",
+  "method",
+  "field",
+  "variable",
+  "alias",
+  "macro",
+]);
+
 export const symbolHitSchema = z.object({
   path: compositeFilePathSchema,
   line: z.number().int().positive(),
   text: z.string(),
-  isDeclaration: z.boolean(),
+  kind: declarationKindSchema.nullable(),
 }).strict();
 
 export const symbolSearchResultSchema = z.object({
@@ -194,6 +205,7 @@ export type CompositeDiffResultDto = z.infer<typeof compositeDiffResultSchema>;
 export type RangeResult = z.infer<typeof rangeResultSchema>;
 export type SymbolSearchRequest = z.infer<typeof symbolSearchRequestSchema>;
 export type SymbolHitDto = z.infer<typeof symbolHitSchema>;
+export type DeclarationKindDto = z.infer<typeof declarationKindSchema>;
 export type SymbolSearchResultDto = z.infer<typeof symbolSearchResultSchema>;
 export type BaseFileRequest = z.infer<typeof baseFileRequestSchema>;
 export type BaseFileDto = z.infer<typeof baseFileSchema>;

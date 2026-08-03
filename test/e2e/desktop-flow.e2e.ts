@@ -644,20 +644,27 @@ test("navigates from a reviewed file to a declaration outside the result and bac
   })).toBeVisible();
   await expect(running.page.getByText("Loading diff editor…")).toBeHidden();
 
-  // Ctrl+Click on the constructed class asks for its declaration. `UtVar.java`
-  // is not part of the result, so the declaration is read at the comparison base.
+  /*
+   * Two places name the type on their own: the import, and the construction on
+   * `UtVar counter = new UtVar();`. Monaco renders the rest of the type uses
+   * inside wider tokens, so these two are the ones a test can point at.
+   */
   const reviewed = running.page.locator(".monaco-diff-editor .modified");
-  const token = reviewed.locator("span", { hasText: /^UtVar$/u }).first();
-  await expect(token).toBeVisible();
+  // Monaco keeps the space before a token inside that token's span, so the
+  // pattern allows it.
+  const names = reviewed.locator("span", { hasText: /^\s*UtVar\s*$/u });
+  const inImport = names.first();
+  await expect(inImport).toBeVisible();
 
   // Holding Ctrl over an identifier says it can be followed, before any click.
   await running.page.keyboard.down("Control");
-  await token.hover();
+  await inImport.hover();
   await expect(reviewed.locator(".prettifer-symbol-link")).toHaveCount(1);
   await running.page.keyboard.up("Control");
   await expect(reviewed.locator(".prettifer-symbol-link")).toHaveCount(0);
 
-  await token.click({ modifiers: ["Control"] });
+  // Not a construction, so this goes straight to the class, not to a constructor.
+  await inImport.click({ modifiers: ["Control"] });
 
   await expect(running.page.getByRole("heading", {
     name: "Outside the Selected Result",
@@ -691,6 +698,9 @@ test("keeps the review scrolled where it was when a lookup starts", async () => 
     name: "Include in selected result: feat(app): call UtVar from Caller",
   }).check();
   await running.page.getByRole("button", { name: "Build Selected Result" }).click();
+  await expect(running.page.getByRole("textbox", {
+    name: "Read-only diff: src/app/Caller.java · base and selected result",
+  })).toBeVisible();
   await expect(running.page.getByText("Loading diff editor…")).toBeHidden();
 
   const reviewed = running.page.locator(".monaco-diff-editor .modified");
@@ -716,6 +726,45 @@ test("keeps the review scrolled where it was when a lookup starts", async () => 
     .toHaveText(scrolledTo);
 });
 
+test("offers the constructors where an object is made, not the class line", async () => {
+  const fixture = await createSymbolE2eFixture();
+  const running = await launch([fixture.path]);
+  await setViewportSize(running.page, 1280, 900);
+  await openRepository(running.page, fixture.path, fixture.headRef);
+  await running.page.getByRole("button", { name: "Load Commit Range" }).click();
+  await running.page.getByRole("checkbox", {
+    name: "Include in selected result: feat(app): call UtVar from Caller",
+  }).check();
+  await running.page.getByRole("button", { name: "Build Selected Result" }).click();
+  await expect(running.page.getByRole("textbox", {
+    name: "Read-only diff: src/app/Caller.java · base and selected result",
+  })).toBeVisible();
+  await expect(running.page.getByText("Loading diff editor…")).toBeHidden();
+
+  const reviewed = running.page.locator(".monaco-diff-editor .modified");
+  // The import names the type; the second standalone name is the one after `new`.
+  const constructed = reviewed.locator("span", { hasText: /^\s*UtVar\s*$/u }).nth(1);
+  await expect(constructed).toBeVisible();
+
+  await constructed.click({ modifiers: ["Control"] });
+
+  // Two constructors are a real choice, so they are listed; the class line is not.
+  const matches = running.page.getByRole("list", { name: "Symbol matches" });
+  await expect(running.page.getByRole("heading", { name: "Declarations of UtVar" }))
+    .toBeVisible();
+  await expect(matches.getByRole("button", { name: /src\/model\/UtVar\.java:6/u })).toBeVisible();
+  await expect(matches.getByRole("button", { name: /src\/model\/UtVar\.java:10/u })).toBeVisible();
+  await expect(matches.getByRole("button", { name: /src\/model\/UtVar\.java:3/u })).toBeHidden();
+  // Each entry says what kind of declaration it is.
+  await expect(matches.getByRole("button", { name: /ctor/u }).first()).toBeVisible();
+
+  await matches.getByRole("button", { name: /src\/model\/UtVar\.java:10/u }).click();
+  await expect(running.page.getByRole("textbox", {
+    name: "Read-only file outside the selected result: src/model/UtVar.java · contents at the comparison base",
+  })).toBeVisible();
+  expect(fixture.git(["status", "--porcelain"])).toBe("");
+});
+
 test("lists the references of a symbol and moves to the chosen one", async () => {
   const fixture = await createSymbolE2eFixture();
   const running = await launch([fixture.path]);
@@ -726,6 +775,9 @@ test("lists the references of a symbol and moves to the chosen one", async () =>
     name: "Include in selected result: feat(app): call UtVar from Caller",
   }).check();
   await running.page.getByRole("button", { name: "Build Selected Result" }).click();
+  await expect(running.page.getByRole("textbox", {
+    name: "Read-only diff: src/app/Caller.java · base and selected result",
+  })).toBeVisible();
   await expect(running.page.getByText("Loading diff editor…")).toBeHidden();
 
   const reviewed = running.page.locator(".monaco-diff-editor .modified");
@@ -737,10 +789,10 @@ test("lists the references of a symbol and moves to the chosen one", async () =>
   const matches = running.page.getByRole("list", { name: "Symbol matches" });
   await expect(running.page.getByRole("heading", { name: "References to total" })).toBeVisible();
   // The declaration in the unchanged file and the call in the reviewed file.
-  await expect(matches.getByRole("button", { name: /src\/model\/UtVar\.java:4/u })).toBeVisible();
+  await expect(matches.getByRole("button", { name: /src\/model\/UtVar\.java:14/u })).toBeVisible();
   await expect(matches.getByRole("button", { name: /src\/app\/Caller\.java:8/u })).toBeVisible();
 
-  await matches.getByRole("button", { name: /src\/model\/UtVar\.java:4/u }).click();
+  await matches.getByRole("button", { name: /src\/model\/UtVar\.java:14/u }).click();
   await expect(running.page.getByRole("textbox", {
     name: "Read-only file outside the selected result: src/model/UtVar.java · contents at the comparison base",
   })).toBeVisible();
