@@ -3,7 +3,7 @@ import {
   GitCommandError,
   type GitCommandRunner,
 } from "../git/git-command-runner.js";
-import { declaresSymbol } from "./declarations.js";
+import { declarationKindOf, type DeclarationKind } from "./declarations.js";
 import {
   symbolLanguageForPath,
   SYMBOL_FILE_EXTENSIONS,
@@ -15,8 +15,8 @@ export interface SymbolHit {
   /** 1-based. */
   readonly line: number;
   readonly text: string;
-  /** Whether the line looks like a declaration of the symbol. */
-  readonly isDeclaration: boolean;
+  /** What the line declares, or null when it only mentions the symbol. */
+  readonly kind: DeclarationKind | null;
 }
 
 export interface SymbolSearchResult {
@@ -109,7 +109,7 @@ export class SymbolSearchService {
       }
       hits.push({
         ...parsed,
-        isDeclaration: declaresSymbol(language, parsed.text, name),
+        kind: declarationKindOf(language, parsed.text, name),
       });
     }
     return { hits, truncated };

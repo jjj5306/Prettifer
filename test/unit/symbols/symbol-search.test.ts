@@ -19,7 +19,7 @@ function runner(stdout: string): { git: Git; run: ReturnType<typeof vi.fn> } {
 }
 
 describe("SymbolSearchService", () => {
-  it("reads path, line and text and marks declarations", async () => {
+  it("reads path, line and text and names what each line declares", async () => {
     const { git } = runner([
       `${commit}:src/com/UtVar.java:12:public class UtVar {`,
       `${commit}:src/com/Caller.java:30:    new UtVar("x");`,
@@ -34,13 +34,13 @@ describe("SymbolSearchService", () => {
           path: "src/com/UtVar.java",
           line: 12,
           text: "public class UtVar {",
-          isDeclaration: true,
+          kind: "type",
         },
         {
           path: "src/com/Caller.java",
           line: 30,
           text: '    new UtVar("x");',
-          isDeclaration: false,
+          kind: null,
         },
       ],
     });

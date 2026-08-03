@@ -52,7 +52,7 @@
  */
 .hits .hit {
   display: grid;
-  grid-template-columns: 2.25rem minmax(6rem, auto) minmax(0, 1fr);
+  grid-template-columns: 3.25rem minmax(6rem, auto) minmax(0, 1fr);
   width: 100%;
   min-width: 0;
   min-height: 1.9rem;

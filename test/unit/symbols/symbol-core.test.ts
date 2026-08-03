@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { declaresSymbol } from "../../../src/symbols/declarations.js";
+import { declarationKindOf } from "../../../src/symbols/declarations.js";
 import {
   symbolLanguageForPath,
   SYMBOL_FILE_EXTENSIONS,
@@ -78,7 +78,7 @@ describe("symbolAt", () => {
   });
 });
 
-describe("declaresSymbol", () => {
+describe("declarationKindOf recognizes a declaration at all", () => {
   it.each([
     ["public class UtVar {", "UtVar"],
     ["  interface Visitor {", "Visitor"],
@@ -88,7 +88,7 @@ describe("declaresSymbol", () => {
     ["  protected List<String> names(int size) {", "names"],
     ["  UtVar(String name) {", "UtVar"],
   ])("recognizes the Java declaration in %s", (line, name) => {
-    expect(declaresSymbol("java", line, name)).toBe(true);
+    expect(declarationKindOf("java", line, name)).not.toBeNull();
   });
 
   it.each([
@@ -96,7 +96,7 @@ describe("declaresSymbol", () => {
     ["    return names(2).size();", "names"],
     ["import com.codescroll.UtVar;", "UtVar"],
   ])("does not treat the Java use in %s as a declaration", (line, name) => {
-    expect(declaresSymbol("java", line, name)).toBe(false);
+    expect(declarationKindOf("java", line, name)).toBeNull();
   });
 
   it.each([
@@ -107,14 +107,14 @@ describe("declaresSymbol", () => {
     ["void Generator::emit(const Var& var) {", "emit"],
     ["int compute_total(int a, int b);", "compute_total"],
   ])("recognizes the C/C++ declaration in %s", (line, name) => {
-    expect(declaresSymbol("cpp", line, name)).toBe(true);
+    expect(declarationKindOf("cpp", line, name)).not.toBeNull();
   });
 
   it.each([
     ["  total = compute_total(1, 2);", "compute_total"],
     ["  if (MAX_LEN > 0) {", "MAX_LEN"],
   ])("does not treat the C/C++ use in %s as a declaration", (line, name) => {
-    expect(declaresSymbol("cpp", line, name)).toBe(false);
+    expect(declarationKindOf("cpp", line, name)).toBeNull();
   });
 
   it.each([
@@ -124,19 +124,19 @@ describe("declaresSymbol", () => {
     ["export type SymbolLanguage = string;", "SymbolLanguage"],
     ["  async compose(request: Request): Promise<void> {", "compose"],
   ])("recognizes the TypeScript declaration in %s", (line, name) => {
-    expect(declaresSymbol("typescript", line, name)).toBe(true);
+    expect(declarationKindOf("typescript", line, name)).not.toBeNull();
   });
 
   it.each([
     ["  await composeSelection(request);", "composeSelection"],
     ["  return total + 1;", "total"],
   ])("does not treat the TypeScript use in %s as a declaration", (line, name) => {
-    expect(declaresSymbol("typescript", line, name)).toBe(false);
+    expect(declarationKindOf("typescript", line, name)).toBeNull();
   });
 
   it("treats a name with regex characters literally", () => {
-    expect(declaresSymbol("typescript", "const a$b = 1;", "a$b")).toBe(true);
-    expect(declaresSymbol("typescript", "const axb = 1;", "a.b")).toBe(false);
+    expect(declarationKindOf("typescript", "const a$b = 1;", "a$b")).toBe("variable");
+    expect(declarationKindOf("typescript", "const axb = 1;", "a.b")).toBeNull();
   });
 });
 

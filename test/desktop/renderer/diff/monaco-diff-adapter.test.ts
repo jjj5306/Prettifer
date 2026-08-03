@@ -435,7 +435,8 @@ describe("MonacoDiffAdapter", () => {
       target: { position: { lineNumber: 1, column: 16 } },
     } as never);
 
-    expect(onSymbol).toHaveBeenCalledWith("UtVar", "definition");
+    // `class Caller { UtVar value; }` is not a construction.
+    expect(onSymbol).toHaveBeenCalledWith("UtVar", "definition", "plain");
   });
 
   it("ignores a plain click and a click on nothing", () => {
@@ -489,8 +490,8 @@ describe("MonacoDiffAdapter", () => {
     } as never);
 
     expect(onSymbol.mock.calls).toEqual([
-      ["UtVar", "definition"],
-      ["UtVar", "references"],
+      ["UtVar", "definition", "plain"],
+      ["UtVar", "references", "plain"],
     ]);
     expect(preventDefault).toHaveBeenCalledTimes(2);
   });

@@ -5,21 +5,22 @@ import { render, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import type { SymbolHitDto } from "../../../../src/desktop/shared/index.js";
 import { SymbolPanel } from "../../../../src/desktop/renderer/symbols/SymbolPanel.js";
 import type { SymbolLookupState } from "../../../../src/desktop/renderer/state/app-state.js";
 
-const hits = [
+const hits: SymbolHitDto[] = [
   {
     path: "src/UtVar.java",
     line: 12,
     text: "public class UtVar {",
-    isDeclaration: true,
+    kind: "type",
   },
   {
     path: "src/Caller.java",
     line: 30,
     text: "    new UtVar();",
-    isDeclaration: false,
+    kind: null,
   },
 ];
 
@@ -27,7 +28,7 @@ function renderPanel(
   lookup: SymbolLookupState,
   overrides: {
     canGoBack?: boolean;
-    onGoToHit?: (hit: typeof hits[number], symbol: string) => void;
+    onGoToHit?: (hit: SymbolHitDto, symbol: string) => void;
     onDismiss?: () => void;
     onGoBack?: () => void;
   } = {},
@@ -87,7 +88,8 @@ describe("SymbolPanel", () => {
     expect(screen.getByRole("heading", { name: "References to UtVar" })).toBeVisible();
     const entries = within(screen.getByRole("list", { name: "Symbol matches" }))
       .getAllByRole("button");
-    expect(entries[0]).toHaveTextContent("def");
+    // The kind is named, so a type is not confused with its constructor.
+    expect(entries[0]).toHaveTextContent("type");
     expect(entries[0]).toHaveTextContent("src/UtVar.java:12");
     expect(entries[0]).toHaveTextContent("public class UtVar {");
     expect(entries[1]).toHaveTextContent("ref");

@@ -285,7 +285,7 @@ describe("useAppController symbol lookup", () => {
     path: "docs/notes.md",
     line: 1,
     text: "UtVar is described here",
-    isDeclaration: false,
+    kind: null,
   };
   const commitId = "d".repeat(40);
   const commonCommit = "c".repeat(40);
@@ -369,15 +369,15 @@ describe("useAppController symbol lookup", () => {
       data: {
         // The base still holds the file before the selection changed it.
         hits: [
-          { path: "src/Caller.java", line: 1, text: "class Caller {}", isDeclaration: false },
-          { path: "src/UtVar.java", line: 4, text: "class UtVar {}", isDeclaration: true },
+          { path: "src/Caller.java", line: 1, text: "class Caller {}", kind: null },
+          { path: "src/UtVar.java", line: 4, text: "class UtVar {}", kind: "type" },
         ],
         truncated: false,
       },
     });
     const { controller } = await reviewing({ searchSymbol });
 
-    await act(() => controller.current.lookUpSymbol("UtVar", "references"));
+    await act(() => controller.current.lookUpSymbol("UtVar", "references", "plain"));
 
     expect(searchSymbol).toHaveBeenCalledWith({
       repositorySessionId: session.repositorySessionId,
@@ -391,8 +391,83 @@ describe("useAppController symbol lookup", () => {
     }
     // The stale hit for the changed file is gone, replaced by the composed line.
     expect(lookup.hits).toEqual([
-      { path: "src/Caller.java", line: 1, text: "class Caller { UtVar value; }", isDeclaration: false },
-      { path: "src/UtVar.java", line: 4, text: "class UtVar {}", isDeclaration: true },
+      { path: "src/Caller.java", line: 1, text: "class Caller { UtVar value; }", kind: null },
+      { path: "src/UtVar.java", line: 4, text: "class UtVar {}", kind: "type" },
+    ]);
+  });
+
+  it("goes to the type, not its constructors, from a plain use", async () => {
+    // What the user sees today for `UtVar`: a class and two constructors.
+    const searchSymbol = vi.fn().mockResolvedValue({
+      status: "success",
+      data: {
+        hits: [
+          { path: "src/UtVar.java", line: 3, text: "public class UtVar {", kind: "type" },
+          { path: "src/UtVar.java", line: 8, text: "    public UtVar() {", kind: "constructor" },
+          { path: "src/UtVar.java", line: 12, text: "    public UtVar(int seed) {", kind: "constructor" },
+        ],
+        truncated: false,
+      },
+    });
+    const { controller } = await reviewing({ searchSymbol });
+
+    await act(() => controller.current.lookUpSymbol("UtVar", "definition", "plain"));
+
+    // One candidate of the winning kind, so no list: it goes straight there.
+    expect(controller.current.state.symbolLookup).toEqual({ status: "idle" });
+    expect(controller.current.state.reveal).toMatchObject({ line: 3 });
+  });
+
+  it("offers the constructors where an object is being made", async () => {
+    const searchSymbol = vi.fn().mockResolvedValue({
+      status: "success",
+      data: {
+        hits: [
+          { path: "src/UtVar.java", line: 3, text: "public class UtVar {", kind: "type" },
+          { path: "src/UtVar.java", line: 8, text: "    public UtVar() {", kind: "constructor" },
+          { path: "src/UtVar.java", line: 12, text: "    public UtVar(int seed) {", kind: "constructor" },
+        ],
+        truncated: false,
+      },
+    });
+    const { controller } = await reviewing({ searchSymbol });
+
+    await act(() => controller.current.lookUpSymbol("UtVar", "definition", "construction"));
+
+    const lookup = controller.current.state.symbolLookup;
+    if (lookup.status !== "ready") {
+      throw new Error(`The lookup was ${lookup.status}.`);
+    }
+    // Overloads are a genuine choice, and the class line is not among them.
+    expect(lookup.hits.map((hit) => hit.line)).toEqual([8, 12]);
+  });
+
+  it("keeps every match in a reference list, whatever its kind", async () => {
+    const searchSymbol = vi.fn().mockResolvedValue({
+      status: "success",
+      data: {
+        hits: [
+          { path: "src/UtVar.java", line: 3, text: "public class UtVar {", kind: "type" },
+          { path: "src/Other.java", line: 9, text: "        UtVar v = null;", kind: "variable" },
+          { path: "src/Third.java", line: 2, text: "import model.UtVar;", kind: null },
+        ],
+        truncated: false,
+      },
+    });
+    const { controller } = await reviewing({ searchSymbol });
+
+    await act(() => controller.current.lookUpSymbol("UtVar", "references", "plain"));
+
+    const lookup = controller.current.state.symbolLookup;
+    if (lookup.status !== "ready") {
+      throw new Error(`The lookup was ${lookup.status}.`);
+    }
+    // A type, a variable and a plain mention all survive; nothing is ranked out.
+    expect(lookup.hits.map((hit) => `${hit.path}:${String(hit.kind)}`)).toEqual([
+      "src/Caller.java:null",
+      "src/Other.java:variable",
+      "src/Third.java:null",
+      "src/UtVar.java:type",
     ]);
   });
 
@@ -401,7 +476,7 @@ describe("useAppController symbol lookup", () => {
     const { controller } = await reviewing({ searchSymbol });
     act(() => { controller.current.selectFile("docs/notes.md"); });
 
-    await act(() => controller.current.lookUpSymbol("UtVar", "references"));
+    await act(() => controller.current.lookUpSymbol("UtVar", "references", "plain"));
 
     expect(searchSymbol).not.toHaveBeenCalled();
     expect(controller.current.state.symbolLookup)
@@ -418,7 +493,7 @@ describe("useAppController symbol lookup", () => {
       searchSymbol: vi.fn().mockResolvedValue({ status: "error", diagnostic }),
     });
 
-    await act(() => controller.current.lookUpSymbol("UtVar", "references"));
+    await act(() => controller.current.lookUpSymbol("UtVar", "references", "plain"));
 
     expect(controller.current.state.symbolLookup)
       .toEqual({ status: "error", symbol: "UtVar", diagnostic });
@@ -429,7 +504,7 @@ describe("useAppController symbol lookup", () => {
       searchSymbol: vi.fn().mockRejectedValue(new Error("channel closed")),
     });
 
-    await act(() => controller.current.lookUpSymbol("UtVar", "references"));
+    await act(() => controller.current.lookUpSymbol("UtVar", "references", "plain"));
 
     expect(controller.current.state.symbolLookup).toMatchObject({
       status: "error",
@@ -442,7 +517,7 @@ describe("useAppController symbol lookup", () => {
       path: "src/Caller.java",
       line: 3,
       text: "    private String UtUserCode;",
-      isDeclaration: true,
+      kind: "field" as const,
     };
     const { controller } = await reviewing({
       searchSymbol: vi.fn().mockResolvedValue({
@@ -466,7 +541,7 @@ describe("useAppController symbol lookup", () => {
       path: "src/Caller.java",
       line: 4,
       text: "    int subtotal = total;",
-      isDeclaration: true,
+      kind: "variable" as const,
     };
     const { controller } = await reviewing();
 
@@ -495,7 +570,7 @@ describe("useAppController symbol lookup", () => {
       { wrapper },
     );
 
-    await act(() => result.current.lookUpSymbol("UtVar", "references"));
+    await act(() => result.current.lookUpSymbol("UtVar", "references", "plain"));
 
     expect(searchSymbol).not.toHaveBeenCalled();
     expect(result.current.state.symbolLookup).toEqual({ status: "idle" });
@@ -508,19 +583,19 @@ describe("useAppController navigation outside the result", () => {
     path: "src/UtVar.java",
     line: 12,
     text: "    private String UtVar;",
-    isDeclaration: true,
+    kind: "field" as const,
   };
   const callerHit = {
     path: "src/Caller.java",
     line: 3,
     text: "class Caller { UtVar value; }",
-    isDeclaration: false,
+    kind: null,
   };
   const logoHit = {
     path: "docs/logo.png",
     line: 1,
     text: "",
-    isDeclaration: false,
+    kind: null,
   };
   const commitId = "d".repeat(40);
   const commonCommit = "c".repeat(40);
