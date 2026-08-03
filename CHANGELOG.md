@@ -1,52 +1,80 @@
-# Changelog
+# 변경 기록
 
-Written for the people who download Prettifer, so each entry says what changed on
-screen rather than which module moved. The `Publish release` workflow copies the
-section of the version it builds into the release notes, so a missing section
-fails the release.
+Prettifer를 내려받아 쓰는 사람을 위해 씁니다. 어떤 코드가 바뀌었는지가 아니라 **화면에서 무엇이
+달라졌고 그래서 무엇을 할 수 있는지**를 적습니다. 이 프로그램을 만들지 않은 사람이 읽고 바로
+알아볼 수 있어야 합니다.
+
+- 내부 이슈 번호, 브랜치 이름, 소스 파일 경로는 넣지 않습니다.
+- 화면에 영어로 표시되는 이름은 괄호로 함께 적습니다. 예: 선택 결과(Selected Result).
+
+배포 워크플로가 해당 버전의 절을 릴리스 노트에 그대로 넣습니다. 절이 없으면 게시가 실패합니다.
 
 ## v0.3.0
 
-### Added
+### 새로 할 수 있는 일
 
-- Symbol navigation in the review. `Ctrl+Click` or `F12` goes to a declaration,
-  `Shift+F12` lists every reference, and `Back` returns to where you were. Java,
-  C/C++, TypeScript and JavaScript are covered.
-- The whole repository is searched, not only the files your selection changed.
-  A declaration in a file the selection never touched opens at the comparison
-  base, marked as being outside the selected result.
-- Declarations are told apart by what they are — type, constructor, method,
-  field, variable, alias or macro — and the list says which is which. Pointing at
-  `new UtVar(...)` prefers the constructors; pointing anywhere else prefers the
-  type declaration.
-- Holding `Ctrl` underlines the identifier under the pointer, so you can see what
-  a click would follow.
-- The diff can be read side by side or inline. The toggle sits in the review
-  heading, and switching keeps your place in the file.
-- Java and C/C++ now get syntax highlighting.
-- The review heading names the file you are looking at, which matters once
-  navigation moves you between files.
+**이름을 따라 코드를 읽습니다.**
 
-### Fixed
+검토 중인 코드에서 클래스나 함수 이름을 `Ctrl+클릭`하면 그 이름이 선언된 자리로 이동합니다.
+`F12`도 같고, `Shift+F12`는 그 이름을 쓰는 모든 자리를 목록으로 보여 줍니다. 목록에서 항목을 고르면
+그 자리로 가고, `Back` 버튼으로 원래 보던 자리로 돌아옵니다. Java, C/C++, TypeScript, JavaScript를
+지원합니다.
 
-- Starting a symbol lookup no longer scrolls the diff back to the top.
-- Going to a declaration puts the cursor on the symbol itself and marks the line
-  it arrived at, instead of stopping at the start of the line.
+- **찾는 범위는 저장소 전체입니다.** 내가 고른 커밋이 건드리지 않은 파일에 선언이 있어도 찾아서
+  열어 줍니다. 그 파일은 비교 기준 시점의 내용이고, 선택 결과에 포함되지 않았다는 것을 화면에
+  표시합니다.
+- **찾은 것이 무엇인지 구분해 보여 줍니다.** 형(type), 생성자(ctor), 함수·메서드(func),
+  필드(field), 변수(var) 등으로 표시하므로, 클래스 선언과 생성자가 뒤섞여 보이지 않습니다.
+- **누른 자리에 맞는 것을 먼저 보여 줍니다.** `new Foo(...)`처럼 객체를 만드는 자리에서 누르면
+  생성자를, 그 밖의 자리에서 누르면 클래스 선언을 먼저 보여 줍니다. 후보가 하나면 바로 이동하고,
+  같은 이름이 여럿일 때만 목록으로 물어봅니다.
+- `Ctrl`을 누른 채 이름 위에 마우스를 올리면 밑줄이 생깁니다. 누르면 따라갈 수 있는 이름인지 미리
+  알 수 있습니다.
+
+**diff를 세로로 이어서 읽습니다.**
+
+기준과 결과를 좌우로 나란히 보는 방식과, 삭제된 줄과 추가된 줄을 위아래로 이어 보는 방식을
+전환하는 버튼이 검토 화면에 생겼습니다. 한 줄이 긴 코드나 좁은 화면에서는 세로로 이어 보는 편이
+읽기 쉽습니다. 전환해도 보고 있던 위치를 그대로 유지합니다.
+
+**Java와 C/C++ 코드에 색이 들어갑니다.**
+
+두 언어가 이제 다른 언어들과 같이 구문 강조로 표시됩니다.
+
+### 좋아진 점
+
+- 검토 화면 제목 줄이 **지금 보고 있는 파일 경로**를 보여 줍니다. 이름을 따라 파일 사이를 오갈 때
+  어디를 보고 있는지 놓치지 않습니다.
+- 선언으로 이동하면 커서가 그 줄의 이름 위에 놓이고, 도착한 줄에 표시가 남습니다. 줄 맨 앞에서
+  멈추지 않으므로 어디에 도착했는지 바로 보입니다.
+
+### 고친 문제
+
+- 이름을 따라가려고 하면 diff 스크롤이 맨 위로 튀던 문제를 고쳤습니다. 이제 보고 있던 자리가
+  그대로 유지됩니다.
 
 ## v0.2.0
 
-### Added
+### 새로 할 수 있는 일
 
-- A repository path can be passed on the command line, so Prettifer opens that
-  repository instead of asking for a folder.
+- **저장소를 바로 열고 시작합니다.** 실행할 때 저장소 경로를 함께 주면 폴더 선택 창을 거치지 않고
+  그 저장소로 시작합니다. 경로가 저장소가 아니면 무엇이 잘못됐는지 화면에 표시합니다.
 
-### Fixed
+### 좋아진 점
 
-- In Tree View each row is only as wide as its own name, so widening the panel
-  shows the hierarchy as an outline instead of a stack of full-width bars.
+- 변경 파일을 트리로 볼 때 각 줄이 **자기 이름 길이만큼만** 차지합니다. 창을 넓혀도 줄이 화면 끝까지
+  늘어나지 않으므로 폴더 구조가 한눈에 들어옵니다.
 
 ## v0.1.0
 
-First Windows release. Select commits that are not next to each other, review the
-composed file state and one unified diff, and keep your working tree, branch and
-uncommitted work untouched throughout.
+첫 Windows 배포입니다.
+
+Git 이력에서 **서로 떨어져 있는 커밋을 골라**, 그 변경만 반영된 최종 파일 상태와 하나의 통합 diff를
+만들어 검토할 수 있습니다.
+
+- 같은 파일을 여러 번 고친 커밋들을 함께 골라도 최종 상태 하나로 합쳐 보여 줍니다.
+- 텍스트 파일의 추가·수정·삭제를 구분하고, 바이너리 파일은 바이너리로 표시합니다.
+- merge 커밋도 기준으로 삼을 부모를 고르면 결과에 포함할 수 있습니다.
+- 적용할 수 없는 파일이 있으면 그 파일만 문제로 표시하고, 나머지는 그대로 검토할 수 있습니다.
+- **작업 중인 내용을 건드리지 않습니다.** 계산하는 동안에도 내 branch, HEAD, 커밋하지 않은 변경이
+  그대로 유지됩니다.

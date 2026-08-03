@@ -167,10 +167,21 @@ git push origin v0.3.0
 
 ```powershell
 node scripts/changelog-section.mjs 0.3.0    # 그 절만 확인
+node scripts/release-notes.mjs --version 0.3.0 `
+  --sha256 <hex64> --source-sha <hex40>     # 게시될 노트 전체를 미리 보기
 ```
 
-`CHANGELOG.md`는 내려받는 사람을 위해 씁니다. 화면에서 무엇이 달라졌는지를 쓰고, 내부 이슈 번호,
-브랜치 이름, 파일 경로는 넣지 않습니다.
+`CHANGELOG.md`는 내려받는 사람을 위해 **한국어로** 씁니다. 화면에서 무엇이 달라졌고 그래서 무엇을 할
+수 있는지를 쓰고, 내부 이슈 번호, 브랜치 이름, 파일 경로는 넣지 않습니다. 이 프로그램을 만들지 않은
+사람이 읽고 알아볼 수 있어야 합니다.
+
+이미 게시된 릴리스의 노트를 다시 쓸 때도 같은 렌더러를 씁니다. 그래야 나중에 고친 노트가 워크플로가
+만들었을 내용과 어긋나지 않습니다. 그 릴리스의 SHA256과 출처 커밋은 게시된 노트에 적혀 있습니다.
+
+```powershell
+node scripts/release-notes.mjs --version 0.2.0 --sha256 <hex64> --source-sha <hex40> --out notes.md
+gh release edit v0.2.0 --repo jjj5306/prettifer-release --notes-file notes.md
+```
 
 ### 패키지 산출물
 
