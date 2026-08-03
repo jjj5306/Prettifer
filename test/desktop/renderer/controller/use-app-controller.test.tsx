@@ -281,6 +281,12 @@ describe("useAppController", () => {
 });
 
 describe("useAppController symbol lookup", () => {
+  const mdHit = {
+    path: "docs/notes.md",
+    line: 1,
+    text: "UtVar is described here",
+    isDeclaration: false,
+  };
   const commitId = "d".repeat(40);
   const commonCommit = "c".repeat(40);
   const range = {
@@ -431,9 +437,48 @@ describe("useAppController symbol lookup", () => {
     });
   });
 
+  it("lands on the member, not at the start of its declaration line", async () => {
+    const declaration = {
+      path: "src/Caller.java",
+      line: 3,
+      text: "    private String UtUserCode;",
+      isDeclaration: true,
+    };
+    const { controller } = await reviewing({
+      searchSymbol: vi.fn().mockResolvedValue({
+        status: "success",
+        data: { hits: [declaration], truncated: false },
+      }),
+    });
+
+    act(() => { controller.current.goToHit(declaration, "UtUserCode"); });
+
+    expect(controller.current.state.reveal).toEqual({
+      path: "src/Caller.java",
+      line: 3,
+      // `    private String UtUserCode;` puts the member at column 20.
+      column: 20,
+    });
+  });
+
+  it("skips a longer identifier that merely contains the symbol", async () => {
+    const declaration = {
+      path: "src/Caller.java",
+      line: 4,
+      text: "    int subtotal = total;",
+      isDeclaration: true,
+    };
+    const { controller } = await reviewing();
+
+    act(() => { controller.current.goToHit(declaration, "total"); });
+
+    // Column 20 is `total`, not the `total` inside `subtotal` at column 9.
+    expect(controller.current.state.reveal).toMatchObject({ line: 4, column: 20 });
+  });
+
   it("navigates to a hit and back again", async () => {
     const { controller } = await reviewing();
-    act(() => { controller.current.goToHit("docs/notes.md", 1); });
+    act(() => { controller.current.goToHit(mdHit, "UtVar"); });
     expect(controller.current.state.selectedFilePath).toBe("docs/notes.md");
 
     act(() => { controller.current.goBack(); });
@@ -458,6 +503,25 @@ describe("useAppController symbol lookup", () => {
 });
 
 describe("useAppController navigation outside the result", () => {
+  // Hits as the search would report them, so the column comes from real line text.
+  const utVarHit = {
+    path: "src/UtVar.java",
+    line: 12,
+    text: "    private String UtVar;",
+    isDeclaration: true,
+  };
+  const callerHit = {
+    path: "src/Caller.java",
+    line: 3,
+    text: "class Caller { UtVar value; }",
+    isDeclaration: false,
+  };
+  const logoHit = {
+    path: "docs/logo.png",
+    line: 1,
+    text: "",
+    isDeclaration: false,
+  };
   const commitId = "d".repeat(40);
   const commonCommit = "c".repeat(40);
   const range = {
@@ -532,7 +596,7 @@ describe("useAppController navigation outside the result", () => {
     });
     const { controller } = await reviewing({ readBaseFile });
 
-    await act(() => { controller.current.goToHit("src/UtVar.java", 12); return Promise.resolve(); });
+    await act(() => { controller.current.goToHit(utVarHit, "UtVar"); return Promise.resolve(); });
 
     expect(readBaseFile).toHaveBeenCalledWith({
       repositorySessionId: session.repositorySessionId,
@@ -545,14 +609,19 @@ describe("useAppController navigation outside the result", () => {
       path: "src/UtVar.java",
       contents: "public class UtVar {}",
     });
-    expect(controller.current.state.revealLine).toBe(12);
+    expect(controller.current.state.reveal).toEqual({
+      path: "src/UtVar.java",
+      line: 12,
+      // `private String UtVar;` puts the symbol at column 20, not at the margin.
+      column: utVarHit.text.indexOf("UtVar") + 1,
+    });
   });
 
   it("does not read the base for a file the result already holds", async () => {
     const readBaseFile = vi.fn();
     const { controller } = await reviewing({ readBaseFile });
 
-    act(() => { controller.current.goToHit("src/Caller.java", 3); });
+    act(() => { controller.current.goToHit(callerHit, "UtVar"); });
 
     expect(readBaseFile).not.toHaveBeenCalled();
     expect(controller.current.state.externalFile).toEqual({ status: "idle" });
@@ -568,7 +637,7 @@ describe("useAppController navigation outside the result", () => {
       readBaseFile: vi.fn().mockResolvedValue({ status: "error", diagnostic }),
     });
 
-    await act(() => { controller.current.goToHit("docs/logo.png", 1); return Promise.resolve(); });
+    await act(() => { controller.current.goToHit(logoHit, "UtVar"); return Promise.resolve(); });
 
     expect(controller.current.state.externalFile)
       .toEqual({ status: "error", path: "docs/logo.png", diagnostic });
@@ -581,7 +650,7 @@ describe("useAppController navigation outside the result", () => {
         data: { path: "src/UtVar.java", contents: "public class UtVar {}" },
       }),
     });
-    await act(() => { controller.current.goToHit("src/UtVar.java", 12); return Promise.resolve(); });
+    await act(() => { controller.current.goToHit(utVarHit, "UtVar"); return Promise.resolve(); });
 
     act(() => { controller.current.goBack(); });
 
@@ -596,8 +665,8 @@ describe("useAppController navigation outside the result", () => {
       data: { path: "src/UtVar.java", contents: "public class UtVar {}" },
     });
     const { controller } = await reviewing({ readBaseFile });
-    await act(() => { controller.current.goToHit("src/UtVar.java", 12); return Promise.resolve(); });
-    act(() => { controller.current.goToHit("src/Caller.java", 3); });
+    await act(() => { controller.current.goToHit(utVarHit, "UtVar"); return Promise.resolve(); });
+    act(() => { controller.current.goToHit(callerHit, "UtVar"); });
     expect(controller.current.state.navigationHistory).toHaveLength(2);
 
     await act(() => { controller.current.goBack(); return Promise.resolve(); });

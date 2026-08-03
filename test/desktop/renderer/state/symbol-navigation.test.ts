@@ -88,7 +88,7 @@ const hit = {
 describe("symbol lookup state", () => {
   it("starts idle", () => {
     expect(initialAppState.symbolLookup).toEqual({ status: "idle" });
-    expect(initialAppState.revealLine).toBeNull();
+    expect(initialAppState.reveal).toBeNull();
     expect(initialAppState.navigationHistory).toEqual([]);
   });
 
@@ -198,15 +198,16 @@ describe("symbol lookup state", () => {
 });
 
 describe("symbol navigation", () => {
-  it("opens the target file at the target line", () => {
+  it("opens the target file at the target line and column", () => {
     const state = appReducer(reviewingState(), {
       type: "symbol/navigated",
       path: "src/UtVar.java",
       line: 12,
+      column: 14,
     });
 
     expect(state.selectedFilePath).toBe("src/UtVar.java");
-    expect(state.revealLine).toBe(12);
+    expect(state.reveal).toEqual({ path: "src/UtVar.java", line: 12, column: 14 });
   });
 
   it("remembers where the review was, so it can be reached again", () => {
@@ -214,25 +215,29 @@ describe("symbol navigation", () => {
       type: "symbol/navigated",
       path: "src/UtVar.java",
       line: 12,
+      column: 14,
     });
 
-    expect(state.navigationHistory).toEqual([{ path: "src/Caller.java", line: 1 }]);
+    expect(state.navigationHistory)
+      .toEqual([{ path: "src/Caller.java", line: 1, column: 1 }]);
   });
 
-  it("returns to the exact line the navigation left", () => {
+  it("returns to the exact position the navigation left", () => {
     const away = appReducer(
       appReducer(reviewingState(), {
         type: "symbol/navigated",
         path: "src/Caller.java",
         line: 30,
+        column: 9,
       }),
-      { type: "symbol/navigated", path: "src/UtVar.java", line: 12 },
+      { type: "symbol/navigated", path: "src/UtVar.java", line: 12, column: 14 },
     );
     const back = appReducer(away, { type: "symbol/back" });
 
     expect(back.selectedFilePath).toBe("src/Caller.java");
-    expect(back.revealLine).toBe(30);
-    expect(back.navigationHistory).toEqual([{ path: "src/Caller.java", line: 1 }]);
+    expect(back.reveal).toEqual({ path: "src/Caller.java", line: 30, column: 9 });
+    expect(back.navigationHistory)
+      .toEqual([{ path: "src/Caller.java", line: 1, column: 1 }]);
   });
 
   it("does nothing when there is nowhere to go back to", () => {
@@ -246,6 +251,7 @@ describe("symbol navigation", () => {
       type: "symbol/navigated",
       path: "src/broken.java",
       line: 3,
+      column: 1,
     });
 
     expect(state.selectedFilePath).toBe("src/broken.java");
@@ -258,6 +264,7 @@ describe("symbol navigation", () => {
       type: "symbol/navigated",
       path: "src/absent.java",
       line: 1,
+      column: 1,
     })).toBe(state);
   });
 
@@ -270,12 +277,12 @@ describe("symbol navigation", () => {
         hits: [hit],
         truncated: false,
       }),
-      { type: "symbol/navigated", path: "src/UtVar.java", line: 12 },
+      { type: "symbol/navigated", path: "src/UtVar.java", line: 12, column: 14 },
     );
     const picked = appReducer(away, { type: "file/selected", path: "src/Caller.java" });
 
     expect(picked.symbolLookup).toEqual({ status: "idle" });
-    expect(picked.revealLine).toBeNull();
+    expect(picked.reveal).toBeNull();
     expect(picked.navigationHistory).toEqual([]);
   });
 
@@ -288,7 +295,7 @@ describe("symbol navigation", () => {
         hits: [hit],
         truncated: false,
       }),
-      { type: "symbol/navigated", path: "src/UtVar.java", line: 12 },
+      { type: "symbol/navigated", path: "src/UtVar.java", line: 12, column: 14 },
     );
     const rebuilt = appReducer(away, {
       type: "composition/loading",
@@ -299,7 +306,7 @@ describe("symbol navigation", () => {
 
     expect(rebuilt.composition).toMatchObject({ status: "loading" });
     expect(rebuilt.symbolLookup).toEqual({ status: "idle" });
-    expect(rebuilt.revealLine).toBeNull();
+    expect(rebuilt.reveal).toBeNull();
     expect(rebuilt.navigationHistory).toEqual([]);
   });
 });

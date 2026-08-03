@@ -7,6 +7,12 @@ type TextCompositeFile = Exclude<CompositeFile, { binary: true }>;
 /** Monaco decoration class that paints an added line, styled in DiffPane.module.css. */
 export const ADDED_LINE_CLASS_NAME = "prettifer-added-line";
 
+/** Marks the identifier a modifier-click would follow. */
+export const SYMBOL_LINK_CLASS_NAME = "prettifer-symbol-link";
+
+/** Marks the line a navigation arrived at. */
+export const TARGET_LINE_CLASS_NAME = "prettifer-target-line";
+
 interface Disposable {
   dispose(): void;
 }
@@ -21,7 +27,12 @@ interface EditorPosition {
   readonly column: number;
 }
 
-interface EditorKeyboardEvent {
+interface EditorModifierEvent {
+  readonly ctrlKey: boolean;
+  readonly metaKey: boolean;
+}
+
+interface EditorKeyboardEvent extends EditorModifierEvent {
   readonly keyCode: number;
   readonly shiftKey: boolean;
   preventDefault(): void;
@@ -54,13 +65,15 @@ interface DiffEditor extends Disposable {
   getModifiedEditor(): CodeEditor;
 }
 
+interface DecorationRange {
+  readonly startLineNumber: number;
+  readonly startColumn: number;
+  readonly endLineNumber: number;
+  readonly endColumn: number;
+}
+
 interface LineDecoration {
-  readonly range: {
-    readonly startLineNumber: number;
-    readonly startColumn: number;
-    readonly endLineNumber: number;
-    readonly endColumn: number;
-  };
+  readonly range: DecorationRange;
   readonly options: {
     readonly isWholeLine: boolean;
     readonly className: string;
@@ -68,15 +81,34 @@ interface LineDecoration {
   };
 }
 
+/** A decoration over part of one line, used to mark an identifier. */
+interface InlineDecoration {
+  readonly range: DecorationRange;
+  readonly options: { readonly inlineClassName: string };
+}
+
+/**
+ * The handle Monaco returns for a set of decorations. Holding it and replacing
+ * its contents is what keeps one mark on screen instead of a growing pile.
+ */
+interface DecorationsCollection {
+  set(decorations: readonly (LineDecoration | InlineDecoration)[]): void;
+  clear(): void;
+}
+
 interface CodeEditor extends Disposable {
   setModel(model: TextModel): void;
-  createDecorationsCollection(decorations: readonly LineDecoration[]): void;
+  createDecorationsCollection(
+    decorations: readonly (LineDecoration | InlineDecoration)[],
+  ): DecorationsCollection;
   getModel(): TextModel | null;
   getPosition(): EditorPosition | null;
   setPosition(position: EditorPosition): void;
   revealLineInCenter(lineNumber: number): void;
   onKeyDown(listener: (event: EditorKeyboardEvent) => void): Disposable;
+  onKeyUp(listener: (event: EditorKeyboardEvent) => void): Disposable;
   onMouseDown(listener: (event: EditorMouseEvent) => void): Disposable;
+  onMouseMove(listener: (event: EditorMouseEvent) => void): Disposable;
 }
 
 interface MonacoUri {
@@ -119,6 +151,11 @@ export class MonacoDiffAdapter {
   private resources: readonly Disposable[] = [];
   /** The editor holding the reviewed revision, which navigation acts on. */
   private reviewEditor: CodeEditor | undefined;
+  /** One collection each, replaced in place so marks never pile up. */
+  private linkMark: DecorationsCollection | undefined;
+  private targetMark: DecorationsCollection | undefined;
+  /** Where the pointer last was, so a modifier press alone can mark a symbol. */
+  private hoverPosition: EditorPosition | null = null;
 
   constructor(private readonly monaco: MonacoApi) {}
 
@@ -161,6 +198,7 @@ export class MonacoDiffAdapter {
       });
       editor.setModel(model);
       this.reviewEditor = editor;
+      this.createMarks(editor);
       this.resources = [...this.attachSymbolHooks(editor, hooks), editor, model];
     } catch (error) {
       editor?.dispose();
@@ -170,14 +208,21 @@ export class MonacoDiffAdapter {
     }
   }
 
-  /** Puts a line in view and on the cursor, so the keyboard continues from there. */
-  reveal(line: number): void {
+  /**
+   * Puts a position in view, on the cursor and under a mark.
+   *
+   * The column matters: a navigation to a member declaration should land on the
+   * member, not at the start of its line. The mark stays until the next reveal,
+   * so the arrival is still visible after scrolling away and back.
+   */
+  reveal(line: number, column = 1): void {
     const editor = this.reviewEditor;
     if (editor === undefined || line < 1) {
       return;
     }
     editor.revealLineInCenter(line);
-    editor.setPosition({ lineNumber: line, column: 1 });
+    editor.setPosition({ lineNumber: line, column: Math.max(column, 1) });
+    this.targetMark?.set([targetLineDecoration(line)]);
   }
 
   dispose(): void {
@@ -186,6 +231,9 @@ export class MonacoDiffAdapter {
     }
     this.resources = [];
     this.reviewEditor = undefined;
+    this.linkMark = undefined;
+    this.targetMark = undefined;
+    this.hoverPosition = null;
   }
 
   /**
@@ -204,12 +252,19 @@ export class MonacoDiffAdapter {
     }
     return [
       editor.onKeyDown((event) => {
+        this.markLinkTarget(editor, event);
         if (event.keyCode !== this.monaco.KeyCode.F12) {
           return;
         }
         event.preventDefault();
         event.stopPropagation();
         requestSymbolAt(editor, editor.getPosition(), event.shiftKey ? "references" : "definition", onSymbol);
+      }),
+      // Releasing the modifier has to take the mark away again.
+      editor.onKeyUp((event) => { this.markLinkTarget(editor, event); }),
+      editor.onMouseMove((event) => {
+        this.hoverPosition = event.target.position;
+        this.markLinkTarget(editor, event.event);
       }),
       editor.onMouseDown((event) => {
         if (!event.event.leftButton || !(event.event.ctrlKey || event.event.metaKey)) {
@@ -218,6 +273,37 @@ export class MonacoDiffAdapter {
         requestSymbolAt(editor, event.target.position, "definition", onSymbol);
       }),
     ];
+  }
+
+  /**
+   * Marks the identifier a modifier-click would follow, using the same lookup as
+   * the click itself so the mark can never name a different symbol.
+   */
+  private markLinkTarget(editor: CodeEditor, modifiers: EditorModifierEvent): void {
+    const held = modifiers.ctrlKey || modifiers.metaKey;
+    const position = this.hoverPosition;
+    const found = held && position !== null
+      ? symbolAtPosition(editor, position)
+      : null;
+    if (found === null || position === null) {
+      this.linkMark?.clear();
+      return;
+    }
+    this.linkMark?.set([{
+      range: {
+        startLineNumber: position.lineNumber,
+        startColumn: found.startColumn,
+        endLineNumber: position.lineNumber,
+        endColumn: found.endColumn,
+      },
+      options: { inlineClassName: SYMBOL_LINK_CLASS_NAME },
+    }]);
+  }
+
+  /** Creates the two mark collections on whichever editor holds the review. */
+  private createMarks(editor: CodeEditor): void {
+    this.linkMark = editor.createDecorationsCollection([]);
+    this.targetMark = editor.createDecorationsCollection([]);
   }
 
   /**
@@ -242,6 +328,7 @@ export class MonacoDiffAdapter {
       editor.setModel(model);
       editor.createDecorationsCollection([addedLineDecoration(model.getLineCount())]);
       this.reviewEditor = editor;
+      this.createMarks(editor);
       return [...this.attachSymbolHooks(editor, hooks), editor, model];
     } catch (error) {
       editor?.dispose();
@@ -281,6 +368,7 @@ export class MonacoDiffAdapter {
       editor.setModel({ original: originalModel, modified: resultModel });
       const modified = editor.getModifiedEditor();
       this.reviewEditor = modified;
+      this.createMarks(modified);
       return [
         ...this.attachSymbolHooks(modified, hooks),
         editor,
@@ -317,14 +405,21 @@ function requestSymbolAt(
   mode: SymbolRequestMode,
   onSymbol: SymbolRequestHandler,
 ): void {
-  const model = editor.getModel();
-  if (model === null || position === null) {
-    return;
-  }
-  const found = symbolAt(model.getLineContent(position.lineNumber), position.column);
+  const found = position === null ? null : symbolAtPosition(editor, position);
   if (found !== null) {
     onSymbol(found.name, mode);
   }
+}
+
+/** The one place a position becomes an identifier, shared by clicks and marks. */
+function symbolAtPosition(
+  editor: CodeEditor,
+  position: EditorPosition,
+): ReturnType<typeof symbolAt> {
+  const model = editor.getModel();
+  return model === null
+    ? null
+    : symbolAt(model.getLineContent(position.lineNumber), position.column);
 }
 
 function addedLineDecoration(lineCount: number): LineDecoration {
@@ -339,6 +434,22 @@ function addedLineDecoration(lineCount: number): LineDecoration {
       isWholeLine: true,
       className: ADDED_LINE_CLASS_NAME,
       marginClassName: ADDED_LINE_CLASS_NAME,
+    },
+  };
+}
+
+function targetLineDecoration(line: number): LineDecoration {
+  return {
+    range: {
+      startLineNumber: line,
+      startColumn: 1,
+      endLineNumber: line,
+      endColumn: 1,
+    },
+    options: {
+      isWholeLine: true,
+      className: TARGET_LINE_CLASS_NAME,
+      marginClassName: TARGET_LINE_CLASS_NAME,
     },
   };
 }

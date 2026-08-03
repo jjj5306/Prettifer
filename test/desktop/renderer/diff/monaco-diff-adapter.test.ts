@@ -5,6 +5,8 @@ import { describe, expect, it, vi, type Mock } from "vitest";
 import {
   ADDED_LINE_CLASS_NAME,
   MonacoDiffAdapter,
+  SYMBOL_LINK_CLASS_NAME,
+  TARGET_LINE_CLASS_NAME,
 } from "../../../../src/desktop/renderer/diff/MonacoDiffAdapter.js";
 
 type Listener<T> = (event: T) => void;
@@ -18,18 +20,30 @@ interface FakeModel {
   dispose: Mock<() => void>;
 }
 
+/** A decoration collection whose contents a test can read back. */
+interface FakeCollection {
+  set: Mock<(decorations: never) => void>;
+  clear: Mock<() => void>;
+  decorations: unknown[];
+}
+
 interface FakeEditor {
   setModel: Mock<(model: never) => void>;
-  createDecorationsCollection: Mock<(decorations: never) => void>;
+  createDecorationsCollection: Mock<(decorations: never) => FakeCollection>;
   dispose: Mock<() => void>;
   revealLineInCenter: Mock<(lineNumber: number) => void>;
   setPosition: Mock<(position: { lineNumber: number; column: number }) => void>;
   getModel: () => FakeModel | null;
   getPosition: () => { lineNumber: number; column: number } | null;
   onKeyDown: (listener: Listener<never>) => { dispose: Mock<() => void> };
+  onKeyUp: (listener: Listener<never>) => { dispose: Mock<() => void> };
   onMouseDown: (listener: Listener<never>) => { dispose: Mock<() => void> };
+  onMouseMove: (listener: Listener<never>) => { dispose: Mock<() => void> };
   keyListeners: Listener<never>[];
+  keyUpListeners: Listener<never>[];
   mouseListeners: Listener<never>[];
+  moveListeners: Listener<never>[];
+  collections: FakeCollection[];
   position: { lineNumber: number; column: number } | null;
   model: FakeModel | null;
   options: unknown;
@@ -46,7 +60,15 @@ function createMonaco() {
   function createEditor(options: unknown): FakeEditor {
     const editor: FakeEditor = {
       setModel: vi.fn((model: never) => { editor.model = model; }),
-      createDecorationsCollection: vi.fn(() => undefined),
+      createDecorationsCollection: vi.fn((decorations: never) => {
+        const collection: FakeCollection = {
+          set: vi.fn((next: never) => { collection.decorations = next; }),
+          clear: vi.fn(() => { collection.decorations = []; }),
+          decorations,
+        };
+        editor.collections.push(collection);
+        return collection;
+      }),
       dispose: vi.fn(() => undefined),
       revealLineInCenter: vi.fn(() => undefined),
       setPosition: vi.fn((position: { lineNumber: number; column: number }) => {
@@ -58,12 +80,23 @@ function createMonaco() {
         editor.keyListeners.push(listener);
         return { dispose: vi.fn(() => undefined) };
       },
+      onKeyUp: (listener) => {
+        editor.keyUpListeners.push(listener);
+        return { dispose: vi.fn(() => undefined) };
+      },
       onMouseDown: (listener) => {
         editor.mouseListeners.push(listener);
         return { dispose: vi.fn(() => undefined) };
       },
+      onMouseMove: (listener) => {
+        editor.moveListeners.push(listener);
+        return { dispose: vi.fn(() => undefined) };
+      },
       keyListeners: [],
+      keyUpListeners: [],
       mouseListeners: [],
+      moveListeners: [],
+      collections: [],
       position: null,
       model: null,
       options,
@@ -470,8 +503,10 @@ describe("MonacoDiffAdapter", () => {
     expect(fixture.editors).toHaveLength(0);
     expect(fixture.models[0]?.language).toBe("java");
     expect(fixture.models[0]?.uri).toContain("base");
-    // No added-line decoration: nothing in this file belongs to the selection.
-    expect(fixture.addedEditors[0]?.createDecorationsCollection).not.toHaveBeenCalled();
+    // No added-line decoration: nothing in this file belongs to the selection. The
+    // two collections that exist are the empty link and target marks.
+    expect(fixture.addedEditors[0]?.createDecorationsCollection.mock.calls)
+      .toEqual([[[]], [[]]]);
     expect(fixture.addedEditors[0]?.revealLineInCenter).toHaveBeenCalledWith(2);
     expect(fixture.addedEditors[0]?.setPosition)
       .toHaveBeenCalledWith({ lineNumber: 2, column: 1 });
@@ -534,5 +569,141 @@ describe("MonacoDiffAdapter", () => {
     // A failed view leaves nothing to reveal into.
     adapter.reveal(1);
     expect(fixture.addedEditors[0]?.revealLineInCenter).not.toHaveBeenCalled();
+  });
+
+  /** The reviewed side of a diff over one line of Java-like code. */
+  function reviewing(onSymbol = vi.fn()) {
+    const fixture = createMonaco();
+    const adapter = new MonacoDiffAdapter(fixture.monaco);
+    adapter.show(document.createElement("div"), identity, {
+      path: "src/Caller.java",
+      status: "modified",
+      beforeContent: "class Caller {}",
+      afterContent: "class Caller { UtVar value; }",
+    }, { onSymbol });
+    const modified = fixture.editors[0]!.modified;
+    return { fixture, adapter, modified, onSymbol };
+  }
+
+  it("marks the identifier under the pointer while the modifier is held", () => {
+    const { modified } = reviewing();
+    const [linkMark] = modified.collections;
+
+    modified.moveListeners[0]?.({
+      event: { leftButton: false, ctrlKey: true, metaKey: false },
+      target: { position: { lineNumber: 1, column: 16 } },
+    } as never);
+
+    // Exactly the range a modifier-click at that position would follow.
+    expect(linkMark?.decorations).toEqual([{
+      range: { startLineNumber: 1, startColumn: 16, endLineNumber: 1, endColumn: 21 },
+      options: { inlineClassName: SYMBOL_LINK_CLASS_NAME },
+    }]);
+  });
+
+  it("marks nothing while the modifier is not held", () => {
+    const { modified } = reviewing();
+    const [linkMark] = modified.collections;
+
+    modified.moveListeners[0]?.({
+      event: { leftButton: false, ctrlKey: false, metaKey: false },
+      target: { position: { lineNumber: 1, column: 16 } },
+    } as never);
+
+    expect(linkMark?.decorations).toEqual([]);
+    expect(linkMark?.set).not.toHaveBeenCalled();
+  });
+
+  it("marks on the modifier press alone, using where the pointer already was", () => {
+    const { modified } = reviewing();
+    const [linkMark] = modified.collections;
+    modified.moveListeners[0]?.({
+      event: { leftButton: false, ctrlKey: false, metaKey: false },
+      target: { position: { lineNumber: 1, column: 16 } },
+    } as never);
+
+    modified.keyListeners[0]?.({
+      keyCode: 5, shiftKey: false, ctrlKey: true, metaKey: false,
+      preventDefault: vi.fn(), stopPropagation: vi.fn(),
+    } as never);
+
+    expect(linkMark?.decorations).toHaveLength(1);
+  });
+
+  it("takes the mark away when the modifier is released", () => {
+    const { modified } = reviewing();
+    const [linkMark] = modified.collections;
+    modified.moveListeners[0]?.({
+      event: { leftButton: false, ctrlKey: true, metaKey: false },
+      target: { position: { lineNumber: 1, column: 16 } },
+    } as never);
+    expect(linkMark?.decorations).toHaveLength(1);
+
+    modified.keyUpListeners[0]?.({
+      keyCode: 5, shiftKey: false, ctrlKey: false, metaKey: false,
+      preventDefault: vi.fn(), stopPropagation: vi.fn(),
+    } as never);
+
+    expect(linkMark?.clear).toHaveBeenCalled();
+    expect(linkMark?.decorations).toEqual([]);
+  });
+
+  it("takes the mark away when the pointer leaves the identifier", () => {
+    const { modified } = reviewing();
+    const [linkMark] = modified.collections;
+    const move = modified.moveListeners[0];
+    move?.({
+      event: { leftButton: false, ctrlKey: true, metaKey: false },
+      target: { position: { lineNumber: 1, column: 16 } },
+    } as never);
+
+    // Column 14 is the space between `{` and `UtVar`.
+    move?.({
+      event: { leftButton: false, ctrlKey: true, metaKey: false },
+      target: { position: { lineNumber: 1, column: 15 } },
+    } as never);
+
+    expect(linkMark?.decorations).toEqual([]);
+  });
+
+  it("keeps one mark instead of a growing pile", () => {
+    const { modified } = reviewing();
+    const [linkMark] = modified.collections;
+    const move = modified.moveListeners[0];
+
+    for (const column of [16, 17, 18]) {
+      move?.({
+        event: { leftButton: false, ctrlKey: true, metaKey: false },
+        target: { position: { lineNumber: 1, column } },
+      } as never);
+    }
+
+    expect(modified.createDecorationsCollection.mock.calls).toHaveLength(2);
+    expect(linkMark?.decorations).toHaveLength(1);
+  });
+
+  it("puts the cursor on the column it was given and marks the arrival", () => {
+    const { modified, adapter } = reviewing();
+    const targetMark = modified.collections[1];
+
+    adapter.reveal(1, 16);
+
+    expect(modified.setPosition).toHaveBeenCalledWith({ lineNumber: 1, column: 16 });
+    expect(targetMark?.decorations).toEqual([{
+      range: { startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1 },
+      options: {
+        isWholeLine: true,
+        className: TARGET_LINE_CLASS_NAME,
+        marginClassName: TARGET_LINE_CLASS_NAME,
+      },
+    }]);
+  });
+
+  it("falls back to the start of the line when no column is given", () => {
+    const { modified, adapter } = reviewing();
+
+    adapter.reveal(1);
+
+    expect(modified.setPosition).toHaveBeenCalledWith({ lineNumber: 1, column: 1 });
   });
 });

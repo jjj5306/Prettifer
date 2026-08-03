@@ -27,7 +27,7 @@ function renderPanel(
   lookup: SymbolLookupState,
   overrides: {
     canGoBack?: boolean;
-    onGoToHit?: (path: string, line: number) => void;
+    onGoToHit?: (hit: typeof hits[number], symbol: string) => void;
     onDismiss?: () => void;
     onGoBack?: () => void;
   } = {},
@@ -118,7 +118,7 @@ describe("SymbolPanel", () => {
 
     await user.click(screen.getByRole("button", { name: /src\/Caller\.java:30/u }));
 
-    expect(handlers.onGoToHit).toHaveBeenCalledWith("src/Caller.java", 30);
+    expect(handlers.onGoToHit).toHaveBeenCalledWith(hits[1], "UtVar");
   });
 
   it("puts focus on the first hit so the keyboard continues in the list", () => {

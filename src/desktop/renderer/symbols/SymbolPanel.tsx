@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 
+import type { SymbolHitDto } from "../../shared/index.js";
 import type { SymbolLookupState } from "../state/app-state.js";
 import styles from "./SymbolPanel.module.css";
 
@@ -7,7 +8,7 @@ interface SymbolPanelProps {
   readonly lookup: SymbolLookupState;
   /** True while there is a position to return to. */
   readonly canGoBack: boolean;
-  readonly onGoToHit: (path: string, line: number) => void;
+  readonly onGoToHit: (hit: SymbolHitDto, symbol: string) => void;
   readonly onDismiss: () => void;
   readonly onGoBack: () => void;
 }
@@ -85,7 +86,7 @@ const PanelBody = ({
 }: {
   readonly lookup: SymbolLookupState;
   readonly listRef: React.RefObject<HTMLUListElement | null>;
-  readonly onGoToHit: (path: string, line: number) => void;
+  readonly onGoToHit: (hit: SymbolHitDto, symbol: string) => void;
   readonly onEscape: (event: React.KeyboardEvent) => void;
 }) => {
   switch (lookup.status) {
@@ -132,7 +133,7 @@ const PanelBody = ({
                 <button
                   type="button"
                   className={styles.hit}
-                  onClick={() => { onGoToHit(hit.path, hit.line); }}
+                  onClick={() => { onGoToHit(hit, lookup.symbol); }}
                   onKeyDown={onEscape}
                 >
                   <span

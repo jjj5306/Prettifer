@@ -5,8 +5,10 @@ import type {
   DesktopApi,
   Diagnostic,
   RepositorySession,
+  SymbolHitDto,
 } from "../../shared/index.js";
 import { symbolLanguageForPath } from "../../../symbols/language-support.js";
+import { findOccurrences } from "../../../symbols/occurrences.js";
 import { selectRepositorySession } from "../state/app-selectors.js";
 import { mergeSymbolHits } from "../symbols/merge-hits.js";
 import {
@@ -15,6 +17,7 @@ import {
   resultHoldsPath,
   type AppAction,
   type AppState,
+  type ReviewPosition,
   type SymbolLookupMode,
 } from "../state/app-state.js";
 
@@ -31,7 +34,7 @@ export interface AppController {
   readonly selectFile: (path: string) => void;
   /** Finds where a symbol is declared and used, for the file under review. */
   readonly lookUpSymbol: (symbol: string, mode: SymbolLookupMode) => Promise<void>;
-  readonly goToHit: (path: string, line: number) => void;
+  readonly goToHit: (hit: SymbolHitDto, symbol: string) => void;
   readonly dismissSymbolLookup: () => void;
   readonly goBack: () => void;
 }
@@ -311,7 +314,7 @@ export function useAppController(
         if (mode === "definition" && only !== undefined) {
           // One declaration is not a choice, so go there instead of listing it.
           dispatch({ type: "symbol/dismissed" });
-          goToHit(only.path, only.line);
+          goToHit(only, symbol);
         } else {
           dispatch({
             type: "symbol/found",
@@ -337,15 +340,15 @@ export function useAppController(
    * at the comparison base, the same revision the review compares against.
    */
   const openBaseFile = async (
-    path: string,
-    line: number,
+    position: ReviewPosition,
     remember: boolean,
   ): Promise<void> => {
     const session = selectRepositorySession(state.repository);
+    const { path, line, column } = position;
     if (session === null || state.range.status !== "ready") {
       return;
     }
-    dispatch({ type: "external/opening", path, line, remember });
+    dispatch({ type: "external/opening", path, line, column, remember });
     try {
       const result = await api.readBaseFile({
         repositorySessionId: session.repositorySessionId,
@@ -363,12 +366,22 @@ export function useAppController(
     }
   };
 
-  const goToHit = (path: string, line: number): void => {
-    if (resultHoldsPath(state, path)) {
-      dispatch({ type: "symbol/navigated", path, line });
+  /*
+   * A hit carries its own line, so the column of the symbol on that line is read
+   * here rather than asked of the main process. Landing on the symbol is what
+   * makes a jump to a member declaration point at the member.
+   */
+  const goToHit = (hit: SymbolHitDto, symbol: string): void => {
+    const position = {
+      path: hit.path,
+      line: hit.line,
+      column: symbolColumn(hit.text, symbol),
+    };
+    if (resultHoldsPath(state, hit.path)) {
+      dispatch({ type: "symbol/navigated", ...position });
       return;
     }
-    void openBaseFile(path, line, true);
+    void openBaseFile(position, true);
   };
 
   const goBack = (): void => {
@@ -379,7 +392,7 @@ export function useAppController(
     dispatch({ type: "symbol/back" });
     if (!resultHoldsPath(state, previous.path)) {
       // The position was just popped, so it must not be pushed again.
-      void openBaseFile(previous.path, previous.line, false);
+      void openBaseFile(previous, false);
     }
   };
 
@@ -449,6 +462,17 @@ export function useAppController(
     },
     goBack,
   };
+}
+
+/**
+ * The column of the symbol on the line a hit reports.
+ *
+ * Whole-word matching matters here: on `subtotal = total;` a plain search for
+ * `total` would point the cursor at `subtotal`. A line that holds the name only
+ * inside a comment or a string falls back to the start of the line.
+ */
+function symbolColumn(line: string, symbol: string): number {
+  return findOccurrences(line, symbol)[0]?.column ?? 1;
 }
 
 function connectionDiagnostic(_error: unknown): Diagnostic {

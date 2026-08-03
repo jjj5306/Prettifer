@@ -31,7 +31,7 @@ const baseState: AppState = {
   selectedFilePath: null,
   symbolLookup: { status: "idle" },
   externalFile: { status: "idle" },
-  revealLine: null,
+  reveal: null,
   navigationHistory: [],
 };
 

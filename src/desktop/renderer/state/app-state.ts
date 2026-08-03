@@ -93,8 +93,8 @@ export interface AppState {
   readonly selectedFilePath: string | null;
   readonly symbolLookup: SymbolLookupState;
   readonly externalFile: ExternalFileState;
-  /** Line the review should reveal, set by a symbol navigation. */
-  readonly revealLine: number | null;
+  /** Position the review should reveal, set by a symbol navigation. */
+  readonly reveal: ReviewPosition | null;
   /** Positions to return to, newest last. */
   readonly navigationHistory: readonly ReviewPosition[];
 }
@@ -102,6 +102,8 @@ export interface AppState {
 export interface ReviewPosition {
   readonly path: string;
   readonly line: number;
+  /** 1-based column of the symbol on that line, 1 when there is none. */
+  readonly column: number;
 }
 
 /**
@@ -153,12 +155,13 @@ export type AppAction =
   | Readonly<{ type: "symbol/unsupported"; path: string }>
   | Readonly<{ type: "symbol/failed"; symbol: string; diagnostic: Diagnostic }>
   | Readonly<{ type: "symbol/dismissed" }>
-  | Readonly<{ type: "symbol/navigated"; path: string; line: number }>
+  | Readonly<{ type: "symbol/navigated"; path: string; line: number; column: number }>
   | Readonly<{ type: "symbol/back" }>
   | Readonly<{
       type: "external/opening";
       path: string;
       line: number;
+      column: number;
       /**
        * False when going back, because that position was just taken off the
        * history and must not be pushed onto it again.
@@ -264,7 +267,7 @@ export const initialAppState: AppState = {
   selectedFilePath: null,
   symbolLookup: { status: "idle" },
   externalFile: { status: "idle" },
-  revealLine: null,
+  reveal: null,
   navigationHistory: [],
 };
 
@@ -272,11 +275,11 @@ export const initialAppState: AppState = {
 const clearedSymbolNavigation = {
   symbolLookup: { status: "idle" },
   externalFile: { status: "idle" },
-  revealLine: null,
+  reveal: null,
   navigationHistory: [],
 } as const satisfies Pick<
   AppState,
-  "symbolLookup" | "externalFile" | "revealLine" | "navigationHistory"
+  "symbolLookup" | "externalFile" | "reveal" | "navigationHistory"
 >;
 
 export function appReducer(state: AppState, action: AppAction): AppState {
@@ -327,7 +330,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         selectedFilePath: action.path,
         externalFile: { status: "idle" },
-        revealLine: action.line,
+        reveal: { path: action.path, line: action.line, column: action.column },
         navigationHistory: from === null
           ? state.navigationHistory
           : [...state.navigationHistory, from],
@@ -343,7 +346,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
             ...state,
             selectedFilePath: previous.path,
             externalFile: { status: "idle" },
-            revealLine: previous.line,
+            reveal: previous,
             navigationHistory: state.navigationHistory.slice(0, -1),
           };
     }
@@ -353,7 +356,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         selectedFilePath: action.path,
         externalFile: { status: "loading", path: action.path },
-        revealLine: action.line,
+        reveal: { path: action.path, line: action.line, column: action.column },
         navigationHistory: from === null
           ? state.navigationHistory
           : [...state.navigationHistory, from],
@@ -712,9 +715,13 @@ function matchesExternalRequest(state: AppState, path: string): boolean {
 
 /** Where the review is now, so a navigation can offer a way back. */
 function currentPosition(state: AppState): ReviewPosition | null {
-  return state.selectedFilePath === null
-    ? null
-    : { path: state.selectedFilePath, line: state.revealLine ?? 1 };
+  if (state.selectedFilePath === null) {
+    return null;
+  }
+  const path = state.selectedFilePath;
+  return state.reveal?.path === path
+    ? state.reveal
+    : { path, line: 1, column: 1 };
 }
 
 /**
