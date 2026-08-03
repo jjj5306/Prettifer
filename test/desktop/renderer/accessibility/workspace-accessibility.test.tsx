@@ -198,6 +198,8 @@ describe("desktop workspace accessibility", () => {
       screen.getByRole("button", { name: "List View" }),
       screen.getByRole("button", { name: "Currently viewing file: src/app.ts (Modified)" }),
       screen.getByRole("separator", { name: "Resize Changed Files" }),
+      screen.getByRole("button", { name: "Side-by-side" }),
+      screen.getByRole("button", { name: "Inline" }),
       screen.getByRole("textbox", { name: "Read-only diff: src/app.ts · base and selected result" }),
     ];
     for (const element of expected) {

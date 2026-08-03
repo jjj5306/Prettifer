@@ -628,6 +628,56 @@ test("reviews a partial result and jumps to its problem file", async () => {
   expect(fixture.git(["rev-parse", "--abbrev-ref", "HEAD"]).trim()).toBe(fixture.headRef);
 });
 
+test("switches the diff between side-by-side and inline without losing the place", async () => {
+  const fixture = await createSymbolE2eFixture();
+  const running = await launch([fixture.path]);
+  await setViewportSize(running.page, 1280, 900);
+  await openRepository(running.page, fixture.path, fixture.headRef);
+  await running.page.getByRole("button", { name: "Load Commit Range" }).click();
+  await running.page.getByRole("checkbox", {
+    name: "Include in selected result: feat(app): call UtVar from Caller",
+  }).check();
+  await running.page.getByRole("button", { name: "Build Selected Result" }).click();
+  await expect(running.page.getByRole("textbox", {
+    name: "Read-only diff: src/app/Caller.java · base and selected result",
+  })).toBeVisible();
+  await expect(running.page.getByText("Loading diff editor…")).toBeHidden();
+
+  /*
+   * Side by side is where a reader starts. Monaco marks that layout with its own
+   * `side-by-side` class on the diff editor and drops it for the inline flow.
+   */
+  const sideBySide = running.page.getByRole("button", { name: "Side-by-side" });
+  const inline = running.page.getByRole("button", { name: "Inline" });
+  const splitPanes = running.page.locator(".monaco-diff-editor.side-by-side");
+  await expect(sideBySide).toHaveAttribute("aria-pressed", "true");
+  await expect(splitPanes).toHaveCount(1);
+
+  const reviewed = running.page.locator(".monaco-diff-editor .modified");
+  await reviewed.locator(".view-lines").hover();
+  const topLine = reviewed.locator(".margin-view-overlays .line-numbers").first();
+  await expect.poll(async () => {
+    await running.page.mouse.wheel(0, 600);
+    return Number(await topLine.innerText());
+  }).toBeGreaterThan(10);
+  const scrolledTo = await topLine.innerText();
+
+  await inline.click();
+
+  await expect(inline).toHaveAttribute("aria-pressed", "true");
+  await expect(sideBySide).toHaveAttribute("aria-pressed", "false");
+  // One flow instead of two panes, and the same place in the file.
+  await expect(splitPanes).toHaveCount(0);
+  await expect(topLine).toHaveText(scrolledTo);
+
+  await inline.press("Enter");
+  await expect(inline).toHaveAttribute("aria-pressed", "true");
+  await sideBySide.press("Enter");
+  await expect(sideBySide).toHaveAttribute("aria-pressed", "true");
+  await expect(splitPanes).toHaveCount(1);
+  expect(fixture.git(["status", "--porcelain"])).toBe("");
+});
+
 test("navigates from a reviewed file to a declaration outside the result and back", async () => {
   const fixture = await createSymbolE2eFixture();
   const running = await launch([fixture.path]);
