@@ -5,6 +5,7 @@ import { CompositeResultHeader } from "./composition/CompositeResultHeader.js";
 import { DiffPane } from "./diff/DiffPane.js";
 import { DiffErrorBoundary } from "./errors/DiffErrorBoundary.js";
 import { ChangedFilePane } from "./files/ChangedFilePane.js";
+import { useChangedFileView } from "./files/use-changed-file-view.js";
 import { CommitHistoryPane } from "./history/CommitHistoryPane.js";
 import {
   ActivityRail,
@@ -40,6 +41,22 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
   const selectedFile = selectSelectedFile(controller.state);
   const repositorySession = selectRepositorySession(controller.state.repository);
   const [activeRegion, setActiveRegion] = useState<WorkbenchRegion>("repository");
+  const changedFileView = useChangedFileView(
+    controller.state.selectedFilePath,
+    controller.state.groupingRules,
+  );
+
+  /*
+   * The rail names regions, except for Group Rules, which is a place inside the
+   * changed file panel. Activating it puts the panel there instead of leaving
+   * the user to find the view toggle.
+   */
+  const handleActivateRegion = (region: WorkbenchRegion): void => {
+    if (region === "rules") {
+      changedFileView.openRuleEditor();
+    }
+    setActiveRegion(region);
+  };
   const {
     containerRef: resultGridRef,
     control: changedFilesWidth,
@@ -49,7 +66,7 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
       <ActivityRail
         activeRegion={activeRegion}
         resultAvailable={controller.state.composition.status === "ready"}
-        onActivate={setActiveRegion}
+        onActivate={handleActivateRegion}
       />
       <div className={styles.appContent}>
         <header className={styles.appHeader}>
@@ -112,6 +129,7 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
                     selectedFilePath={controller.state.selectedFilePath}
                     repositoryPath={repositorySession?.rootPath ?? ""}
                     groupingRules={controller.state.groupingRules}
+                    control={changedFileView}
                     onSelectFile={controller.selectFile}
                     onChangeRules={(rules) => {
                       void controller.saveGroupingRules(rules);

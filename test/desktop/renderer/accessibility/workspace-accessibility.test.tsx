@@ -75,7 +75,11 @@ function createController(withResult = false): AppController {
         : { status: "idle" },
       selectedFilePath: withResult ? "src/app.ts" : null,
       symbolLookup: { status: "idle" },
-      groupingRules: { status: "idle" },
+      groupingRules: {
+        status: "ready",
+        rules: [{ prefix: "src", name: "Source" }],
+        saveDiagnostic: null,
+      },
       externalFile: { status: "idle" },
       reveal: null,
       navigationHistory: [],
@@ -181,6 +185,7 @@ describe("desktop workspace accessibility", () => {
       screen.getByRole("button", { name: "Repository" }),
       screen.getByRole("button", { name: "Commit History" }),
       screen.getByRole("button", { name: "Changed Files" }),
+      screen.getByRole("button", { name: "Group Rules" }),
       screen.getByRole("button", { name: "Diff Review" }),
       screen.getByRole("button", { name: "Change Repository" }),
       screen.getByRole("combobox", { name: "Base branch" }),
@@ -267,5 +272,41 @@ describe("desktop workspace accessibility", () => {
     render(<StrictMode><DesktopWorkspace controller={createController()} /></StrictMode>);
 
     expect(screen.queryByRole("separator", { name: "Resize Changed Files" })).toBeNull();
+  });
+  it("opens the group rule editor from the activity rail", async () => {
+    const user = userEvent.setup();
+    render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
+
+    await user.click(screen.getByRole("button", { name: "Group Rules" }));
+
+    expect(screen.getByRole("button", { name: "Config View" }))
+      .toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("region", { name: "Group rules" })).toBeVisible();
+    expect(screen.getByLabelText("Path prefix")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Group Rules" }))
+      .toHaveAttribute("aria-current", "page");
+  });
+
+  it("keeps the reviewed file visible when the rail opens the rule editor", async () => {
+    const user = userEvent.setup();
+    render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
+
+    await user.click(screen.getByRole("button", { name: "Config View" }));
+    // Fold the group away, then arrive again through the rail.
+    await user.click(screen.getByRole("button", { name: /^Source, / }));
+    await user.click(screen.getByRole("button", { name: "List View" }));
+    await user.click(screen.getByRole("button", { name: "Group Rules" }));
+
+    expect(screen.getByRole("button", { name: /^Source, / }))
+      .toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", {
+      name: /Currently viewing file: src\/app\.ts .*rule src to Source/u,
+    })).toBeVisible();
+  });
+
+  it("disables the group rule entry until a result exists", () => {
+    render(<StrictMode><DesktopWorkspace controller={createController()} /></StrictMode>);
+
+    expect(screen.getByRole("button", { name: "Group Rules" })).toBeDisabled();
   });
 });

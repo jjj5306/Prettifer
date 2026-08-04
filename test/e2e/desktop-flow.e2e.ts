@@ -908,6 +908,29 @@ test("groups changed files by a saved rule and restores the rule after a restart
   expect(await fixture.snapshotWorktree()).toEqual(before);
 });
 
+test("opens the group rule editor from the activity rail", async () => {
+  const fixture = await createFixture();
+  const settingsPath = await createSettingsDirectory();
+  const running = await launch([fixture.path], {}, settingsPath);
+  await composeAuthResult(running.page, fixture.path);
+
+  // Start in List View, the default, so the rail has to switch the view too.
+  await expect(running.page.getByRole("button", { name: "List View" }))
+    .toHaveAttribute("aria-pressed", "true");
+  await running.page.getByRole("button", { name: "Group Rules" }).click();
+
+  await expect(running.page.getByRole("button", { name: "Config View" }))
+    .toHaveAttribute("aria-pressed", "true");
+  await expect(running.page.getByRole("region", { name: "Group rules" })).toBeVisible();
+  await running.page.getByLabel("Path prefix").fill("src/auth");
+  await running.page.getByLabel("Group name").fill("Auth code");
+  await running.page.getByRole("button", { name: "Add rule" }).click();
+
+  await expect(running.page.getByRole("button", {
+    name: /^Auth code, rule src\/auth to Auth code, \d+ files$/u,
+  })).toBeVisible();
+});
+
 async function createFixture(): Promise<GitFixture> {
   const fixture = await createAuthHistoryFixture();
   fixtures.push(fixture);

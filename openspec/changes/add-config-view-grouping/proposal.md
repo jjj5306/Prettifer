@@ -18,6 +18,7 @@
 - 규칙은 저장소별로 분리해 보관하고, 앱을 다시 실행해도 복원한다.
 - 규칙이 하나도 없으면 Config View에서 규칙을 만드는 방법을 안내한다.
 - 그룹을 접고 펼 수 있고, 보기 전환과 그룹 이동, 파일 선택을 키보드만으로 할 수 있다.
+- activity rail에 Group Rules 항목을 추가해 어느 보기에서든 규칙 편집으로 바로 이동한다.
 - 보기를 전환해도 선택 파일과 현재 diff를 유지하며 결과를 다시 계산하지 않는다.
 
 ## Capabilities
@@ -32,10 +33,13 @@
 - `changed-file-view-toggle`: 보기 전환이 Tree View와 List View 두 가지에서 Config View를 포함한
   세 가지로 늘어난다. 선택 맥락 보존, 동일한 파일 상태 표현, 접근 가능한 보기 토글과 빈 결과 표시가
   세 보기 모두에 적용된다.
+- `desktop-review-workbench`: activity rail의 이동 대상에 그룹 규칙 편집이 더해진다. 결과가 없을 때
+  사용할 수 없는 항목의 범위도 함께 늘어난다.
 
 ## Impact
 
 - `src/desktop/renderer/files/`: Config View 표시, 그룹 접기와 펼치기, 규칙 편집 화면
+- `src/desktop/renderer/navigation/`: activity rail의 그룹 규칙 항목
 - `src/desktop/renderer/state/`: 보기 선택과 규칙 상태
 - `src/desktop/shared/`, `src/desktop/preload/`: 규칙 읽기와 저장 계약
 - `src/desktop/main/`: 저장소별 규칙 보관 경계

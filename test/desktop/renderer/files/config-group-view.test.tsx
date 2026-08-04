@@ -5,13 +5,13 @@ import { render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { ChangedFilePane } from "../../../../src/desktop/renderer/files/ChangedFilePane.js";
 import { GROUP_RULE_LIMIT } from "../../../../src/grouping/group-rule.js";
 import type { GroupingRulesState } from "../../../../src/desktop/renderer/state/app-state.js";
 import type {
   CompositeDiffResultDto,
   GroupRuleDto,
 } from "../../../../src/desktop/shared/index.js";
+import { Pane, REPOSITORY_PATH } from "./changed-file-pane-harness.js";
 
 const result: CompositeDiffResultDto = {
   baseCommit: "a".repeat(40),
@@ -42,10 +42,9 @@ function renderPane(
 ) {
   return render(
     <StrictMode>
-      <ChangedFilePane
+      <Pane
         result={overrides.result ?? result}
         selectedFilePath={overrides.selectedFilePath ?? null}
-        repositoryPath="C:\work\repo"
         groupingRules={rulesState}
         onSelectFile={overrides.onSelectFile ?? vi.fn()}
         onChangeRules={overrides.onChangeRules ?? vi.fn()}
@@ -191,7 +190,7 @@ describe("Config View", () => {
     expect(screen.getByRole("button", { name: "Add a rule" })).toBeInTheDocument();
     // Rules are filed under the repository path, so the guidance names it.
     expect(screen.getByText(/Rules are kept in the Prettifer settings for/u))
-      .toHaveTextContent("C:\\work\\repo");
+      .toHaveTextContent(REPOSITORY_PATH);
   });
 
   it("replaces the guidance with groups once the first rule exists", async () => {
@@ -202,13 +201,11 @@ describe("Config View", () => {
 
     rerender(
       <StrictMode>
-        <ChangedFilePane
+        <Pane
           result={result}
           selectedFilePath={null}
-          repositoryPath="C:\work\repo"
           groupingRules={ready([{ prefix: "src", name: "Source" }])}
           onSelectFile={vi.fn()}
-          onChangeRules={vi.fn()}
         />
       </StrictMode>,
     );

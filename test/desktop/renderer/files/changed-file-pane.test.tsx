@@ -5,10 +5,7 @@ import { render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { ChangedFilePane } from "../../../../src/desktop/renderer/files/ChangedFilePane.js";
-import type { GroupingRulesState } from "../../../../src/desktop/renderer/state/app-state.js";
-
-const noRules: GroupingRulesState = { status: "ready", rules: [], saveDiagnostic: null };
+import { Pane } from "./changed-file-pane-harness.js";
 
 const result = {
   baseCommit: "a".repeat(40),
@@ -27,13 +24,10 @@ describe("ChangedFilePane", () => {
   it("shows the main-process order and English file states in List View", () => {
     render(
       <StrictMode>
-        <ChangedFilePane
+        <Pane
           result={result}
           selectedFilePath="src/a.ts"
-          repositoryPath="C:\work\repo"
-          groupingRules={noRules}
           onSelectFile={vi.fn()}
-          onChangeRules={vi.fn()}
         />
       </StrictMode>,
     );
@@ -58,10 +52,7 @@ describe("ChangedFilePane", () => {
     const onSelectFile = vi.fn();
     render(
       <StrictMode>
-        <ChangedFilePane
-          repositoryPath="C:\work\repo"
-          groupingRules={noRules}
-          onChangeRules={vi.fn()}
+        <Pane
           result={result}
           selectedFilePath="src/nested/m.ts"
           onSelectFile={onSelectFile}
@@ -88,10 +79,7 @@ describe("ChangedFilePane", () => {
     const onSelectFile = vi.fn();
     render(
       <StrictMode>
-        <ChangedFilePane
-          repositoryPath="C:\work\repo"
-          groupingRules={noRules}
-          onChangeRules={vi.fn()}
+        <Pane
           result={result}
           selectedFilePath="src/nested/m.ts"
           onSelectFile={onSelectFile}
@@ -122,13 +110,10 @@ describe("ChangedFilePane", () => {
     const user = userEvent.setup();
     render(
       <StrictMode>
-        <ChangedFilePane
+        <Pane
           result={result}
           selectedFilePath={null}
-          repositoryPath="C:\work\repo"
-          groupingRules={noRules}
           onSelectFile={vi.fn()}
-          onChangeRules={vi.fn()}
         />
       </StrictMode>,
     );
@@ -148,13 +133,10 @@ describe("ChangedFilePane", () => {
     const onSelectFile = vi.fn();
     render(
       <StrictMode>
-        <ChangedFilePane
+        <Pane
           result={result}
           selectedFilePath="src/a.ts"
-          repositoryPath="C:\work\repo"
-          groupingRules={noRules}
           onSelectFile={onSelectFile}
-          onChangeRules={vi.fn()}
         />
       </StrictMode>,
     );
@@ -171,13 +153,10 @@ describe("ChangedFilePane", () => {
     const user = userEvent.setup();
     render(
       <StrictMode>
-        <ChangedFilePane
+        <Pane
           result={result}
           selectedFilePath="src/a.ts"
-          repositoryPath="C:\work\repo"
-          groupingRules={noRules}
           onSelectFile={vi.fn()}
-          onChangeRules={vi.fn()}
         />
       </StrictMode>,
     );
@@ -193,10 +172,7 @@ describe("ChangedFilePane", () => {
     const user = userEvent.setup();
     render(
       <StrictMode>
-        <ChangedFilePane
-          repositoryPath="C:\work\repo"
-          groupingRules={noRules}
-          onChangeRules={vi.fn()}
+        <Pane
           result={{ ...result, files: [] }}
           selectedFilePath={null}
           onSelectFile={vi.fn()}
@@ -212,10 +188,7 @@ describe("ChangedFilePane", () => {
   it("renders markup-shaped paths as text", () => {
     const markupPath = "src/<img src=x onerror=alert(1)>.ts";
     const { container } = render(
-      <ChangedFilePane
-          repositoryPath="C:\work\repo"
-          groupingRules={noRules}
-          onChangeRules={vi.fn()}
+      <Pane
         result={{
           ...result,
           files: [{
@@ -246,10 +219,7 @@ describe("ChangedFilePane", () => {
       }],
     };
     render(
-      <ChangedFilePane
-          repositoryPath="C:\work\repo"
-          groupingRules={noRules}
-          onChangeRules={vi.fn()}
+      <Pane
         result={withProblem}
         selectedFilePath={null}
         onSelectFile={vi.fn()}
@@ -282,10 +252,7 @@ describe("ChangedFilePane", () => {
       }],
     };
     render(
-      <ChangedFilePane
-          repositoryPath="C:\work\repo"
-          groupingRules={noRules}
-          onChangeRules={vi.fn()}
+      <Pane
         result={withProblem}
         selectedFilePath={null}
         onSelectFile={onSelectFile}

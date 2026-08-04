@@ -1,8 +1,4 @@
-import { useState } from "react";
-
 import type { CompositeDiffResultDto, GroupRuleDto } from "../../shared/index.js";
-import { groupKeyForRule, selectGroupRule } from "../../../grouping/group-files.js";
-import { reviewGroupRules } from "../../../grouping/group-rule.js";
 import type { GroupingRulesState } from "../state/app-state.js";
 import { ConfigGroupView } from "./ConfigGroupView.js";
 import { FileButton } from "./FileButton.js";
@@ -12,9 +8,8 @@ import {
   type FileTreeNode,
 } from "./file-tree.js";
 import { buildReviewEntries } from "./review-entries.js";
+import type { ChangedFileViewControl, FileView } from "./use-changed-file-view.js";
 import styles from "./ChangedFilePane.module.css";
-
-type FileView = "tree" | "list" | "config";
 
 /**
  * The views the panel offers, as data, so adding one is a list entry rather than
@@ -32,6 +27,8 @@ interface ChangedFilePaneProps {
   /** Root of the open repository, which is the key the group rules are kept under. */
   readonly repositoryPath: string;
   readonly groupingRules: GroupingRulesState;
+  /** What the panel is showing, owned by the workbench so the rail can open it. */
+  readonly control: ChangedFileViewControl;
   readonly onSelectFile: (path: string) => void;
   readonly onChangeRules: (rules: readonly GroupRuleDto[]) => void;
 }
@@ -41,42 +38,13 @@ export const ChangedFilePane = ({
   selectedFilePath,
   repositoryPath,
   groupingRules,
+  control,
   onSelectFile,
   onChangeRules,
 }: ChangedFilePaneProps) => {
-  const [view, setView] = useState<FileView>("list");
-  const [collapsedDirectories, setCollapsedDirectories] = useState<ReadonlySet<string>>(
-    new Set<string>(),
-  );
-  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<string>>(
-    new Set<string>(),
-  );
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const { view, review } = control;
   const entries = buildReviewEntries(result);
   const tree = view === "tree" ? buildFileTree(entries) : [];
-  const review = groupingRules.status === "ready"
-    ? reviewGroupRules(groupingRules.rules)
-    : { rules: [], problems: [] };
-
-  const handleToggleDirectory = (path: string) => {
-    setCollapsedDirectories((current) => toggled(current, path));
-  };
-
-  const handleToggleGroup = (key: string) => {
-    setCollapsedGroups((current) => toggled(current, key));
-  };
-
-  /*
-   * Arriving in Config View with a file under review must not hide it, so the
-   * group that holds it is expanded as the view changes.
-   */
-  const handleSelectView = (next: FileView) => {
-    if (next === "config" && selectedFilePath !== null) {
-      const key = groupKeyForRule(selectGroupRule(selectedFilePath, review.rules));
-      setCollapsedGroups((current) => current.has(key) ? toggled(current, key) : current);
-    }
-    setView(next);
-  };
 
   return (
     <section
@@ -99,7 +67,7 @@ export const ChangedFilePane = ({
               aria-label={label}
               aria-pressed={view === id}
               className={view === id ? styles.activeView : undefined}
-              onClick={() => { handleSelectView(id); }}
+              onClick={() => { control.selectView(id); }}
             >
               <ViewIcon view={id} />
             </button>
@@ -115,13 +83,13 @@ export const ChangedFilePane = ({
             rulesState={groupingRules}
             rules={review.rules}
             problems={review.problems}
-            isEditorOpen={isEditorOpen}
-            collapsedGroups={collapsedGroups}
+            isEditorOpen={control.isEditorOpen}
+            collapsedGroups={control.collapsedGroups}
             selectedFilePath={selectedFilePath}
             onSelectFile={onSelectFile}
-            onToggleGroup={handleToggleGroup}
-            onOpenEditor={() => { setIsEditorOpen(true); }}
-            onCloseEditor={() => { setIsEditorOpen(false); }}
+            onToggleGroup={control.toggleGroup}
+            onOpenEditor={control.openRuleEditor}
+            onCloseEditor={control.closeRuleEditor}
             onChangeRules={onChangeRules}
           />
         ) : entries.length === 0 ? (
@@ -142,25 +110,16 @@ export const ChangedFilePane = ({
         ) : (
           <FileTree
             nodes={tree}
-            collapsedDirectories={collapsedDirectories}
+            collapsedDirectories={control.collapsedDirectories}
             selectedFilePath={selectedFilePath}
             onSelectFile={onSelectFile}
-            onToggleDirectory={handleToggleDirectory}
+            onToggleDirectory={control.toggleDirectory}
           />
         )}
       </div>
     </section>
   );
 };
-
-/** Adds the key when it is absent and removes it when it is present. */
-function toggled(current: ReadonlySet<string>, key: string): ReadonlySet<string> {
-  const next = new Set(current);
-  if (!next.delete(key)) {
-    next.add(key);
-  }
-  return next;
-}
 
 const ViewIcon = ({ view }: Readonly<{ view: FileView }>) => (
   <svg
