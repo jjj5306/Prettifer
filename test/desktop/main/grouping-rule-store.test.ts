@@ -121,6 +121,31 @@ describe("createGroupingRuleStore", () => {
     expect((failure as GroupingRuleStoreError).nextAction).not.toBe("");
   });
 
+  it("keeps overlapping writes in order", async () => {
+    // Reading is held open so the second write starts while the first is still
+    // deciding what to save, which is what two quick edits look like.
+    let releaseFirstRead: (() => void) | undefined;
+    const held = new Promise<void>((resolve) => { releaseFirstRead = resolve; });
+    const contents = files.readFile.bind(files);
+    let reads = 0;
+    files.readFile = async (path: string) => {
+      reads += 1;
+      if (reads === 1) {
+        await held;
+      }
+      return contents(path);
+    };
+    const writing = store();
+
+    const first = writing.write("C:/repos/a", [{ prefix: "one", name: "One" }]);
+    const second = writing.write("C:/repos/a", [{ prefix: "two", name: "Two" }]);
+    releaseFirstRead?.();
+    await Promise.all([first, second]);
+
+    await expect(store().read("C:/repos/a")).resolves
+      .toEqual([{ prefix: "two", name: "Two" }]);
+  });
+
   it("creates the settings folder before writing", async () => {
     await store().write("C:/repos/a", []);
 

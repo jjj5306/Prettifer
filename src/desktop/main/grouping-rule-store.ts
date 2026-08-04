@@ -53,6 +53,7 @@ export function createGroupingRuleStore(
   directoryPath: string,
   files: GroupingRuleFileSystem,
 ): GroupingRuleStore {
+  const serialize = createWriteQueue();
   const load = async (): Promise<StoredFile> => {
     let contents: string;
     try {
@@ -77,7 +78,10 @@ export function createGroupingRuleStore(
       return stored.repositories[repositoryKey(repositoryPath)]?.rules ?? [];
     },
 
-    async write(repositoryPath: string, rules: readonly GroupRule[]): Promise<void> {
+    // Every edit saves on its own, so two quick ones overlap. Serializing keeps
+    // the second from reading the file before the first has written it, which
+    // would leave the saved rules one edit behind what the screen shows.
+    write: (repositoryPath, rules) => serialize(async () => {
       // Loading first means a file that cannot be understood is reported instead
       // of replaced, so rules saved by another version are never thrown away.
       const stored = await load();
@@ -99,7 +103,17 @@ export function createGroupingRuleStore(
           { cause: error },
         );
       }
-    },
+    }),
+  };
+}
+
+/** Runs the given work after everything queued before it, failures included. */
+function createWriteQueue(): <T>(work: () => Promise<T>) => Promise<T> {
+  let queued: Promise<unknown> = Promise.resolve();
+  return (work) => {
+    const result = queued.then(work, work);
+    queued = result.catch(() => undefined);
+    return result;
   };
 }
 
