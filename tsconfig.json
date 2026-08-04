@@ -20,6 +20,7 @@
     "test/**/*.ts",
     "test/**/*.tsx",
     "vitest.config.ts",
-    "playwright.electron.config.ts"
+    "playwright.electron.config.ts",
+    "playwright.screenshots.config.ts"
   ]
 }
