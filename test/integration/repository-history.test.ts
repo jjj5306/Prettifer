@@ -138,7 +138,12 @@ describe("RepositoryHistoryService", () => {
   });
 
   it("rejects pages and composition inputs after the head branch moves", async () => {
-    mutableFixture = await createHistoryFixture();
+    /*
+     * Its own repository, because advancing HEAD would spoil the shared one. It
+     * never pages, so it skips the filler commits the shared fixture needs; the
+     * fixture used to cost more than a third of the per-test timeout on its own.
+     */
+    mutableFixture = await createHistoryFixture({ fillerCommits: 1 });
     const service = new RepositoryHistoryService();
     const range = await createRange(service, mutableFixture);
     await mutableFixture.advanceHead();
