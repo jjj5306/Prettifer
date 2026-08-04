@@ -7,6 +7,7 @@ import { CompositeDiffCoordinator } from "../../composition/composite-diff-coord
 import { CompositeDiffService } from "../../composition/composite-diff-service.js";
 import { GitCommandRunner } from "../../git/git-command-runner.js";
 import { RepositoryHistoryService } from "../../history/repository-history-service.js";
+import { BaseTreeLister } from "../../base-tree/base-tree-lister.js";
 import { BaseFileReader } from "../../symbols/base-file-reader.js";
 import { SymbolSearchService } from "../../symbols/symbol-search.js";
 import { DesktopCompositionController } from "./desktop-composition-controller.js";
@@ -138,6 +139,7 @@ export async function startDesktopApplication(
     composition,
     symbols: new SymbolSearchService(git),
     baseFiles: new BaseFileReader(git),
+    baseTree: new BaseTreeLister(git),
     groupingRules: groupingRuleStore(seams.groupingRulesPath),
     signal: lifetime.signal,
   });

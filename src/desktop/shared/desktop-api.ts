@@ -139,6 +139,20 @@ export const baseFileSchema = z.object({
   contents: z.string(),
 }).strict();
 
+/**
+ * The paths tracked at the range's comparison base. Asked for once per range,
+ * when the review first shows the whole repository structure.
+ */
+export const baseTreeRequestSchema = sessionIdentitySchema.extend({
+  range: repositoryRangeSchema,
+}).strict();
+
+export const baseTreeSchema = z.object({
+  paths: z.array(compositeFilePathSchema),
+  /** True when the limit cut the list, so the screen can say so. */
+  truncated: z.boolean(),
+}).strict();
+
 
 const textFileFields = {
   path: compositeFilePathSchema,
@@ -231,6 +245,8 @@ export type DeclarationKindDto = z.infer<typeof declarationKindSchema>;
 export type SymbolSearchResultDto = z.infer<typeof symbolSearchResultSchema>;
 export type BaseFileRequest = z.infer<typeof baseFileRequestSchema>;
 export type BaseFileDto = z.infer<typeof baseFileSchema>;
+export type BaseTreeRequest = z.infer<typeof baseTreeRequestSchema>;
+export type BaseTreeDto = z.infer<typeof baseTreeSchema>;
 export type GroupRuleDto = z.infer<typeof groupRuleSchema>;
 export type GroupingRulesRequest = z.infer<typeof groupingRulesRequestSchema>;
 export type SaveGroupingRulesRequest = z.infer<typeof saveGroupingRulesRequestSchema>;
@@ -249,6 +265,7 @@ export const DESKTOP_CHANNELS = Object.freeze({
   cancelComposition: "composition:cancel",
   searchSymbol: "symbols:search",
   readBaseFile: "files:read-base",
+  listBaseTree: "files:list-base-tree",
   readGroupingRules: "grouping:read-rules",
   saveGroupingRules: "grouping:save-rules",
 });
@@ -265,6 +282,8 @@ export interface DesktopApi {
   cancelComposition(request: CancelCompositionRequest): Promise<ApiResult<null>>;
   /** Reads one file at the range's comparison base, for navigation outside the result. */
   readBaseFile(request: BaseFileRequest): Promise<ApiResult<BaseFileDto>>;
+  /** Lists the paths tracked at the range's comparison base. */
+  listBaseTree(request: BaseTreeRequest): Promise<ApiResult<BaseTreeDto>>;
   /** Reads the grouping rules kept for the session's repository. */
   readGroupingRules(request: GroupingRulesRequest): Promise<ApiResult<GroupingRulesDto>>;
   /** Replaces the grouping rules kept for the session's repository. */

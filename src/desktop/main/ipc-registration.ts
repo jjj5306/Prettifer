@@ -40,6 +40,9 @@ export function registerDesktopRequestHandlers(
   ipcMain.handle(DESKTOP_CHANNELS.readBaseFile, (event, input) =>
     handlers.readBaseFile(toDesktopEvent(event), input),
   );
+  ipcMain.handle(DESKTOP_CHANNELS.listBaseTree, (event, input) =>
+    handlers.listBaseTree(toDesktopEvent(event), input),
+  );
   ipcMain.handle(DESKTOP_CHANNELS.readGroupingRules, (event, input) =>
     handlers.readGroupingRules(toDesktopEvent(event), input),
   );

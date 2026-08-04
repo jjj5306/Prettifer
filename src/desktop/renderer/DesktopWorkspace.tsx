@@ -5,6 +5,7 @@ import { CompositeResultHeader } from "./composition/CompositeResultHeader.js";
 import { DiffPane } from "./diff/DiffPane.js";
 import { DiffErrorBoundary } from "./errors/DiffErrorBoundary.js";
 import { ChangedFilePane } from "./files/ChangedFilePane.js";
+import { changedPathsOf } from "./files/full-tree.js";
 import { useChangedFileView } from "./files/use-changed-file-view.js";
 import { CommitHistoryPane } from "./history/CommitHistoryPane.js";
 import { ActivityRail } from "./navigation/ActivityRail.js";
@@ -52,6 +53,12 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
   const changedFileView = useChangedFileView(
     controller.state.selectedFilePath,
     controller.state.groupingRules,
+    {
+      changedPaths: controller.state.composition.status === "ready"
+        ? changedPathsOf(controller.state.composition.result)
+        : [],
+      onShowFullTree: () => { void controller.loadBaseTree(); },
+    },
   );
 
   /*
@@ -140,6 +147,7 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
                     selectedFilePath={controller.state.selectedFilePath}
                     repositoryPath={repositorySession?.rootPath ?? ""}
                     groupingRules={controller.state.groupingRules}
+                    baseTree={controller.state.baseTree}
                     control={changedFileView}
                     onSelectFile={controller.selectFile}
                     onChangeRules={(rules) => {

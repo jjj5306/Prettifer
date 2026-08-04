@@ -43,6 +43,11 @@ export interface AppController {
   readonly goToHit: (hit: SymbolHitDto, symbol: string) => void;
   readonly dismissSymbolLookup: () => void;
   readonly goBack: () => void;
+  /**
+   * Reads the comparison base path list, once per range. Called when the review
+   * first needs the whole repository structure.
+   */
+  readonly loadBaseTree: () => Promise<void>;
   /** Replaces the grouping rules of the open repository and saves them. */
   readonly saveGroupingRules: (rules: readonly GroupRuleDto[]) => Promise<void>;
 }
@@ -173,6 +178,60 @@ export function useAppController(
       }
     } catch (error) {
       dispatch({ type: "rules/saveFailed", diagnostic: connectionDiagnostic(error) });
+    }
+  };
+
+  /*
+   * The path list belongs to the comparison base, not to a calculation, so it is
+   * read at most once per range. Asking again while an answer for the same range
+   * exists or is on its way does nothing.
+   */
+  const loadBaseTree = async (): Promise<void> => {
+    const session = selectRepositorySession(state.repository);
+    if (session === null || state.range.status !== "ready") {
+      return;
+    }
+    const { range } = state.range;
+    if (
+      state.baseTree.status !== "idle"
+      && state.baseTree.rangeRevision === range.rangeRevision
+    ) {
+      return;
+    }
+    const requestId = createRequestId();
+    dispatch({
+      type: "baseTree/loading",
+      requestId,
+      rangeRevision: range.rangeRevision,
+    });
+    try {
+      const result = await api.listBaseTree({
+        repositorySessionId: session.repositorySessionId,
+        sessionRevision: session.sessionRevision,
+        range,
+      });
+      if (result.status === "success") {
+        dispatch({
+          type: "baseTree/loaded",
+          requestId,
+          rangeRevision: range.rangeRevision,
+          tree: result.data,
+        });
+      } else if (result.status === "error") {
+        dispatch({
+          type: "baseTree/failed",
+          requestId,
+          rangeRevision: range.rangeRevision,
+          diagnostic: result.diagnostic,
+        });
+      }
+    } catch (error) {
+      dispatch({
+        type: "baseTree/failed",
+        requestId,
+        rangeRevision: range.rangeRevision,
+        diagnostic: connectionDiagnostic(error),
+      });
     }
   };
 
@@ -537,8 +596,17 @@ export function useAppController(
     },
     composeSelection,
     cancelComposition,
+    /*
+     * Full Tree also offers files the selection never changed. Those are not in
+     * the result, so they take the same path a symbol navigation outside the
+     * result takes: read at the comparison base and shown as one document.
+     */
     selectFile: (path) => {
-      dispatch({ type: "file/selected", path });
+      if (resultHoldsPath(state, path)) {
+        dispatch({ type: "file/selected", path });
+        return;
+      }
+      void openBaseFile({ path, line: 1, column: 1 }, false);
     },
     lookUpSymbol,
     goToHit,
@@ -546,6 +614,7 @@ export function useAppController(
       dispatch({ type: "symbol/dismissed" });
     },
     goBack,
+    loadBaseTree,
     saveGroupingRules,
   };
 }

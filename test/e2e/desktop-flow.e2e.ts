@@ -951,6 +951,39 @@ test("shows which region the activity rail moved to after a mouse click", async 
   expect(await borderColorOf(history)).not.toBe(before);
 });
 
+test("shows the repository structure around a change and opens an unchanged file", async () => {
+  const fixture = await createFixture();
+  const running = await launch([fixture.path]);
+  await composeAuthResult(running.page, fixture.path);
+
+  await running.page.getByRole("button", { name: "Full Tree" }).click();
+
+  // The folder holding a change is open; a folder without one stays folded.
+  await expect(running.page.getByRole("button", { name: "src, contains changes" }))
+    .toHaveAttribute("aria-expanded", "true");
+  const changed = running.page.getByRole("button", {
+    name: /View file: src\/auth\/login\.ts \(Modified\)/u,
+  });
+  await expect(changed).toBeVisible();
+
+  // A file the selection never touched sits beside it, read at the base.
+  const unchanged = running.page.getByRole("button", {
+    name: /View file: src\/config\.ts \(Unchanged\)/u,
+  });
+  await expect(unchanged).toBeVisible();
+  await unchanged.click();
+
+  await expect(running.page.getByRole("heading", {
+    name: "Outside the Selected Result",
+  })).toBeVisible();
+  await expect(running.page.getByRole("textbox", {
+    name: /src\/config\.ts/u,
+  })).toBeVisible();
+
+  // Reviewing never touches the repository.
+  expect(fixture.git(["status", "--porcelain"])).toBe("");
+});
+
 async function createFixture(): Promise<GitFixture> {
   const fixture = await createAuthHistoryFixture();
   fixtures.push(fixture);

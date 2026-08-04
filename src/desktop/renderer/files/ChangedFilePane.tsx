@@ -1,8 +1,11 @@
+import { useMemo } from "react";
+
 import type { CompositeDiffResultDto, GroupRuleDto } from "../../shared/index.js";
-import type { GroupingRulesState } from "../state/app-state.js";
+import type { BaseTreeState, GroupingRulesState } from "../state/app-state.js";
 import { panelClass } from "../panel-class.js";
 import { ConfigGroupView } from "./ConfigGroupView.js";
 import { FileButton } from "./FileButton.js";
+import { FullTreeView } from "./FullTreeView.js";
 import {
   buildFileTree,
   type FileTreeDirectory,
@@ -20,6 +23,7 @@ const FILE_VIEWS = [
   { id: "tree", label: "Tree View" },
   { id: "list", label: "List View" },
   { id: "config", label: "Config View" },
+  { id: "fullTree", label: "Full Tree" },
 ] as const satisfies readonly { id: FileView; label: string }[];
 
 interface ChangedFilePaneProps {
@@ -30,6 +34,8 @@ interface ChangedFilePaneProps {
   /** Root of the open repository, which is the key the group rules are kept under. */
   readonly repositoryPath: string;
   readonly groupingRules: GroupingRulesState;
+  /** Paths tracked at the comparison base, for the whole-repository view. */
+  readonly baseTree: BaseTreeState;
   /** What the panel is showing, owned by the workbench so the rail can open it. */
   readonly control: ChangedFileViewControl;
   readonly onSelectFile: (path: string) => void;
@@ -42,12 +48,18 @@ export const ChangedFilePane = ({
   selectedFilePath,
   repositoryPath,
   groupingRules,
+  baseTree,
   control,
   onSelectFile,
   onChangeRules,
 }: ChangedFilePaneProps) => {
   const { view, review } = control;
-  const entries = buildReviewEntries(result);
+  /*
+   * Kept across renders because Full Tree builds its structure from this, and the
+   * pane re-renders on every frame of a splitter drag. Rebuilding the review list
+   * would change the identity the tree is memoized on and undo that.
+   */
+  const entries = useMemo(() => buildReviewEntries(result), [result]);
   const tree = view === "tree" ? buildFileTree(entries) : [];
 
   return (
@@ -95,6 +107,15 @@ export const ChangedFilePane = ({
             onOpenEditor={control.openRuleEditor}
             onCloseEditor={control.closeRuleEditor}
             onChangeRules={onChangeRules}
+          />
+        ) : view === "fullTree" ? (
+          <FullTreeView
+            entries={entries}
+            baseTree={baseTree}
+            expandedDirectories={control.expandedBaseDirectories}
+            selectedFilePath={selectedFilePath}
+            onSelectFile={onSelectFile}
+            onToggleDirectory={control.toggleBaseDirectory}
           />
         ) : entries.length === 0 ? (
           <p className={styles.empty}>No changed files in this result.</p>

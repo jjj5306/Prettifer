@@ -1,4 +1,5 @@
 import type {
+  BaseTreeDto,
   CompositeDiffResultDto,
   Diagnostic,
   GroupRuleDto,
@@ -94,6 +95,7 @@ export interface AppState {
   readonly selectedFilePath: string | null;
   readonly symbolLookup: SymbolLookupState;
   readonly groupingRules: GroupingRulesState;
+  readonly baseTree: BaseTreeState;
   readonly externalFile: ExternalFileState;
   /** Position the review should reveal, set by a symbol navigation. */
   readonly reveal: ReviewPosition | null;
@@ -116,6 +118,23 @@ export type GroupingRulesState =
       saveDiagnostic: Diagnostic | null;
     }>
   | Readonly<{ status: "error"; diagnostic: Diagnostic }>;
+
+/**
+ * The paths tracked at the comparison base, read once per range when the review
+ * first shows the whole repository structure. `rangeRevision` is what makes a
+ * list belong to a range: a new range never reuses the previous answer.
+ */
+export type BaseTreeState =
+  | Readonly<{ status: "idle" }>
+  | Readonly<{ status: "loading"; requestId: string; rangeRevision: string }>
+  | Readonly<{
+      status: "ready";
+      rangeRevision: string;
+      paths: readonly string[];
+      /** True when the limit cut the list, so the screen can say so. */
+      truncated: boolean;
+    }>
+  | Readonly<{ status: "error"; rangeRevision: string; diagnostic: Diagnostic }>;
 
 export interface ReviewPosition {
   readonly path: string;
@@ -188,6 +207,19 @@ export type AppAction =
     }>
   | Readonly<{ type: "external/opened"; path: string; contents: string }>
   | Readonly<{ type: "external/failed"; path: string; diagnostic: Diagnostic }>
+  | Readonly<{ type: "baseTree/loading"; requestId: string; rangeRevision: string }>
+  | Readonly<{
+      type: "baseTree/loaded";
+      requestId: string;
+      rangeRevision: string;
+      tree: BaseTreeDto;
+    }>
+  | Readonly<{
+      type: "baseTree/failed";
+      requestId: string;
+      rangeRevision: string;
+      diagnostic: Diagnostic;
+    }>
   | Readonly<{ type: "rules/loading"; requestId: string }>
   | Readonly<{ type: "rules/loaded"; requestId: string; rules: readonly GroupRuleDto[] }>
   | Readonly<{ type: "rules/failed"; requestId: string; diagnostic: Diagnostic }>
@@ -290,6 +322,7 @@ export const initialAppState: AppState = {
   selectedFilePath: null,
   symbolLookup: { status: "idle" },
   groupingRules: { status: "idle" },
+  baseTree: { status: "idle" },
   externalFile: { status: "idle" },
   reveal: null,
   navigationHistory: [],
@@ -308,6 +341,38 @@ const clearedSymbolNavigation = {
 
 export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
+    case "baseTree/loading":
+      return {
+        ...state,
+        baseTree: {
+          status: "loading",
+          requestId: action.requestId,
+          rangeRevision: action.rangeRevision,
+        },
+      };
+    case "baseTree/loaded":
+      return matchesBaseTreeRequest(state, action)
+        ? {
+            ...state,
+            baseTree: {
+              status: "ready",
+              rangeRevision: action.rangeRevision,
+              paths: action.tree.paths,
+              truncated: action.tree.truncated,
+            },
+          }
+        : state;
+    case "baseTree/failed":
+      return matchesBaseTreeRequest(state, action)
+        ? {
+            ...state,
+            baseTree: {
+              status: "error",
+              rangeRevision: action.rangeRevision,
+              diagnostic: action.diagnostic,
+            },
+          }
+        : state;
     case "rules/loading":
       return { ...state, groupingRules: { status: "loading", requestId: action.requestId } };
     case "rules/loaded":
@@ -477,6 +542,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
             inspectedCommitId: null,
             composition: { status: "idle" },
             selectedFilePath: null,
+            // The path list belongs to a comparison base, so a new range drops it.
+            baseTree: { status: "idle" },
             ...clearedSymbolNavigation,
           }
         : state;
@@ -609,6 +676,20 @@ export function appReducer(state: AppState, action: AppAction): AppState {
   }
 }
 
+/**
+ * A reply is applied only while its own read is still the one running and the
+ * range it answered is still the range under review.
+ */
+function matchesBaseTreeRequest(
+  state: AppState,
+  action: { readonly requestId: string; readonly rangeRevision: string },
+): boolean {
+  return state.baseTree.status === "loading"
+    && state.baseTree.requestId === action.requestId
+    && state.range.status === "ready"
+    && state.range.range.rangeRevision === action.rangeRevision;
+}
+
 /** A reply is applied only while its own read is still the one running. */
 function matchesRuleRequest(state: AppState, requestId: string): boolean {
   return state.groupingRules.status === "loading"
@@ -654,6 +735,7 @@ function resetForRepository(state: AppState, session: RepositorySession): AppSta
     selectedFilePath: null,
     // Rules belong to one repository, so the next one starts from its own file.
     groupingRules: { status: "idle" },
+    baseTree: { status: "idle" },
     ...clearedSymbolNavigation,
   };
 }

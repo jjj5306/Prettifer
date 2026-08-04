@@ -290,6 +290,28 @@
   font-size: 0.6875rem;
 }
 
+.fullTree {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* A folder with a change below it, so a folded row still says so. */
+.changedDirectory {
+  composes: directory;
+  color: var(--color-text);
+}
+
+.changeDot {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding-left: var(--space-1);
+  color: var(--color-modified);
+}
+
+.unchanged {
+  color: var(--color-muted);
+}
+
 .groupList .directory {
   justify-content: flex-start;
 }

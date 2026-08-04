@@ -39,6 +39,10 @@ function createApi(overrides: Partial<DesktopApi> = {}): DesktopApi {
       status: "success",
       data: { path: "src/UtVar.java", contents: "public class UtVar {}" },
     }),
+    listBaseTree: vi.fn().mockResolvedValue({
+      status: "success",
+      data: { paths: [], truncated: false },
+    }),
     readGroupingRules: vi.fn().mockResolvedValue({
       status: "success",
       data: { rules: [] },
@@ -821,7 +825,11 @@ describe("useAppController grouping rules", () => {
     };
 
     const { controller } = await opened({
-      readGroupingRules: vi.fn().mockResolvedValue({ status: "error", diagnostic }),
+      listBaseTree: vi.fn().mockResolvedValue({
+      status: "success",
+      data: { paths: [], truncated: false },
+    }),
+    readGroupingRules: vi.fn().mockResolvedValue({ status: "error", diagnostic }),
     });
 
     expect(controller.current.state.groupingRules).toEqual({ status: "error", diagnostic });
@@ -868,5 +876,191 @@ describe("useAppController grouping rules", () => {
       rules,
       saveDiagnostic: diagnostic,
     });
+  });
+});
+
+describe("useAppController base tree", () => {
+  const commitId = "d".repeat(40);
+  const commonCommit = "c".repeat(40);
+  const tip = session.branches[0]!.commitId;
+  const range = {
+    baseRef: "main",
+    baseRefCommit: tip,
+    headRef: "main",
+    headCommit: tip,
+    baseCommit: commonCommit,
+    rangeRevision: `${tip}:${tip}:${commonCommit}`,
+  };
+
+  /** Drives the controller to a finished result, ready to be reviewed. */
+  async function reviewing(overrides: Partial<DesktopApi> = {}) {
+    const api = createApi({
+      selectRepository: vi.fn().mockResolvedValue({ status: "success", data: session }),
+      loadRange: vi.fn().mockResolvedValue({
+        status: "success",
+        data: {
+          range,
+          page: {
+            rangeRevision: range.rangeRevision,
+            commits: [{
+              id: commitId,
+              shortId: commitId.slice(0, 7),
+              parentIds: [commonCommit],
+              title: "select me",
+              authorName: "Prettifer Test",
+              authoredAt: "2026-07-23T00:00:00.000Z",
+              isMerge: false,
+              selectable: true,
+            }],
+            nextOffset: null,
+          },
+        },
+      }),
+      composeSelection: vi.fn().mockResolvedValue({
+        status: "success",
+        data: {
+          baseCommit: commonCommit,
+          selectedCommits: [commitId],
+          files: [{
+            path: "src/app.ts",
+            status: "modified",
+            beforeContent: "before",
+            afterContent: "after",
+          }],
+          mainlineParents: {},
+          problemFiles: [],
+          unifiedDiff: "diff",
+        },
+      }),
+      ...overrides,
+    });
+    let request = 0;
+    const { result } = renderHook(
+      () => useAppController(api, () => `request-${String(++request)}`),
+      { wrapper },
+    );
+    await act(() => result.current.openRepository());
+    await act(() => result.current.loadRange("main", "main"));
+    act(() => { result.current.toggleCommit(commitId); });
+    await act(() => result.current.composeSelection());
+    return { controller: result, api };
+  }
+
+  it("reads the path list for the range under review", async () => {
+    const listBaseTree = vi.fn().mockResolvedValue({
+      status: "success",
+      data: { paths: ["README.md", "src/app.ts"], truncated: false },
+    });
+    const { controller } = await reviewing({ listBaseTree });
+
+    await act(() => controller.current.loadBaseTree());
+
+    expect(listBaseTree).toHaveBeenCalledWith({
+      repositorySessionId: session.repositorySessionId,
+      sessionRevision: session.sessionRevision,
+      range,
+    });
+    expect(controller.current.state.baseTree).toEqual({
+      status: "ready",
+      rangeRevision: range.rangeRevision,
+      paths: ["README.md", "src/app.ts"],
+      truncated: false,
+    });
+  });
+
+  it("does not read the path list twice for one range", async () => {
+    const listBaseTree = vi.fn().mockResolvedValue({
+      status: "success",
+      data: { paths: [], truncated: false },
+    });
+    const { controller } = await reviewing({ listBaseTree });
+
+    await act(() => controller.current.loadBaseTree());
+    await act(() => controller.current.loadBaseTree());
+
+    expect(listBaseTree).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the path list when the result is calculated again", async () => {
+    const listBaseTree = vi.fn().mockResolvedValue({
+      status: "success",
+      data: { paths: ["README.md"], truncated: false },
+    });
+    const { controller } = await reviewing({ listBaseTree });
+    await act(() => controller.current.loadBaseTree());
+
+    await act(() => controller.current.composeSelection());
+    await act(() => controller.current.loadBaseTree());
+
+    expect(listBaseTree).toHaveBeenCalledOnce();
+    expect(controller.current.state.baseTree).toMatchObject({ status: "ready" });
+  });
+
+  it("drops the path list when the comparison range is loaded again", async () => {
+    const listBaseTree = vi.fn().mockResolvedValue({
+      status: "success",
+      data: { paths: ["README.md"], truncated: false },
+    });
+    const { controller } = await reviewing({ listBaseTree });
+    await act(() => controller.current.loadBaseTree());
+
+    await act(() => controller.current.loadRange("main", "main"));
+
+    expect(controller.current.state.baseTree).toEqual({ status: "idle" });
+    await act(() => controller.current.loadBaseTree());
+    expect(listBaseTree).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports a failed listing and leaves the result alone", async () => {
+    const diagnostic = {
+      code: "BASE_TREE_LIST_FAILED",
+      message: "The repository file list could not be read.",
+      subject: "Repository tree",
+      nextAction: "Reload the comparison range, then open Full Tree again.",
+    };
+    const { controller } = await reviewing({
+      listBaseTree: vi.fn().mockResolvedValue({ status: "error", diagnostic }),
+    });
+
+    await act(() => controller.current.loadBaseTree());
+
+    expect(controller.current.state.baseTree).toEqual({
+      status: "error",
+      rangeRevision: range.rangeRevision,
+      diagnostic,
+    });
+    expect(controller.current.state.composition).toMatchObject({ status: "ready" });
+  });
+
+  it("reads a file the result never changed when it is selected", async () => {
+    const readBaseFile = vi.fn().mockResolvedValue({
+      status: "success",
+      data: { path: "README.md", contents: "# Prettifer" },
+    });
+    const { controller } = await reviewing({ readBaseFile });
+
+    await act(() => { controller.current.selectFile("README.md"); return Promise.resolve(); });
+
+    expect(readBaseFile).toHaveBeenCalledWith({
+      repositorySessionId: session.repositorySessionId,
+      sessionRevision: session.sessionRevision,
+      range,
+      path: "README.md",
+    });
+    expect(controller.current.state.externalFile).toEqual({
+      status: "ready",
+      path: "README.md",
+      contents: "# Prettifer",
+    });
+  });
+
+  it("does not read the comparison base for a file the result holds", async () => {
+    const readBaseFile = vi.fn();
+    const { controller } = await reviewing({ readBaseFile });
+
+    act(() => { controller.current.selectFile("src/app.ts"); });
+
+    expect(readBaseFile).not.toHaveBeenCalled();
+    expect(controller.current.state.selectedFilePath).toBe("src/app.ts");
   });
 });
