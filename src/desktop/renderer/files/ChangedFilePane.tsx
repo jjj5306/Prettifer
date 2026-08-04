@@ -1,5 +1,6 @@
 import type { CompositeDiffResultDto, GroupRuleDto } from "../../shared/index.js";
 import type { GroupingRulesState } from "../state/app-state.js";
+import { panelClass } from "../panel-class.js";
 import { ConfigGroupView } from "./ConfigGroupView.js";
 import { FileButton } from "./FileButton.js";
 import {
@@ -22,6 +23,8 @@ const FILE_VIEWS = [
 ] as const satisfies readonly { id: FileView; label: string }[];
 
 interface ChangedFilePaneProps {
+  /** True while the activity rail points at this region. */
+  readonly isCurrentRegion: boolean;
   readonly result: CompositeDiffResultDto;
   readonly selectedFilePath: string | null;
   /** Root of the open repository, which is the key the group rules are kept under. */
@@ -35,6 +38,7 @@ interface ChangedFilePaneProps {
 
 export const ChangedFilePane = ({
   result,
+  isCurrentRegion,
   selectedFilePath,
   repositoryPath,
   groupingRules,
@@ -49,7 +53,7 @@ export const ChangedFilePane = ({
   return (
     <section
       id="changed-files"
-      className={styles.panel}
+      className={panelClass(styles.panel, isCurrentRegion)}
       aria-labelledby="changed-files-heading"
       tabIndex={-1}
     >

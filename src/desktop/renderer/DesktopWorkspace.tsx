@@ -7,10 +7,11 @@ import { DiffErrorBoundary } from "./errors/DiffErrorBoundary.js";
 import { ChangedFilePane } from "./files/ChangedFilePane.js";
 import { useChangedFileView } from "./files/use-changed-file-view.js";
 import { CommitHistoryPane } from "./history/CommitHistoryPane.js";
+import { ActivityRail } from "./navigation/ActivityRail.js";
 import {
-  ActivityRail,
+  currentPanel,
   type WorkbenchRegion,
-} from "./navigation/ActivityRail.js";
+} from "./navigation/workbench-region.js";
 import { PaneSplitter } from "./layout/PaneSplitter.js";
 import {
   useResizablePane,
@@ -41,6 +42,13 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
   const selectedFile = selectSelectedFile(controller.state);
   const repositorySession = selectRepositorySession(controller.state.repository);
   const [activeRegion, setActiveRegion] = useState<WorkbenchRegion>("repository");
+  const resultAvailable = controller.state.composition.status === "ready";
+  /*
+   * The panel the rail points at, marked so a mouse user sees where the rail
+   * took them. The rail decides the same thing for its own current item, so both
+   * read it from one place and cannot disagree.
+   */
+  const markedPanel = currentPanel(activeRegion, resultAvailable);
   const changedFileView = useChangedFileView(
     controller.state.selectedFilePath,
     controller.state.groupingRules,
@@ -65,7 +73,7 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
     <>
       <ActivityRail
         activeRegion={activeRegion}
-        resultAvailable={controller.state.composition.status === "ready"}
+        resultAvailable={resultAvailable}
         onActivate={handleActivateRegion}
       />
       <div className={styles.appContent}>
@@ -84,6 +92,7 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
           </p>
         </header>
         <RepositoryToolbar
+          isCurrentRegion={markedPanel === "repository"}
           repository={controller.state.repository}
           range={controller.state.range}
           onOpenRepository={controller.openRepository}
@@ -92,6 +101,7 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
         <div className={styles.workbench}>
           <div className={styles.workspaceGrid}>
             <CommitHistoryPane
+              isCurrentRegion={markedPanel === "history"}
               range={controller.state.range}
               selectedCommitIds={controller.state.selectedCommitIds}
               mergeParents={controller.state.mergeParents}
@@ -125,6 +135,7 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
                   style={changedFilesColumn(changedFilesWidth.width)}
                 >
                   <ChangedFilePane
+                    isCurrentRegion={markedPanel === "files"}
                     result={controller.state.composition.result}
                     selectedFilePath={controller.state.selectedFilePath}
                     repositoryPath={repositorySession?.rootPath ?? ""}
@@ -143,6 +154,7 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
                   <div className={styles.reviewColumn}>
                     <DiffErrorBoundary onRecover={() => undefined}>
                       <DiffPane
+                        isCurrentRegion={markedPanel === "diff"}
                         identity={{
                           repositorySessionId: repositorySession?.repositorySessionId
                             ?? "expired-session",

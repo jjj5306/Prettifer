@@ -38,6 +38,7 @@ export const Pane = ({
   const control = useChangedFileView(selectedFilePath, groupingRules);
   return (
     <ChangedFilePane
+      isCurrentRegion={false}
       result={result}
       selectedFilePath={selectedFilePath}
       repositoryPath={repositoryPath}

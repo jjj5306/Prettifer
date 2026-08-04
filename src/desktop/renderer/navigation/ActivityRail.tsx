@@ -1,6 +1,9 @@
+import {
+  currentRegion,
+  regionNeedsResult,
+  type WorkbenchRegion,
+} from "./workbench-region.js";
 import styles from "./ActivityRail.module.css";
-
-export type WorkbenchRegion = "repository" | "history" | "files" | "rules" | "diff";
 
 interface ActivityRailProps {
   readonly activeRegion: WorkbenchRegion;
@@ -25,27 +28,21 @@ export const ActivityRail = ({
   resultAvailable,
   onActivate,
 }: ActivityRailProps) => {
-  // Everything below the history needs a result to point at.
-  const needsResult = (region: WorkbenchRegion): boolean =>
-    region === "files" || region === "rules" || region === "diff";
-  const availableActiveRegion =
-    !resultAvailable && needsResult(activeRegion) ? "history" : activeRegion;
+  const marked = currentRegion(activeRegion, resultAvailable);
 
   return (
     <nav className={styles.rail} aria-label="Workbench">
       {items.map((item) => {
-        const disabled = needsResult(item.id) && !resultAvailable;
+        const disabled = regionNeedsResult(item.id) && !resultAvailable;
         return (
           <button
             key={item.id}
             type="button"
             title={item.label}
             aria-label={item.label}
-            aria-current={item.id === availableActiveRegion ? "page" : undefined}
+            aria-current={item.id === marked ? "page" : undefined}
             disabled={disabled}
-            className={
-              item.id === availableActiveRegion ? styles.active : undefined
-            }
+            className={item.id === marked ? styles.active : undefined}
             onClick={() => {
               onActivate(item.id);
               focusRegion(item.targetId);

@@ -43,6 +43,7 @@ describe("RepositoryToolbar", () => {
     render(
       <StrictMode>
         <RepositoryToolbar
+          isCurrentRegion={false}
           repository={baseState.repository}
           range={baseState.range}
           onOpenRepository={onOpenRepository}
@@ -60,6 +61,7 @@ describe("RepositoryToolbar", () => {
     render(
       <StrictMode>
         <RepositoryToolbar
+          isCurrentRegion={false}
           repository={{ status: "ready", session }}
           range={baseState.range}
           onOpenRepository={vi.fn()}
@@ -79,6 +81,7 @@ describe("RepositoryToolbar", () => {
     render(
       <StrictMode>
         <RepositoryToolbar
+          isCurrentRegion={false}
           repository={{ status: "ready", session }}
           range={{
             status: "ready",
@@ -109,6 +112,7 @@ describe("RepositoryToolbar", () => {
     render(
       <StrictMode>
         <RepositoryToolbar
+          isCurrentRegion={false}
           repository={{
             status: "error",
             session,
@@ -136,6 +140,7 @@ describe("RepositoryToolbar", () => {
     const { rerender } = render(
       <StrictMode>
         <RepositoryToolbar
+          isCurrentRegion={false}
           repository={{ status: "ready", session }}
           range={{
             status: "loading",
@@ -156,6 +161,7 @@ describe("RepositoryToolbar", () => {
     rerender(
       <StrictMode>
         <RepositoryToolbar
+          isCurrentRegion={false}
           repository={{ status: "ready", session }}
           range={{
             status: "error",
@@ -181,6 +187,7 @@ describe("RepositoryToolbar", () => {
     const user = userEvent.setup();
     const { rerender } = render(
       <RepositoryToolbar
+        isCurrentRegion={false}
         repository={{ status: "ready", session }}
         range={baseState.range}
         onOpenRepository={vi.fn()}
@@ -199,6 +206,7 @@ describe("RepositoryToolbar", () => {
     };
     rerender(
       <RepositoryToolbar
+        isCurrentRegion={false}
         repository={{ status: "ready", session: nextSession }}
         range={baseState.range}
         onOpenRepository={vi.fn()}

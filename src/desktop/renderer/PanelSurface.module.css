@@ -8,3 +8,23 @@
   background: var(--color-panel);
   overflow: hidden;
 }
+
+/*
+ * The panel the activity rail points at. Defined once here because all four
+ * target panels compose `.surface`, so the marker cannot drift between them.
+ *
+ * The accent bar repeats the rail's own current-item marker, so it reads as
+ * "you are here" with nothing new to learn. It sits on the panel edge and stays
+ * thinner than the selected-row marker inside a panel, so the two do not
+ * compete for the same meaning.
+ */
+.currentRegion {
+  border-color: var(--color-accent);
+  box-shadow: inset 1px 0 var(--color-accent);
+}
+
+@media (forced-colors: active) {
+  .currentRegion {
+    border-color: Highlight;
+  }
+}

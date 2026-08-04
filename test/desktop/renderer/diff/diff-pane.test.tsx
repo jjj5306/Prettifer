@@ -24,7 +24,7 @@ describe("DiffPane", () => {
     const loadAdapter = vi.fn().mockResolvedValue(adapter);
     const { rerender } = render(
       <StrictMode>
-        <DiffPane identity={identity} file={null} loadAdapter={loadAdapter} />
+        <DiffPane isCurrentRegion={false} identity={identity} file={null} loadAdapter={loadAdapter} />
       </StrictMode>,
     );
     expect(loadAdapter).not.toHaveBeenCalled();
@@ -32,7 +32,7 @@ describe("DiffPane", () => {
 
     rerender(
       <StrictMode>
-        <DiffPane identity={identity} file={file} loadAdapter={loadAdapter} />
+        <DiffPane isCurrentRegion={false} identity={identity} file={file} loadAdapter={loadAdapter} />
       </StrictMode>,
     );
     expect(screen.getByText("Loading diff editor…")).toBeVisible();
@@ -60,7 +60,7 @@ describe("DiffPane", () => {
     };
     render(
       <StrictMode>
-        <DiffPane identity={identity} file={addedFile} loadAdapter={loadAdapter} />
+        <DiffPane isCurrentRegion={false} identity={identity} file={addedFile} loadAdapter={loadAdapter} />
       </StrictMode>,
     );
 
@@ -78,6 +78,7 @@ describe("DiffPane", () => {
     const loadAdapter = vi.fn();
     render(
       <DiffPane
+        isCurrentRegion={false}
         identity={identity}
         file={{
           path: "fixtures/project.csp",
@@ -106,7 +107,7 @@ describe("DiffPane", () => {
       .mockResolvedValue(secondAdapter);
     const view = render(
       <StrictMode>
-        <DiffPane identity={identity} file={file} loadAdapter={loadAdapter} />
+        <DiffPane isCurrentRegion={false} identity={identity} file={file} loadAdapter={loadAdapter} />
       </StrictMode>,
     );
     await waitFor(() => { expect(firstAdapter.show).toHaveBeenCalledOnce(); });
@@ -114,7 +115,7 @@ describe("DiffPane", () => {
     const nextFile = { ...file, path: "src/next.ts" };
     view.rerender(
       <StrictMode>
-        <DiffPane identity={identity} file={nextFile} loadAdapter={loadAdapter} />
+        <DiffPane isCurrentRegion={false} identity={identity} file={nextFile} loadAdapter={loadAdapter} />
       </StrictMode>,
     );
     await waitFor(() => { expect(secondAdapter.show).toHaveBeenCalledOnce(); });
@@ -132,7 +133,7 @@ describe("DiffPane", () => {
       .mockResolvedValueOnce(adapter);
     render(
       <StrictMode>
-        <DiffPane identity={identity} file={file} loadAdapter={loadAdapter} />
+        <DiffPane isCurrentRegion={false} identity={identity} file={file} loadAdapter={loadAdapter} />
       </StrictMode>,
     );
 
@@ -152,6 +153,7 @@ describe("DiffPane", () => {
     const loadAdapter = vi.fn();
     render(
       <DiffPane
+        isCurrentRegion={false}
         identity={identity}
         file={null}
         problem={{
@@ -178,6 +180,7 @@ describe("DiffPane", () => {
     const loadAdapter = vi.fn().mockResolvedValue(adapter);
     const { rerender } = render(
       <DiffPane
+        isCurrentRegion={false}
         identity={identity}
         file={null}
         problem={{
@@ -192,7 +195,7 @@ describe("DiffPane", () => {
     expect(screen.getByRole("heading", { name: "Problem File" })).toBeVisible();
 
     rerender(
-      <DiffPane identity={identity} file={file} problem={null} loadAdapter={loadAdapter} />,
+      <DiffPane isCurrentRegion={false} identity={identity} file={file} problem={null} loadAdapter={loadAdapter} />,
     );
 
     await waitFor(() => { expect(adapter.show).toHaveBeenCalledOnce(); });
@@ -212,6 +215,7 @@ describe("DiffPane", () => {
     render(
       <StrictMode>
         <DiffPane
+          isCurrentRegion={false}
           identity={identity}
           file={file}
           externalFile={{
@@ -250,13 +254,13 @@ describe("DiffPane", () => {
     };
     const loadAdapter = vi.fn().mockResolvedValue(adapter);
     const { rerender } = render(
-      <DiffPane identity={identity} file={file} reveal={{ path: file.path, line: 4, column: 1 }} loadAdapter={loadAdapter} />,
+      <DiffPane isCurrentRegion={false} identity={identity} file={file} reveal={{ path: file.path, line: 4, column: 1 }} loadAdapter={loadAdapter} />,
     );
     await waitFor(() => { expect(adapter.reveal).toHaveBeenCalledWith(4, 1); });
     const loads = loadAdapter.mock.calls.length;
 
     rerender(
-      <DiffPane identity={identity} file={file} reveal={{ path: file.path, line: 9, column: 7 }} loadAdapter={loadAdapter} />,
+      <DiffPane isCurrentRegion={false} identity={identity} file={file} reveal={{ path: file.path, line: 9, column: 7 }} loadAdapter={loadAdapter} />,
     );
 
     await waitFor(() => { expect(adapter.reveal).toHaveBeenCalledWith(9, 7); });
@@ -267,6 +271,7 @@ describe("DiffPane", () => {
     const loadAdapter = vi.fn();
     const { rerender } = render(
       <DiffPane
+        isCurrentRegion={false}
         identity={identity}
         file={file}
         externalFile={{ status: "loading", path: "src/UtVar.java" }}
@@ -278,6 +283,7 @@ describe("DiffPane", () => {
 
     rerender(
       <DiffPane
+        isCurrentRegion={false}
         identity={identity}
         file={file}
         externalFile={{
@@ -310,6 +316,7 @@ describe("DiffPane", () => {
     const onSymbol = vi.fn();
     render(
       <DiffPane
+        isCurrentRegion={false}
         identity={identity}
         file={file}
         onSymbol={onSymbol}
@@ -333,7 +340,7 @@ describe("DiffPane", () => {
     };
     const loadAdapter = vi.fn().mockResolvedValue(adapter);
     const { rerender } = render(
-      <DiffPane identity={identity} file={file} loadAdapter={loadAdapter} />,
+      <DiffPane isCurrentRegion={false} identity={identity} file={file} loadAdapter={loadAdapter} />,
     );
     // The directory and the file name are separate so the name never truncates.
     expect(screen.getByText("src/")).toBeVisible();
@@ -341,6 +348,7 @@ describe("DiffPane", () => {
 
     rerender(
       <DiffPane
+        isCurrentRegion={false}
         identity={identity}
         file={{
           path: "src/deep/nested/other.ts",
@@ -362,6 +370,7 @@ describe("DiffPane", () => {
   it("names a file with no directory by its name alone", () => {
     render(
       <DiffPane
+        isCurrentRegion={false}
         identity={identity}
         file={{
           path: "README.md",
@@ -391,6 +400,7 @@ describe("DiffPane", () => {
     const loadAdapter = vi.fn().mockResolvedValue(adapter);
     const { rerender } = render(
       <DiffPane
+        isCurrentRegion={false}
         identity={identity}
         file={file}
         onSymbol={() => undefined}
@@ -403,6 +413,7 @@ describe("DiffPane", () => {
     for (let index = 0; index < 3; index += 1) {
       rerender(
         <DiffPane
+          isCurrentRegion={false}
           identity={identity}
           file={file}
           onSymbol={() => undefined}
@@ -428,11 +439,11 @@ describe("DiffPane", () => {
     const first = vi.fn();
     const second = vi.fn();
     const { rerender } = render(
-      <DiffPane identity={identity} file={file} onSymbol={first} loadAdapter={loadAdapter} />,
+      <DiffPane isCurrentRegion={false} identity={identity} file={file} onSymbol={first} loadAdapter={loadAdapter} />,
     );
     await waitFor(() => { expect(adapter.show).toHaveBeenCalledOnce(); });
     rerender(
-      <DiffPane identity={identity} file={file} onSymbol={second} loadAdapter={loadAdapter} />,
+      <DiffPane isCurrentRegion={false} identity={identity} file={file} onSymbol={second} loadAdapter={loadAdapter} />,
     );
 
     // The editor still holds the hook it was given first.
@@ -460,6 +471,7 @@ describe("DiffPane", () => {
     const adapter = createAdapter();
     render(
       <DiffPane
+        isCurrentRegion={false}
         identity={identity}
         file={file}
         loadAdapter={vi.fn().mockResolvedValue(adapter)}
@@ -477,7 +489,7 @@ describe("DiffPane", () => {
     const user = userEvent.setup();
     const adapter = createAdapter();
     const loadAdapter = vi.fn().mockResolvedValue(adapter);
-    render(<DiffPane identity={identity} file={file} loadAdapter={loadAdapter} />);
+    render(<DiffPane isCurrentRegion={false} identity={identity} file={file} loadAdapter={loadAdapter} />);
     await waitFor(() => { expect(adapter.show).toHaveBeenCalledOnce(); });
 
     await user.click(screen.getByRole("button", { name: "Inline" }));
@@ -496,6 +508,7 @@ describe("DiffPane", () => {
     const adapter = createAdapter();
     const { rerender } = render(
       <DiffPane
+        isCurrentRegion={false}
         identity={identity}
         file={file}
         loadAdapter={vi.fn().mockResolvedValue(adapter)}
@@ -506,6 +519,7 @@ describe("DiffPane", () => {
 
     rerender(
       <DiffPane
+        isCurrentRegion={false}
         identity={identity}
         file={{
           path: "src/other.ts",
@@ -541,6 +555,7 @@ describe("DiffPane", () => {
     const adapter = createAdapter();
     render(
       <DiffPane
+        isCurrentRegion={false}
         identity={identity}
         file={target}
         loadAdapter={vi.fn().mockResolvedValue(adapter)}
@@ -556,6 +571,7 @@ describe("DiffPane", () => {
     const adapter = createAdapter();
     render(
       <DiffPane
+        isCurrentRegion={false}
         identity={identity}
         file={file}
         externalFile={{

@@ -9,6 +9,7 @@ describe("desktop visual direction", () => {
   it("uses English copy for the first repository action", () => {
     render(
       <RepositoryToolbar
+        isCurrentRegion={false}
         repository={{ status: "empty" }}
         range={{ status: "idle" }}
         onOpenRepository={vi.fn()}

@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { AppController } from "../../../../src/desktop/renderer/controller/use-app-controller.js";
 import { DesktopWorkspace } from "../../../../src/desktop/renderer/DesktopWorkspace.js";
+import surface from "../../../../src/desktop/renderer/PanelSurface.module.css";
 
 const firstCommit = {
   id: "a".repeat(40),
@@ -308,5 +309,81 @@ describe("desktop workspace accessibility", () => {
     render(<StrictMode><DesktopWorkspace controller={createController()} /></StrictMode>);
 
     expect(screen.getByRole("button", { name: "Group Rules" })).toBeDisabled();
+  });
+  const currentRegionMarker = surface.currentRegion ?? "";
+
+  it("marks the region the rail points at when clicked with a mouse", async () => {
+    const user = userEvent.setup();
+    render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
+    const history = screen.getByRole("region", { name: "Commit History" });
+
+    // The repository is current at startup, so the history is not marked yet.
+    expect(history).not.toHaveClass(currentRegionMarker);
+    await user.click(screen.getByRole("button", { name: "Commit History" }));
+
+    expect(history).toHaveClass(currentRegionMarker);
+    expect(screen.getByRole("region", { name: "Repository and comparison range" }))
+      .not.toHaveClass(currentRegionMarker);
+  });
+
+  it("marks the same region when the rail is used from the keyboard", async () => {
+    const user = userEvent.setup();
+    render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
+
+    screen.getByRole("button", { name: "Commit History" }).focus();
+    await user.keyboard("{Enter}");
+
+    expect(screen.getByRole("region", { name: "Commit History" }))
+      .toHaveClass(currentRegionMarker);
+  });
+
+  it("keeps the marker after focus moves into another region", async () => {
+    const user = userEvent.setup();
+    render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
+    await user.click(screen.getByRole("button", { name: "Commit History" }));
+
+    await user.click(screen.getByRole("button", { name: "Change Repository" }));
+
+    expect(screen.getByRole("region", { name: "Commit History" }))
+      .toHaveClass(currentRegionMarker);
+  });
+
+  it("marks the changed file region for the group rule entry", async () => {
+    const user = userEvent.setup();
+    render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
+
+    await user.click(screen.getByRole("button", { name: "Group Rules" }));
+
+    expect(screen.getByRole("region", { name: "Changed Files" }))
+      .toHaveClass(currentRegionMarker);
+  });
+
+  it("moves the marker with the rail when the result goes away", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>,
+    );
+    await user.click(screen.getByRole("button", { name: "Changed Files" }));
+    expect(screen.getByRole("region", { name: "Changed Files" }))
+      .toHaveClass(currentRegionMarker);
+
+    rerender(<StrictMode><DesktopWorkspace controller={createController()} /></StrictMode>);
+
+    expect(screen.getByRole("button", { name: "Commit History" }))
+      .toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("region", { name: "Commit History" }))
+      .toHaveClass(currentRegionMarker);
+  });
+
+  it("does not add a state to the region for assistive technology", async () => {
+    const user = userEvent.setup();
+    render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
+
+    await user.click(screen.getByRole("button", { name: "Commit History" }));
+
+    // The rail already says where the user is; the region must not repeat it.
+    const history = screen.getByRole("region", { name: "Commit History" });
+    expect(history).not.toHaveAttribute("aria-current");
+    expect(history).not.toHaveAttribute("aria-selected");
   });
 });
