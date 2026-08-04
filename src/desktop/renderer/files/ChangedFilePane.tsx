@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+
 import type { CompositeDiffResultDto, GroupRuleDto } from "../../shared/index.js";
 import type { BaseTreeState, GroupingRulesState } from "../state/app-state.js";
 import { panelClass } from "../panel-class.js";
@@ -52,7 +54,12 @@ export const ChangedFilePane = ({
   onChangeRules,
 }: ChangedFilePaneProps) => {
   const { view, review } = control;
-  const entries = buildReviewEntries(result);
+  /*
+   * Kept across renders because Full Tree builds its structure from this, and the
+   * pane re-renders on every frame of a splitter drag. Rebuilding the review list
+   * would change the identity the tree is memoized on and undo that.
+   */
+  const entries = useMemo(() => buildReviewEntries(result), [result]);
   const tree = view === "tree" ? buildFileTree(entries) : [];
 
   return (

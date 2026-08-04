@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+
 import type { BaseTreeState } from "../state/app-state.js";
 import { FileButton } from "./FileButton.js";
 import {
@@ -7,6 +9,8 @@ import {
 } from "./full-tree.js";
 import type { ReviewEntry } from "./review-entries.js";
 import styles from "./ChangedFilePane.module.css";
+
+const EMPTY_PATHS: readonly string[] = [];
 
 interface FullTreeViewProps {
   readonly entries: readonly ReviewEntry[];
@@ -29,6 +33,14 @@ export const FullTreeView = ({
   onSelectFile,
   onToggleDirectory,
 }: FullTreeViewProps) => {
+  /*
+   * The structure is built from every tracked path, which the limit puts in the
+   * thousands, and the pane re-renders on every frame of a splitter drag. It is
+   * built once per path list and result instead.
+   */
+  const paths = baseTree.status === "ready" ? baseTree.paths : EMPTY_PATHS;
+  const nodes = useMemo(() => buildFullTree(paths, entries), [paths, entries]);
+
   if (baseTree.status === "idle" || baseTree.status === "loading") {
     return <p className={styles.empty}>Reading the repository file list…</p>;
   }
@@ -44,8 +56,6 @@ export const FullTreeView = ({
       </div>
     );
   }
-
-  const nodes = buildFullTree(baseTree.paths, entries);
 
   return (
     <div className={styles.fullTree}>
