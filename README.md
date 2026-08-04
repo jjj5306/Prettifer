@@ -185,9 +185,17 @@ src/
 
 ## 화면 기준
 
+`Changed Files`의 네 가지 보기입니다. 이미지는 `npm run screenshots`로 다시 만듭니다.
+
 | Tree View | List View |
 |---|---|
 | ![Tree View](docs/assets/prettifer-desktop-workbench-tree-view.png) | ![List View](docs/assets/prettifer-desktop-workbench-list-view.png) |
+| 변경 파일을 저장소 경로 계층으로 표시 | 변경 파일을 전체 경로 한 행으로 표시 |
+
+| Config View | Full Tree |
+|---|---|
+| ![Config View](docs/assets/prettifer-desktop-workbench-config-view.png) | ![Full Tree](docs/assets/prettifer-desktop-workbench-full-tree.png) |
+| 사용자가 정의한 경로 prefix 규칙으로 묶어 표시 | 저장소 전체 구조 안에서 변경 위치를 표시 |
 
 ## 지원 범위
 

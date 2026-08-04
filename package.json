@@ -16,6 +16,7 @@
     "test:desktop": "npm run test:desktop:unit && npm run test:desktop:e2e",
     "test:desktop:unit": "vitest run test/desktop",
     "test:desktop:e2e": "electron-forge package && playwright test --config=playwright.electron.config.ts",
+    "screenshots": "electron-forge package && playwright test --config=playwright.screenshots.config.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig/desktop.shared.json && tsc --noEmit -p tsconfig/desktop.main.json && tsc --noEmit -p tsconfig/desktop.preload.json && tsc --noEmit -p tsconfig/desktop.renderer.json"
   },
