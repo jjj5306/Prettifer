@@ -85,6 +85,7 @@ function readyRange(overrides: Partial<Extract<RangeState, { status: "ready" }>>
     range,
     commits: [firstCommit, mergeCommit],
     nextOffset: 100,
+    firstPageOffset: 100,
     pagination: { status: "idle" },
     ...overrides,
   };
@@ -103,6 +104,8 @@ describe("CommitHistoryPane", () => {
         onToggleCommit={vi.fn()}
         onInspectCommit={vi.fn()}
         onLoadMore={vi.fn()}
+        onResetLoaded={vi.fn()}
+        onClearSelection={vi.fn()}
       />,
     );
 
@@ -132,6 +135,8 @@ describe("CommitHistoryPane", () => {
           onToggleCommit={vi.fn()}
           onInspectCommit={vi.fn()}
           onLoadMore={vi.fn()}
+          onResetLoaded={vi.fn()}
+          onClearSelection={vi.fn()}
         />
       </StrictMode>,
     );
@@ -160,6 +165,8 @@ describe("CommitHistoryPane", () => {
         onToggleCommit={vi.fn()}
         onInspectCommit={vi.fn()}
         onLoadMore={vi.fn()}
+        onResetLoaded={vi.fn()}
+        onClearSelection={vi.fn()}
       />,
     );
 
@@ -185,6 +192,8 @@ describe("CommitHistoryPane", () => {
           onToggleCommit={onToggleCommit}
           onInspectCommit={onInspectCommit}
           onLoadMore={vi.fn()}
+          onResetLoaded={vi.fn()}
+          onClearSelection={vi.fn()}
         />
       </StrictMode>,
     );
@@ -229,6 +238,8 @@ describe("CommitHistoryPane", () => {
         }}
         onInspectCommit={setInspectedCommitId}
         onLoadMore={vi.fn()}
+        onResetLoaded={vi.fn()}
+        onClearSelection={vi.fn()}
       />
     );
   };
@@ -280,6 +291,8 @@ describe("CommitHistoryPane", () => {
         onToggleCommit={onToggleCommit}
         onInspectCommit={onInspectCommit}
         onLoadMore={vi.fn()}
+        onResetLoaded={vi.fn()}
+        onClearSelection={vi.fn()}
       />,
     );
     const card = screen.getByRole("button", { name: unselectableCommitCardName });
@@ -341,6 +354,8 @@ describe("CommitHistoryPane", () => {
           onToggleCommit={vi.fn()}
           onInspectCommit={vi.fn()}
           onLoadMore={vi.fn()}
+          onResetLoaded={vi.fn()}
+          onClearSelection={vi.fn()}
         />
       </StrictMode>,
     );
@@ -360,6 +375,8 @@ describe("CommitHistoryPane", () => {
           onToggleCommit={vi.fn()}
           onInspectCommit={vi.fn()}
           onLoadMore={vi.fn()}
+          onResetLoaded={vi.fn()}
+          onClearSelection={vi.fn()}
         />
       </StrictMode>,
     );
@@ -384,6 +401,8 @@ describe("CommitHistoryPane", () => {
           onToggleCommit={onToggleCommit}
           onInspectCommit={vi.fn()}
           onLoadMore={vi.fn()}
+          onResetLoaded={vi.fn()}
+          onClearSelection={vi.fn()}
         />
       </StrictMode>,
     );
@@ -409,6 +428,8 @@ describe("CommitHistoryPane", () => {
           onToggleCommit={vi.fn()}
           onInspectCommit={vi.fn()}
           onLoadMore={onLoadMore}
+          onResetLoaded={vi.fn()}
+          onClearSelection={vi.fn()}
         />
       </StrictMode>,
     );
@@ -427,6 +448,8 @@ describe("CommitHistoryPane", () => {
           onToggleCommit={vi.fn()}
           onInspectCommit={vi.fn()}
           onLoadMore={onLoadMore}
+          onResetLoaded={vi.fn()}
+          onClearSelection={vi.fn()}
         />
       </StrictMode>,
     );
@@ -450,6 +473,8 @@ describe("CommitHistoryPane", () => {
         onToggleCommit={vi.fn()}
         onInspectCommit={vi.fn()}
         onLoadMore={onLoadMore}
+        onResetLoaded={vi.fn()}
+        onClearSelection={vi.fn()}
       />,
     );
     await user.click(screen.getByRole("button", { name: "Load 100 older commits" }));
@@ -465,6 +490,8 @@ describe("CommitHistoryPane", () => {
         onToggleCommit={vi.fn()}
         onInspectCommit={vi.fn()}
         onLoadMore={onLoadMore}
+        onResetLoaded={vi.fn()}
+        onClearSelection={vi.fn()}
       />,
     );
 
@@ -483,6 +510,8 @@ describe("CommitHistoryPane", () => {
         onToggleCommit={vi.fn()}
         onInspectCommit={vi.fn()}
         onLoadMore={vi.fn()}
+        onResetLoaded={vi.fn()}
+        onClearSelection={vi.fn()}
       />,
     );
 
@@ -510,6 +539,8 @@ describe("CommitHistoryPane", () => {
         onToggleCommit={vi.fn()}
         onInspectCommit={vi.fn()}
         onLoadMore={vi.fn()}
+        onResetLoaded={vi.fn()}
+        onClearSelection={vi.fn()}
       />,
     );
 
@@ -542,6 +573,8 @@ describe("CommitHistoryPane", () => {
         onToggleCommit={onToggleCommit}
         onInspectCommit={vi.fn()}
         onLoadMore={vi.fn()}
+        onResetLoaded={vi.fn()}
+        onClearSelection={vi.fn()}
       />,
     );
 
@@ -564,5 +597,99 @@ describe("CommitHistoryPane", () => {
     expect(onChooseMainlineParent).toHaveBeenCalledWith(mergeCommit.id, 1);
     expect(onToggleCommit).not.toHaveBeenCalled();
     expect(screen.getByText("1 selected")).toBeVisible();
+  });
+  it("offers a selection reset only while something is selected", async () => {
+    const user = userEvent.setup();
+    const onClearSelection = vi.fn();
+    const { rerender } = render(
+      <CommitHistoryPane
+        isCurrentRegion={false}
+        range={readyRange()}
+        selectedCommitIds={[]}
+        inspectedCommitId={null}
+        mergeParents={{}}
+        onChooseMainlineParent={vi.fn()}
+        onToggleCommit={vi.fn()}
+        onInspectCommit={vi.fn()}
+        onLoadMore={vi.fn()}
+        onResetLoaded={vi.fn()}
+        onClearSelection={onClearSelection}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Clear selection" })).toBeNull();
+
+    rerender(
+      <CommitHistoryPane
+        isCurrentRegion={false}
+        range={readyRange()}
+        selectedCommitIds={[firstCommit.id]}
+        inspectedCommitId={null}
+        mergeParents={{}}
+        onChooseMainlineParent={vi.fn()}
+        onToggleCommit={vi.fn()}
+        onInspectCommit={vi.fn()}
+        onLoadMore={vi.fn()}
+        onResetLoaded={vi.fn()}
+        onClearSelection={onClearSelection}
+      />,
+    );
+
+    const clear = screen.getByRole("button", { name: "Clear selection" });
+    clear.focus();
+    await user.keyboard("{Enter}");
+    expect(onClearSelection).toHaveBeenCalledOnce();
+  });
+
+  it("offers a loaded-commit reset only after extra pages arrived", async () => {
+    const user = userEvent.setup();
+    const onResetLoaded = vi.fn();
+    const paneWith = (range: RangeState) => (
+      <CommitHistoryPane
+        isCurrentRegion={false}
+        range={range}
+        selectedCommitIds={[]}
+        inspectedCommitId={null}
+        mergeParents={{}}
+        onChooseMainlineParent={vi.fn()}
+        onToggleCommit={vi.fn()}
+        onInspectCommit={vi.fn()}
+        onLoadMore={vi.fn()}
+        onResetLoaded={onResetLoaded}
+        onClearSelection={vi.fn()}
+      />
+    );
+    // Two commits loaded and the first page held two: nothing was added yet.
+    const { rerender } = render(paneWith(readyRange({ firstPageOffset: 2 })));
+    expect(screen.queryByRole("button", { name: "Reset loaded commits" })).toBeNull();
+
+    rerender(paneWith(readyRange({
+      commits: [firstCommit, mergeCommit, secondCommit],
+      firstPageOffset: 2,
+    })));
+
+    const reset = screen.getByRole("button", { name: "Reset loaded commits" });
+    reset.focus();
+    await user.keyboard(" ");
+    expect(onResetLoaded).toHaveBeenCalledOnce();
+  });
+
+  it("offers no loaded-commit reset when the first page was the last", () => {
+    render(
+      <CommitHistoryPane
+        isCurrentRegion={false}
+        range={readyRange({ nextOffset: null, firstPageOffset: null })}
+        selectedCommitIds={[]}
+        inspectedCommitId={null}
+        mergeParents={{}}
+        onChooseMainlineParent={vi.fn()}
+        onToggleCommit={vi.fn()}
+        onInspectCommit={vi.fn()}
+        onLoadMore={vi.fn()}
+        onResetLoaded={vi.fn()}
+        onClearSelection={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Reset loaded commits" })).toBeNull();
   });
 });

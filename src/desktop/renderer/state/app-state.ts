@@ -39,6 +39,12 @@ export type RangeState =
       range: RepositoryRangeDto;
       commits: readonly RepositoryCommitDto[];
       nextOffset: number | null;
+      /**
+       * Commits the first page held, remembered when the range loaded. Resetting
+       * the list keeps that many, so the page size stays a main-process decision
+       * instead of being restated here. Null when the first page was the last.
+       */
+      firstPageOffset: number | null;
       pagination: PaginationState;
     }>
   | Readonly<{
@@ -277,6 +283,8 @@ export type AppAction =
       rangeRevision: string;
       diagnostic: Diagnostic;
     }>
+  | Readonly<{ type: "range/loadedPagesReset" }>
+  | Readonly<{ type: "commit/selectionCleared" }>
   | Readonly<{ type: "commit/toggled"; commitId: string }>
   | Readonly<{
       type: "commit/mainlineParentChosen";
@@ -556,6 +564,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
               range: action.result.range,
               commits: [...action.result.page.commits],
               nextOffset: action.result.page.nextOffset,
+              firstPageOffset: action.result.page.nextOffset,
               pagination: { status: "idle" },
             },
           }
@@ -608,6 +617,10 @@ export function appReducer(state: AppState, action: AppAction): AppState {
             },
           }
         : state;
+    case "range/loadedPagesReset":
+      return resetLoadedPages(state);
+    case "commit/selectionCleared":
+      return clearSelection(state);
     case "commit/toggled":
       return toggleCommit(state, action.commitId);
     case "commit/mainlineParentChosen":
@@ -694,6 +707,50 @@ function matchesBaseTreeRequest(
 function matchesRuleRequest(state: AppState, requestId: string): boolean {
   return state.groupingRules.status === "loading"
     && state.groupingRules.requestId === requestId;
+}
+
+/**
+ * Drops the pages the user added and keeps the first one. Nothing is read again:
+ * pages are appended in order, so the first page is the front of the list.
+ * Selection is untouched, because shortening the list is not the same as taking
+ * a commit out of the result.
+ */
+function resetLoadedPages(state: AppState): AppState {
+  if (state.range.status !== "ready" || state.range.firstPageOffset === null) {
+    return state;
+  }
+  const { firstPageOffset } = state.range;
+  if (state.range.commits.length <= firstPageOffset) {
+    return state;
+  }
+  return {
+    ...state,
+    range: {
+      ...state.range,
+      commits: state.range.commits.slice(0, firstPageOffset),
+      nextOffset: firstPageOffset,
+      pagination: { status: "idle" },
+    },
+  };
+}
+
+/**
+ * Empties the selection. A calculated result is put down with it: a result whose
+ * commits are no longer selected would describe something the screen no longer
+ * says is selected.
+ */
+function clearSelection(state: AppState): AppState {
+  if (state.selectedCommitIds.length === 0) {
+    return state;
+  }
+  return {
+    ...state,
+    selectedCommitIds: [],
+    mergeParents: {},
+    composition: { status: "idle" },
+    selectedFilePath: null,
+    ...clearedSymbolNavigation,
+  };
 }
 
 function stableRepository(repository: RepositoryState): StableRepositoryState {

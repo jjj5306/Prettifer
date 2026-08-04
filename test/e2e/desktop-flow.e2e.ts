@@ -991,6 +991,52 @@ test("shows the repository structure around a change and opens an unchanged file
   expect(fixture.git(["status", "--porcelain"])).toBe("");
 });
 
+test("resets the loaded commits and the selection independently", async () => {
+  const fixture = await createHistoryE2eFixture();
+  const running = await launch([fixture.path]);
+  await openRepository(running.page, fixture.path, fixture.headRef);
+  await running.page.getByRole("combobox", { name: "Base branch" })
+    .selectOption(fixture.baseRef);
+  await running.page.getByRole("button", { name: "Load Commit Range" }).click();
+
+  // The status bar shows a selection count too, so assertions stay in the panel.
+  const history = running.page.getByRole("region", { name: "Commit History" });
+  const commits = running.page.getByRole("checkbox");
+  // The range loads asynchronously, so the first page has to arrive before it
+  // can be counted.
+  await expect(commits.first()).toBeVisible();
+  const firstPage = await commits.count();
+  expect(firstPage).toBeGreaterThan(0);
+  // Nothing has been added yet, so there is nothing to undo.
+  await expect(running.page.getByRole("button", { name: "Reset loaded commits" }))
+    .toBeHidden();
+
+  await running.page.getByRole("button", { name: "Load 100 older commits" }).click();
+  await expect.poll(() => commits.count()).toBeGreaterThan(firstPage);
+
+  // Selecting first, so the list reset can be shown to leave it alone.
+  await commits.first().check();
+  await expect(history.getByText("1 selected")).toBeVisible();
+
+  await running.page.getByRole("button", { name: "Reset loaded commits" }).click();
+  await expect.poll(() => commits.count()).toBe(firstPage);
+  await expect(history.getByText("1 selected")).toBeVisible();
+  await expect(running.page.getByRole("button", { name: "Reset loaded commits" }))
+    .toBeHidden();
+
+  // The next page can be asked for again from the reset state.
+  await running.page.getByRole("button", { name: "Load 100 older commits" }).click();
+  await expect.poll(() => commits.count()).toBeGreaterThan(firstPage);
+
+  await running.page.getByRole("button", { name: "Clear selection" }).click();
+  await expect(history.getByText("0 selected")).toBeVisible();
+  await expect(running.page.getByRole("button", { name: "Clear selection" })).toBeHidden();
+  // Clearing the selection does not shorten the list.
+  expect(await commits.count()).toBeGreaterThan(firstPage);
+
+  expect(fixture.git(["status", "--porcelain"])).toBe("");
+});
+
 async function createFixture(): Promise<GitFixture> {
   const fixture = await createAuthHistoryFixture();
   fixtures.push(fixture);

@@ -117,6 +117,8 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
               onChooseMainlineParent={controller.chooseMainlineParent}
               onInspectCommit={controller.inspectCommit}
               onLoadMore={controller.loadMoreCommits}
+              onResetLoaded={controller.resetLoadedCommits}
+              onClearSelection={controller.clearCommitSelection}
             />
             <div className={styles.reviewArea}>
               {controller.state.range.status === "ready" ? (
