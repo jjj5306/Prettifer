@@ -16,6 +16,7 @@ describe("preload desktop API", () => {
       "searchSymbol",
       "cancelComposition",
       "readBaseFile",
+      "listBaseTree",
       "readGroupingRules",
       "saveGroupingRules",
     ]);

@@ -81,6 +81,7 @@ function createController(withResult = false): AppController {
         rules: [{ prefix: "src", name: "Source" }],
         saveDiagnostic: null,
       },
+      baseTree: { status: "idle" },
       externalFile: { status: "idle" },
       reveal: null,
       navigationHistory: [],
@@ -98,6 +99,7 @@ function createController(withResult = false): AppController {
     goToHit: vi.fn(),
     dismissSymbolLookup: vi.fn(),
     goBack: vi.fn(),
+    loadBaseTree: vi.fn().mockResolvedValue(undefined),
     saveGroupingRules: vi.fn().mockResolvedValue(undefined),
   };
 }
@@ -205,6 +207,7 @@ describe("desktop workspace accessibility", () => {
       screen.getByRole("button", { name: "Tree View" }),
       screen.getByRole("button", { name: "List View" }),
       screen.getByRole("button", { name: "Config View" }),
+      screen.getByRole("button", { name: "Full Tree" }),
       screen.getByRole("button", { name: "Currently viewing file: src/app.ts (Modified)" }),
       screen.getByRole("separator", { name: "Resize Changed Files" }),
       screen.getByRole("button", { name: "Side-by-side" }),

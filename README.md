@@ -171,6 +171,7 @@ src/
 ├─ composition/    선택 커밋 합성과 결과 수집
 ├─ symbols/        심볼 판정, 검색, 파일 읽기
 ├─ grouping/       경로 prefix 규칙과 변경 파일 그룹화
+├─ base-tree/      비교 기준 커밋의 추적 경로 조회
 ├─ git/            Git 실행 경계
 └─ desktop/
    ├─ main/        Git, 파일 시스템, 결과 계산
@@ -204,6 +205,7 @@ src/
 - Java, C/C++, TypeScript, JavaScript 심볼 정의·참조 탐색
 - 선택 결과 밖의 파일을 비교 기준 시점 내용으로 표시
 - 저장소별 경로 prefix 규칙으로 변경 파일 그룹화(Config View)
+- 저장소 전체 구조 안에서 변경 위치 확인과 변경되지 않은 파일 검토(Full Tree)
 
 ### 미지원
 

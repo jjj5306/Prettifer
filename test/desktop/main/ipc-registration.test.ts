@@ -28,6 +28,7 @@ describe("desktop IPC registration", () => {
       composeSelection: handler,
       cancelComposition: handler,
       readBaseFile: handler,
+      listBaseTree: handler,
       readGroupingRules: handler,
       saveGroupingRules: handler,
     };
@@ -59,6 +60,7 @@ describe("desktop IPC registration", () => {
       composeSelection: vi.fn(),
       cancelComposition: vi.fn(),
       readBaseFile: vi.fn(),
+      listBaseTree: vi.fn(),
       readGroupingRules: vi.fn(),
       saveGroupingRules: vi.fn(),
     });

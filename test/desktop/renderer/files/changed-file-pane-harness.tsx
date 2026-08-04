@@ -1,6 +1,10 @@
 import { ChangedFilePane } from "../../../../src/desktop/renderer/files/ChangedFilePane.js";
+import { changedPathsOf } from "../../../../src/desktop/renderer/files/full-tree.js";
 import { useChangedFileView } from "../../../../src/desktop/renderer/files/use-changed-file-view.js";
-import type { GroupingRulesState } from "../../../../src/desktop/renderer/state/app-state.js";
+import type {
+  BaseTreeState,
+  GroupingRulesState,
+} from "../../../../src/desktop/renderer/state/app-state.js";
 import type {
   CompositeDiffResultDto,
   GroupRuleDto,
@@ -14,10 +18,13 @@ export const NO_RULES: GroupingRulesState = {
 
 export const REPOSITORY_PATH = "C:\\work\\repo";
 
+export const NO_BASE_TREE: BaseTreeState = { status: "idle" };
+
 interface PaneProps {
   readonly result: CompositeDiffResultDto;
   readonly selectedFilePath: string | null;
   readonly groupingRules?: GroupingRulesState;
+  readonly baseTree?: BaseTreeState;
   readonly repositoryPath?: string;
   readonly onSelectFile: (path: string) => void;
   readonly onChangeRules?: (rules: readonly GroupRuleDto[]) => void;
@@ -31,11 +38,14 @@ export const Pane = ({
   result,
   selectedFilePath,
   groupingRules = NO_RULES,
+  baseTree = NO_BASE_TREE,
   repositoryPath = REPOSITORY_PATH,
   onSelectFile,
   onChangeRules = () => undefined,
 }: PaneProps) => {
-  const control = useChangedFileView(selectedFilePath, groupingRules);
+  const control = useChangedFileView(selectedFilePath, groupingRules, {
+    changedPaths: changedPathsOf(result),
+  });
   return (
     <ChangedFilePane
       isCurrentRegion={false}
@@ -43,6 +53,7 @@ export const Pane = ({
       selectedFilePath={selectedFilePath}
       repositoryPath={repositoryPath}
       groupingRules={groupingRules}
+      baseTree={baseTree}
       control={control}
       onSelectFile={onSelectFile}
       onChangeRules={onChangeRules}

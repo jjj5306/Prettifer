@@ -3,6 +3,8 @@ import {
   type ApiResult,
   type BaseFileDto,
   type BaseFileRequest,
+  type BaseTreeDto,
+  type BaseTreeRequest,
   type CancelCompositionRequest,
   type CommitPageRequest,
   type CompositeDiffResultDto,
@@ -53,6 +55,10 @@ export function createDesktopApi(invoke: Invoke): DesktopApi {
       DESKTOP_CHANNELS.readBaseFile,
       request,
     ) as Promise<ApiResult<BaseFileDto>>,
+    listBaseTree: (request: BaseTreeRequest) => invoke(
+      DESKTOP_CHANNELS.listBaseTree,
+      request,
+    ) as Promise<ApiResult<BaseTreeDto>>,
     readGroupingRules: (request: GroupingRulesRequest) => invoke(
       DESKTOP_CHANNELS.readGroupingRules,
       request,

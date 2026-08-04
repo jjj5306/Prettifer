@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createDesktopRequestHandlers } from "../../../src/desktop/main/desktop-request-handlers.js";
 import { RepositorySessionError } from "../../../src/desktop/main/repository-session.js";
 import { GroupingRuleStoreError } from "../../../src/desktop/main/grouping-rule-store.js";
+import { BaseTreeError } from "../../../src/base-tree/base-tree-lister.js";
 import { BaseFileError } from "../../../src/symbols/base-file-reader.js";
 
 const repositorySessionId = "00000000-0000-4000-8000-000000000001";
@@ -69,6 +70,12 @@ function createDependencies() {
         rangeRevision: range.rangeRevision,
         commits: [],
         nextOffset: null,
+      }),
+    },
+    baseTree: {
+      list: vi.fn().mockResolvedValue({
+        paths: ["README.md", "src/auth/login.ts"],
+        truncated: false,
       }),
     },
     groupingRules: {
@@ -452,5 +459,59 @@ describe("desktop request handlers", () => {
       diagnostic: { code: "GROUP_RULE_PREFIX_DUPLICATE" },
     });
     expect(dependencies.groupingRules.write).not.toHaveBeenCalled();
+  });
+  it("lists the comparison base paths of the requested range", async () => {
+    const dependencies = createDependencies();
+    const handlers = createDesktopRequestHandlers(dependencies);
+
+    const result = await handlers.listBaseTree(trustedEvent, {
+      repositorySessionId,
+      sessionRevision: 1,
+      range,
+    });
+
+    expect(result).toEqual({
+      status: "success",
+      data: { paths: ["README.md", "src/auth/login.ts"], truncated: false },
+    });
+    expect(dependencies.baseTree.list).toHaveBeenCalledWith(
+      session.rootPath,
+      range.baseCommit,
+      undefined,
+    );
+  });
+
+  it("refuses to list a range that no longer matches the session", async () => {
+    const dependencies = createDependencies();
+    const handlers = createDesktopRequestHandlers(dependencies);
+
+    await expect(handlers.listBaseTree(trustedEvent, {
+      repositorySessionId,
+      sessionRevision: 1,
+      range: {
+        ...range,
+        headCommit: "e".repeat(40),
+        rangeRevision: `${baseCommit}:${"e".repeat(40)}:${commonCommit}`,
+      },
+    })).resolves.toMatchObject({
+      status: "error",
+      diagnostic: { code: "RANGE_EXPIRED" },
+    });
+    expect(dependencies.baseTree.list).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed path listing with a next action", async () => {
+    const dependencies = createDependencies();
+    dependencies.baseTree.list.mockRejectedValue(new BaseTreeError());
+    const handlers = createDesktopRequestHandlers(dependencies);
+
+    await expect(handlers.listBaseTree(trustedEvent, {
+      repositorySessionId,
+      sessionRevision: 1,
+      range,
+    })).resolves.toMatchObject({
+      status: "error",
+      diagnostic: { code: "BASE_TREE_LIST_FAILED", subject: "Repository tree" },
+    });
   });
 });

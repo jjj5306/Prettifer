@@ -31,6 +31,7 @@ const baseState: AppState = {
   selectedFilePath: null,
   symbolLookup: { status: "idle" },
   groupingRules: { status: "idle" },
+  baseTree: { status: "idle" },
   externalFile: { status: "idle" },
   reveal: null,
   navigationHistory: [],

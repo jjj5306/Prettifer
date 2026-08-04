@@ -1,5 +1,6 @@
 import {
   baseFileRequestSchema,
+  baseTreeRequestSchema,
   cancelCompositionRequestSchema,
   commitPageRequestSchema,
   compositionRequestSchema,
@@ -10,6 +11,8 @@ import {
   type ApiResult,
   type BaseFileDto,
   type BaseFileRequest,
+  type BaseTreeDto,
+  type BaseTreeRequest,
   type CancelCompositionRequest,
   type CommitPageRequest,
   type CompositeDiffResultDto,
@@ -33,6 +36,7 @@ import {
   type RepositoryCommitPage,
   type RepositoryRange,
 } from "../../history/repository-history-service.js";
+import { BaseTreeError } from "../../base-tree/base-tree-lister.js";
 import { BaseFileError } from "../../symbols/base-file-reader.js";
 import { GroupingRuleStoreError, type GroupingRuleStore } from "./grouping-rule-store.js";
 import { RepositorySessionError } from "./repository-session.js";
@@ -85,6 +89,15 @@ interface SymbolSearcher {
   }>;
 }
 
+/** Lists the paths tracked at a commit, for the whole-repository view. */
+interface BaseTreeSource {
+  list(
+    repositoryPath: string,
+    commit: string,
+    signal?: AbortSignal,
+  ): Promise<{ readonly paths: readonly string[]; readonly truncated: boolean }>;
+}
+
 /** Reads one file at a commit, for a navigation that leaves the result. */
 interface BaseFileSource {
   read(
@@ -113,6 +126,7 @@ interface DesktopRequestDependencies {
   readonly composition: CompositionBoundary;
   readonly symbols: SymbolSearcher;
   readonly baseFiles: BaseFileSource;
+  readonly baseTree: BaseTreeSource;
   readonly groupingRules: GroupingRuleStore;
   readonly signal?: AbortSignal;
 }
@@ -148,6 +162,11 @@ export function createDesktopRequestHandlers(dependencies: DesktopRequestDepende
       event,
       dependencies,
       async () => readBaseFile(dependencies, parseRequest(baseFileRequestSchema, input)),
+    ),
+    listBaseTree: (event: DesktopInvokeEvent, input: unknown) => handleRequest(
+      event,
+      dependencies,
+      async () => listBaseTree(dependencies, parseRequest(baseTreeRequestSchema, input)),
     ),
     readGroupingRules: (event: DesktopInvokeEvent, input: unknown) => handleRequest(
       event,
@@ -253,6 +272,27 @@ async function readBaseFile(
     dependencies.signal,
   );
   return { status: "success", data: { path: file.path, contents: file.contents } };
+}
+
+/**
+ * Lists the paths tracked at the comparison base, so the review can place a
+ * change inside the project structure. Asked for once per range.
+ */
+async function listBaseTree(
+  dependencies: DesktopRequestDependencies,
+  request: BaseTreeRequest,
+): Promise<ApiResult<BaseTreeDto>> {
+  const session = requireSession(dependencies, request);
+  assertRangeBelongsToSession(session, request.range);
+  const listing = await dependencies.baseTree.list(
+    session.rootPath,
+    request.range.baseCommit,
+    dependencies.signal,
+  );
+  return {
+    status: "success",
+    data: { paths: [...listing.paths], truncated: listing.truncated },
+  };
 }
 
 /**
@@ -433,6 +473,7 @@ function toDiagnostic(error: unknown): Diagnostic {
     error instanceof RepositorySessionError ||
     error instanceof RepositoryHistoryError ||
     error instanceof BaseFileError ||
+    error instanceof BaseTreeError ||
     error instanceof GroupingRuleStoreError
   ) {
     return {
