@@ -3,6 +3,15 @@ import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+export interface HistoryFixtureOptions {
+  /**
+   * Commits added to the head branch beyond the ones the fixture always makes.
+   * The default fills more than one page so paging can be exercised; a test that
+   * does not page can ask for fewer and skip the cost.
+   */
+  readonly fillerCommits?: number;
+}
+
 export interface HistoryFixture {
   readonly path: string;
   readonly baseRef: string;
@@ -16,7 +25,13 @@ export interface HistoryFixture {
   dispose(): Promise<void>;
 }
 
-export async function createHistoryFixture(): Promise<HistoryFixture> {
+/** One more than a full page, so the first page is full and a second one exists. */
+const DEFAULT_FILLER_COMMITS = 103;
+
+export async function createHistoryFixture(
+  options: HistoryFixtureOptions = {},
+): Promise<HistoryFixture> {
+  const fillerCommits = options.fillerCommits ?? DEFAULT_FILLER_COMMITS;
   // realpath resolves 8.3 short names so fixture paths match what Git reports.
   const path = await realpath(await mkdtemp(join(tmpdir(), "prettifer-history-")));
   const git = (args: readonly string[]): string =>
@@ -70,7 +85,7 @@ export async function createHistoryFixture(): Promise<HistoryFixture> {
   commit("feat(history): add side branch");
 
   git(["switch", "feature/desktop-history"]);
-  for (let index = 1; index <= 103; index += 1) {
+  for (let index = 1; index <= fillerCommits; index += 1) {
     commit(`feat(history): commit ${String(index).padStart(3, "0")}`, true);
   }
   git(["merge", "--no-ff", "feature/history-side", "-m", "merge: include history side branch"]);
