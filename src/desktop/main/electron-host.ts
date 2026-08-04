@@ -1,3 +1,5 @@
+import { join } from "node:path";
+
 import {
   app,
   BrowserWindow,
@@ -54,7 +56,12 @@ export function runElectronApplication(
 
   void app.whenReady().then(() => {
     configureSessionSecurity();
-    return startDesktopApplication(createElectronHost(), createSeams());
+    // The settings folder is the one place the application writes, so every
+    // entry gets the same location and no repository under review is touched.
+    return startDesktopApplication(createElectronHost(), {
+      groupingRulesPath: join(app.getPath("userData"), "grouping-rules.json"),
+      ...createSeams(),
+    });
   }).catch((error: unknown) => {
     console.error("Prettifer failed to start.", error);
     app.quit();

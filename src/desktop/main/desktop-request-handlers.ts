@@ -3,7 +3,9 @@ import {
   cancelCompositionRequestSchema,
   commitPageRequestSchema,
   compositionRequestSchema,
+  groupingRulesRequestSchema,
   rangeRequestSchema,
+  saveGroupingRulesRequestSchema,
   symbolSearchRequestSchema,
   type ApiResult,
   type BaseFileDto,
@@ -13,21 +15,26 @@ import {
   type CompositeDiffResultDto,
   type CompositionRequest,
   type Diagnostic,
+  type GroupingRulesDto,
+  type GroupingRulesRequest,
   type RangeRequest,
   type RangeResult,
   type RepositoryCommitPageDto,
   type RepositoryRangeDto,
   type RepositorySession,
+  type SaveGroupingRulesRequest,
   type SymbolHitDto,
   type SymbolSearchRequest,
   type SymbolSearchResultDto,
 } from "../shared/index.js";
+import { checkGroupRule, type GroupRule } from "../../grouping/group-rule.js";
 import {
   RepositoryHistoryError,
   type RepositoryCommitPage,
   type RepositoryRange,
 } from "../../history/repository-history-service.js";
 import { BaseFileError } from "../../symbols/base-file-reader.js";
+import { GroupingRuleStoreError, type GroupingRuleStore } from "./grouping-rule-store.js";
 import { RepositorySessionError } from "./repository-session.js";
 import { applicationUrlsMatch } from "./application-url.js";
 
@@ -106,6 +113,7 @@ interface DesktopRequestDependencies {
   readonly composition: CompositionBoundary;
   readonly symbols: SymbolSearcher;
   readonly baseFiles: BaseFileSource;
+  readonly groupingRules: GroupingRuleStore;
   readonly signal?: AbortSignal;
 }
 
@@ -140,6 +148,22 @@ export function createDesktopRequestHandlers(dependencies: DesktopRequestDepende
       event,
       dependencies,
       async () => readBaseFile(dependencies, parseRequest(baseFileRequestSchema, input)),
+    ),
+    readGroupingRules: (event: DesktopInvokeEvent, input: unknown) => handleRequest(
+      event,
+      dependencies,
+      async () => readGroupingRules(
+        dependencies,
+        parseRequest(groupingRulesRequestSchema, input),
+      ),
+    ),
+    saveGroupingRules: (event: DesktopInvokeEvent, input: unknown) => handleRequest(
+      event,
+      dependencies,
+      async () => saveGroupingRules(
+        dependencies,
+        parseRequest(saveGroupingRulesRequestSchema, input),
+      ),
     ),
     composeSelection: (event: DesktopInvokeEvent, input: unknown) => handleRequest(
       event,
@@ -229,6 +253,47 @@ async function readBaseFile(
     dependencies.signal,
   );
   return { status: "success", data: { path: file.path, contents: file.contents } };
+}
+
+/**
+ * Reads the rules of the session's repository. The stored list is returned as it
+ * is: whether a rule can be applied is decided where the groups are drawn, so a
+ * file edited by hand shows its problem instead of losing the rule silently.
+ */
+async function readGroupingRules(
+  dependencies: DesktopRequestDependencies,
+  request: GroupingRulesRequest,
+): Promise<ApiResult<GroupingRulesDto>> {
+  const session = requireSession(dependencies, request);
+  const rules = await dependencies.groupingRules.read(session.rootPath);
+  return { status: "success", data: { rules: rules.map((rule) => ({ ...rule })) } };
+}
+
+/**
+ * Replaces the rules of the session's repository. The window checks every rule
+ * before it offers to save; checking again here keeps a request that skipped the
+ * screen from writing a rule the panel could not apply.
+ */
+async function saveGroupingRules(
+  dependencies: DesktopRequestDependencies,
+  request: SaveGroupingRulesRequest,
+): Promise<ApiResult<GroupingRulesDto>> {
+  const session = requireSession(dependencies, request);
+  const accepted: GroupRule[] = [];
+  for (const rule of request.rules) {
+    const problem = checkGroupRule(rule, accepted);
+    if (problem !== null) {
+      throw new RequestBoundaryError(
+        problem.code,
+        problem.subject,
+        problem.nextAction,
+        problem.message,
+      );
+    }
+    accepted.push(rule);
+  }
+  await dependencies.groupingRules.write(session.rootPath, accepted);
+  return { status: "success", data: { rules: accepted.map((rule) => ({ ...rule })) } };
 }
 
 async function listCommits(
@@ -367,7 +432,8 @@ function toDiagnostic(error: unknown): Diagnostic {
     error instanceof RequestBoundaryError ||
     error instanceof RepositorySessionError ||
     error instanceof RepositoryHistoryError ||
-    error instanceof BaseFileError
+    error instanceof BaseFileError ||
+    error instanceof GroupingRuleStoreError
   ) {
     return {
       code: error.code,

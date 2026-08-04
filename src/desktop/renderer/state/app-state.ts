@@ -1,6 +1,7 @@
 import type {
   CompositeDiffResultDto,
   Diagnostic,
+  GroupRuleDto,
   RangeResult,
   RepositoryCommitDto,
   RepositoryRangeDto,
@@ -92,12 +93,29 @@ export interface AppState {
   readonly composition: CompositionState;
   readonly selectedFilePath: string | null;
   readonly symbolLookup: SymbolLookupState;
+  readonly groupingRules: GroupingRulesState;
   readonly externalFile: ExternalFileState;
   /** Position the review should reveal, set by a symbol navigation. */
   readonly reveal: ReviewPosition | null;
   /** Positions to return to, newest last. */
   readonly navigationHistory: readonly ReviewPosition[];
 }
+
+/**
+ * The grouping rules of the open repository, as the settings file holds them.
+ * An edit stays in `ready` even when saving it failed, so a save the settings
+ * folder refused never costs the user the rule they just wrote.
+ */
+export type GroupingRulesState =
+  | Readonly<{ status: "idle" }>
+  | Readonly<{ status: "loading"; requestId: string }>
+  | Readonly<{
+      status: "ready";
+      rules: readonly GroupRuleDto[];
+      /** Set when the last edit did not reach the settings file. */
+      saveDiagnostic: Diagnostic | null;
+    }>
+  | Readonly<{ status: "error"; diagnostic: Diagnostic }>;
 
 export interface ReviewPosition {
   readonly path: string;
@@ -170,6 +188,11 @@ export type AppAction =
     }>
   | Readonly<{ type: "external/opened"; path: string; contents: string }>
   | Readonly<{ type: "external/failed"; path: string; diagnostic: Diagnostic }>
+  | Readonly<{ type: "rules/loading"; requestId: string }>
+  | Readonly<{ type: "rules/loaded"; requestId: string; rules: readonly GroupRuleDto[] }>
+  | Readonly<{ type: "rules/failed"; requestId: string; diagnostic: Diagnostic }>
+  | Readonly<{ type: "rules/changed"; rules: readonly GroupRuleDto[] }>
+  | Readonly<{ type: "rules/saveFailed"; diagnostic: Diagnostic }>
   | Readonly<{ type: "repository/selecting"; requestId: string }>
   | Readonly<{ type: "repository/cancelled"; requestId: string }>
   | Readonly<{
@@ -266,6 +289,7 @@ export const initialAppState: AppState = {
   composition: { status: "idle" },
   selectedFilePath: null,
   symbolLookup: { status: "idle" },
+  groupingRules: { status: "idle" },
   externalFile: { status: "idle" },
   reveal: null,
   navigationHistory: [],
@@ -284,6 +308,35 @@ const clearedSymbolNavigation = {
 
 export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
+    case "rules/loading":
+      return { ...state, groupingRules: { status: "loading", requestId: action.requestId } };
+    case "rules/loaded":
+      return matchesRuleRequest(state, action.requestId)
+        ? {
+            ...state,
+            groupingRules: {
+              status: "ready",
+              rules: action.rules,
+              saveDiagnostic: null,
+            },
+          }
+        : state;
+    case "rules/failed":
+      return matchesRuleRequest(state, action.requestId)
+        ? { ...state, groupingRules: { status: "error", diagnostic: action.diagnostic } }
+        : state;
+    case "rules/changed":
+      return {
+        ...state,
+        groupingRules: { status: "ready", rules: action.rules, saveDiagnostic: null },
+      };
+    case "rules/saveFailed":
+      return state.groupingRules.status === "ready"
+        ? {
+            ...state,
+            groupingRules: { ...state.groupingRules, saveDiagnostic: action.diagnostic },
+          }
+        : state;
     case "symbol/looking":
       return {
         ...state,
@@ -556,6 +609,12 @@ export function appReducer(state: AppState, action: AppAction): AppState {
   }
 }
 
+/** A reply is applied only while its own read is still the one running. */
+function matchesRuleRequest(state: AppState, requestId: string): boolean {
+  return state.groupingRules.status === "loading"
+    && state.groupingRules.requestId === requestId;
+}
+
 function stableRepository(repository: RepositoryState): StableRepositoryState {
   return repository.status === "selecting" ? repository.previous : repository;
 }
@@ -593,6 +652,8 @@ function resetForRepository(state: AppState, session: RepositorySession): AppSta
     inspectedCommitId: null,
     composition: { status: "idle" },
     selectedFilePath: null,
+    // Rules belong to one repository, so the next one starts from its own file.
+    groupingRules: { status: "idle" },
     ...clearedSymbolNavigation,
   };
 }

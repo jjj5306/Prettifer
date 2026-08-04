@@ -39,6 +39,14 @@ function createApi(overrides: Partial<DesktopApi> = {}): DesktopApi {
       status: "success",
       data: { path: "src/UtVar.java", contents: "public class UtVar {}" },
     }),
+    readGroupingRules: vi.fn().mockResolvedValue({
+      status: "success",
+      data: { rules: [] },
+    }),
+    saveGroupingRules: vi.fn().mockResolvedValue({
+      status: "success",
+      data: { rules: [] },
+    }),
     ...overrides,
   };
 }
@@ -751,5 +759,114 @@ describe("useAppController navigation outside the result", () => {
     // Going back consumed the entry rather than adding another one.
     expect(controller.current.state.navigationHistory).toHaveLength(1);
     expect(readBaseFile).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("useAppController grouping rules", () => {
+  const opened = async (overrides: Partial<DesktopApi> = {}) => {
+    const api = createApi({
+      openInitialRepository: vi.fn().mockResolvedValue({ status: "success", data: session }),
+      ...overrides,
+    });
+    let request = 0;
+    const { result } = renderHook(
+      () => useAppController(api, () => `request-${String(++request)}`),
+      { wrapper },
+    );
+    // The repository settles first, and only then does the rule read it starts.
+    await act(() => Promise.resolve());
+    await act(() => Promise.resolve());
+    return { api, controller: result };
+  };
+
+  it("restores the rules of the repository it opened", async () => {
+    const readGroupingRules = vi.fn().mockResolvedValue({
+      status: "success",
+      data: { rules: [{ prefix: "tests", name: "Tests" }] },
+    });
+
+    const { controller } = await opened({ readGroupingRules });
+
+    expect(readGroupingRules).toHaveBeenCalledWith({
+      repositorySessionId: session.repositorySessionId,
+      sessionRevision: session.sessionRevision,
+    });
+    expect(controller.current.state.groupingRules).toEqual({
+      status: "ready",
+      rules: [{ prefix: "tests", name: "Tests" }],
+      saveDiagnostic: null,
+    });
+  });
+
+  it("does not read the settings again when the screen re-renders", async () => {
+    const readGroupingRules = vi.fn().mockResolvedValue({
+      status: "success",
+      data: { rules: [] },
+    });
+    const { controller } = await opened({ readGroupingRules });
+    const reads = readGroupingRules.mock.calls.length;
+
+    act(() => { controller.current.selectFile("src/app.ts"); });
+    await act(() => Promise.resolve());
+
+    expect(readGroupingRules).toHaveBeenCalledTimes(reads);
+  });
+
+  it("reports a settings file it could not read", async () => {
+    const diagnostic = {
+      code: "GROUPING_RULES_UNREADABLE",
+      message: "The saved grouping rules are not in a form Prettifer understands.",
+      subject: "Group rules",
+      nextAction: "Fix or remove the grouping rules file, then reopen the repository.",
+    };
+
+    const { controller } = await opened({
+      readGroupingRules: vi.fn().mockResolvedValue({ status: "error", diagnostic }),
+    });
+
+    expect(controller.current.state.groupingRules).toEqual({ status: "error", diagnostic });
+  });
+
+  it("saves an edited rule list for the open repository", async () => {
+    const saveGroupingRules = vi.fn().mockResolvedValue({
+      status: "success",
+      data: { rules: [] },
+    });
+    const { controller } = await opened({ saveGroupingRules });
+    const rules = [{ prefix: "tests", name: "Tests" }];
+
+    await act(() => controller.current.saveGroupingRules(rules));
+
+    expect(saveGroupingRules).toHaveBeenCalledWith({
+      repositorySessionId: session.repositorySessionId,
+      sessionRevision: session.sessionRevision,
+      rules,
+    });
+    expect(controller.current.state.groupingRules).toEqual({
+      status: "ready",
+      rules,
+      saveDiagnostic: null,
+    });
+  });
+
+  it("keeps the edit on screen when the settings file refused the save", async () => {
+    const diagnostic = {
+      code: "GROUPING_RULES_WRITE_FAILED",
+      message: "Prettifer could not save the grouping rules.",
+      subject: "Group rules",
+      nextAction: "Check that Prettifer can write to its settings folder, then save again.",
+    };
+    const { controller } = await opened({
+      saveGroupingRules: vi.fn().mockResolvedValue({ status: "error", diagnostic }),
+    });
+    const rules = [{ prefix: "tests", name: "Tests" }];
+
+    await act(() => controller.current.saveGroupingRules(rules));
+
+    expect(controller.current.state.groupingRules).toEqual({
+      status: "ready",
+      rules,
+      saveDiagnostic: diagnostic,
+    });
   });
 });

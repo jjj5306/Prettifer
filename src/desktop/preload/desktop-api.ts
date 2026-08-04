@@ -8,10 +8,13 @@ import {
   type CompositeDiffResultDto,
   type CompositionRequest,
   type DesktopApi,
+  type GroupingRulesDto,
+  type GroupingRulesRequest,
   type RangeRequest,
   type RangeResult,
   type RepositoryCommitPageDto,
   type RepositorySession,
+  type SaveGroupingRulesRequest,
   type SymbolSearchRequest,
   type SymbolSearchResultDto,
 } from "../shared/index.js";
@@ -50,5 +53,13 @@ export function createDesktopApi(invoke: Invoke): DesktopApi {
       DESKTOP_CHANNELS.readBaseFile,
       request,
     ) as Promise<ApiResult<BaseFileDto>>,
+    readGroupingRules: (request: GroupingRulesRequest) => invoke(
+      DESKTOP_CHANNELS.readGroupingRules,
+      request,
+    ) as Promise<ApiResult<GroupingRulesDto>>,
+    saveGroupingRules: (request: SaveGroupingRulesRequest) => invoke(
+      DESKTOP_CHANNELS.saveGroupingRules,
+      request,
+    ) as Promise<ApiResult<GroupingRulesDto>>,
   });
 }

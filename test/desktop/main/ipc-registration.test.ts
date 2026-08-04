@@ -28,6 +28,8 @@ describe("desktop IPC registration", () => {
       composeSelection: handler,
       cancelComposition: handler,
       readBaseFile: handler,
+      readGroupingRules: handler,
+      saveGroupingRules: handler,
     };
 
     registerDesktopRequestHandlers(ipcMain, handlers);
@@ -57,6 +59,8 @@ describe("desktop IPC registration", () => {
       composeSelection: vi.fn(),
       cancelComposition: vi.fn(),
       readBaseFile: vi.fn(),
+      readGroupingRules: vi.fn(),
+      saveGroupingRules: vi.fn(),
     });
     const input = {
       repositorySessionId: "00000000-0000-4000-8000-000000000001",

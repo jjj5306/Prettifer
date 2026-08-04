@@ -110,7 +110,12 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
                   <ChangedFilePane
                     result={controller.state.composition.result}
                     selectedFilePath={controller.state.selectedFilePath}
+                    repositoryPath={repositorySession?.rootPath ?? ""}
+                    groupingRules={controller.state.groupingRules}
                     onSelectFile={controller.selectFile}
+                    onChangeRules={(rules) => {
+                      void controller.saveGroupingRules(rules);
+                    }}
                   />
                   <PaneSplitter
                     label="Resize Changed Files"

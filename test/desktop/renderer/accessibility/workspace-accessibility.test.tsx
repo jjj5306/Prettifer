@@ -75,6 +75,7 @@ function createController(withResult = false): AppController {
         : { status: "idle" },
       selectedFilePath: withResult ? "src/app.ts" : null,
       symbolLookup: { status: "idle" },
+      groupingRules: { status: "idle" },
       externalFile: { status: "idle" },
       reveal: null,
       navigationHistory: [],
@@ -92,6 +93,7 @@ function createController(withResult = false): AppController {
     goToHit: vi.fn(),
     dismissSymbolLookup: vi.fn(),
     goBack: vi.fn(),
+    saveGroupingRules: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -196,6 +198,7 @@ describe("desktop workspace accessibility", () => {
       screen.getByRole("button", { name: "Rebuild Selected Result" }),
       screen.getByRole("button", { name: "Tree View" }),
       screen.getByRole("button", { name: "List View" }),
+      screen.getByRole("button", { name: "Config View" }),
       screen.getByRole("button", { name: "Currently viewing file: src/app.ts (Modified)" }),
       screen.getByRole("separator", { name: "Resize Changed Files" }),
       screen.getByRole("button", { name: "Side-by-side" }),

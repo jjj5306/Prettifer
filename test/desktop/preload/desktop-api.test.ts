@@ -16,6 +16,8 @@ describe("preload desktop API", () => {
       "searchSymbol",
       "cancelComposition",
       "readBaseFile",
+      "readGroupingRules",
+      "saveGroupingRules",
     ]);
     expect(api).not.toHaveProperty("invoke");
     expect(api).not.toHaveProperty("send");
