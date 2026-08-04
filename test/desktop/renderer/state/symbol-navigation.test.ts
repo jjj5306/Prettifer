@@ -43,7 +43,14 @@ function reviewingState(selectedFilePath = "src/Caller.java"): AppState {
         ],
       },
     },
-    range: { status: "ready", range, commits: [], nextOffset: null, pagination: { status: "idle" } },
+    range: {
+      status: "ready",
+      range,
+      commits: [],
+      nextOffset: null,
+      firstPageOffset: null,
+      pagination: { status: "idle" },
+    },
     composition: {
       status: "ready",
       requestId: "composition-1",

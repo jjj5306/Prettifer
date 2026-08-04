@@ -96,6 +96,7 @@ describe("RepositoryToolbar", () => {
             },
             commits: [],
             nextOffset: null,
+            firstPageOffset: null,
             pagination: { status: "idle" },
           }}
           onOpenRepository={vi.fn()}

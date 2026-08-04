@@ -81,6 +81,26 @@ function readyState() {
   });
 }
 
+/** A range whose first page is not the last, so extra pages can be added. */
+function readyStateWithMorePages() {
+  const loading = appReducer(readyState(), {
+    type: "range/loading",
+    requestId: "range-2",
+    sessionRevision: 1,
+    baseRef: "main",
+    headRef: "feature/ui",
+  });
+  return appReducer(loading, {
+    type: "range/loaded",
+    requestId: "range-2",
+    sessionRevision: 1,
+    result: {
+      range,
+      page: { rangeRevision: range.rangeRevision, commits, nextOffset: commits.length },
+    },
+  });
+}
+
 describe("app reducer", () => {
   it("represents the initial repository, range and composition as idle", () => {
     expect(initialAppState).toMatchObject({
@@ -390,5 +410,89 @@ describe("app reducer", () => {
     });
 
     expect(late.groupingRules).toEqual({ status: "loading", requestId: "rules-2" });
+  });
+  it("keeps only the first page when the loaded commits are reset", () => {
+    const older = commits.map((commit, index) => ({
+      ...commit,
+      id: String(index).repeat(40).slice(0, 40),
+    }));
+    let state = readyStateWithMorePages();
+    state = appReducer(state, {
+      type: "range/page-loading",
+      requestId: "page-1",
+      sessionRevision: 1,
+      rangeRevision: range.rangeRevision,
+    });
+    state = appReducer(state, {
+      type: "range/page-loaded",
+      requestId: "page-1",
+      sessionRevision: 1,
+      rangeRevision: range.rangeRevision,
+      commits: older,
+      nextOffset: null,
+    });
+    const grown = state.range.status === "ready" ? state.range.commits.length : 0;
+    expect(grown).toBeGreaterThan(commits.length);
+
+    state = appReducer(state, { type: "range/loadedPagesReset" });
+
+    expect(state.range).toMatchObject({
+      status: "ready",
+      commits: commits,
+      // The next request points where it did before the extra page arrived.
+      nextOffset: 2,
+    });
+  });
+
+  it("leaves the selection alone when the loaded commits are reset", () => {
+    let state = appReducer(readyStateWithMorePages(), {
+      type: "commit/toggled",
+      commitId: commits[0]!.id,
+    });
+    expect(state.selectedCommitIds).toEqual([commits[0]!.id]);
+
+    state = appReducer(state, { type: "range/loadedPagesReset" });
+
+    expect(state.selectedCommitIds).toEqual([commits[0]!.id]);
+  });
+
+  it("does nothing when only the first page is loaded", () => {
+    const state = readyState();
+
+    expect(appReducer(state, { type: "range/loadedPagesReset" })).toBe(state);
+  });
+
+  it("empties the selection and the result built from it", () => {
+    let state = appReducer(readyState(), { type: "commit/toggled", commitId: commits[0]!.id });
+    state = appReducer(state, {
+      type: "commit/mainlineParentChosen",
+      commitId: commits[1]!.id,
+      mainlineParent: 1,
+    });
+
+    state = appReducer(state, { type: "commit/selectionCleared" });
+
+    expect(state.selectedCommitIds).toEqual([]);
+    expect(state.mergeParents).toEqual({});
+    expect(state.composition).toEqual({ status: "idle" });
+    expect(state.selectedFilePath).toBeNull();
+  });
+
+  it("leaves the loaded commits alone when the selection is cleared", () => {
+    let state = appReducer(readyStateWithMorePages(), {
+      type: "commit/toggled",
+      commitId: commits[0]!.id,
+    });
+    const loaded = state.range.status === "ready" ? state.range.commits : [];
+
+    state = appReducer(state, { type: "commit/selectionCleared" });
+
+    expect(state.range).toMatchObject({ status: "ready", commits: loaded });
+  });
+
+  it("does nothing when there is no selection to clear", () => {
+    const state = readyState();
+
+    expect(appReducer(state, { type: "commit/selectionCleared" })).toBe(state);
   });
 });

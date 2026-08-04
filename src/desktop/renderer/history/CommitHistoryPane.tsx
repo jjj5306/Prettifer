@@ -17,6 +17,18 @@ interface CommitHistoryPaneProps {
   readonly onChooseMainlineParent: (commitId: string, mainlineParent: number) => void;
   readonly onInspectCommit: (commitId: string) => void;
   readonly onLoadMore: () => void | Promise<void>;
+  /** Drops the pages the user added. Absent when only the first page is loaded. */
+  readonly onResetLoaded: () => void;
+  readonly onClearSelection: () => void;
+}
+
+/**
+ * Whether the user added pages beyond the first one. Only then is there anything
+ * for the reset to undo, and a control that changes nothing is worse than none.
+ */
+function hasAddedPages(range: Extract<RangeState, { status: "ready" }>): boolean {
+  return range.firstPageOffset !== null
+    && range.commits.length > range.firstPageOffset;
 }
 
 export const CommitHistoryPane = ({
@@ -29,6 +41,8 @@ export const CommitHistoryPane = ({
   onChooseMainlineParent,
   onInspectCommit,
   onLoadMore,
+  onResetLoaded,
+  onClearSelection,
 }: CommitHistoryPaneProps) => {
   const firstCommitRef = useRef<HTMLInputElement>(null);
   const firstCommitButtonRef = useRef<HTMLButtonElement>(null);
@@ -110,6 +124,11 @@ export const CommitHistoryPane = ({
       <div className={styles.headingRow}>
         <h2 id="commit-history-heading">Commit History</h2>
         <strong>{selectedCommitIds.length} selected</strong>
+        {selectedCommitIds.length === 0 ? null : (
+          <button type="button" className={styles.reset} onClick={onClearSelection}>
+            Clear selection
+          </button>
+        )}
       </div>
       {range.commits.length === 0 ? (
         <p>No commits are available in this range. Choose another branch range.</p>
@@ -201,6 +220,11 @@ export const CommitHistoryPane = ({
             : "Load 100 older commits"}
         </button>
       )}
+      {hasAddedPages(range) ? (
+        <button type="button" className={styles.reset} onClick={onResetLoaded}>
+          Reset loaded commits
+        </button>
+      ) : null}
       {range.pagination.status === "error" ? (
         <DiagnosticMessage diagnostic={range.pagination.diagnostic} />
       ) : null}

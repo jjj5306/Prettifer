@@ -29,6 +29,10 @@ export interface AppController {
   readonly loadRange: (baseRef: string, headRef: string) => Promise<void>;
   readonly loadMoreCommits: () => Promise<void>;
   readonly toggleCommit: (commitId: string) => void;
+  /** Drops the pages the user added and keeps the first one. Reads nothing. */
+  readonly resetLoadedCommits: () => void;
+  /** Empties the commit selection and the result built from it. */
+  readonly clearCommitSelection: () => void;
   readonly inspectCommit: (commitId: string) => void;
   readonly composeSelection: () => Promise<void>;
   readonly chooseMainlineParent: (commitId: string, mainlineParent: number) => void;
@@ -587,6 +591,13 @@ export function useAppController(
     toggleCommit: (commitId) => {
       cancelActiveForStateChange();
       dispatch({ type: "commit/toggled", commitId });
+    },
+    resetLoadedCommits: () => {
+      dispatch({ type: "range/loadedPagesReset" });
+    },
+    clearCommitSelection: () => {
+      cancelActiveForStateChange();
+      dispatch({ type: "commit/selectionCleared" });
     },
     inspectCommit: (commitId) => {
       dispatch({ type: "commit/inspected", commitId });

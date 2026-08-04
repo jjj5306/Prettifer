@@ -66,6 +66,7 @@ function createController(withResult = false): AppController {
         },
         commits: [firstCommit],
         nextOffset: null,
+        firstPageOffset: null,
         pagination: { status: "idle" },
       },
       selectedCommitIds: withResult ? [firstCommit.id] : [],
@@ -90,6 +91,8 @@ function createController(withResult = false): AppController {
     loadRange: vi.fn(),
     loadMoreCommits: vi.fn(),
     toggleCommit: vi.fn(),
+    resetLoadedCommits: vi.fn(),
+    clearCommitSelection: vi.fn(),
     inspectCommit: vi.fn(),
     chooseMainlineParent: vi.fn(),
     composeSelection: vi.fn(),
@@ -194,6 +197,8 @@ describe("desktop workspace accessibility", () => {
       screen.getByRole("combobox", { name: "Base branch" }),
       screen.getByRole("combobox", { name: "Working branch" }),
       screen.getByRole("button", { name: "Load Commit Range" }),
+      // Sits in the Commit History heading row, before the commit list.
+      screen.getByRole("button", { name: "Clear selection" }),
       screen.getByRole("checkbox", { name: `Include in selected result: ${firstCommit.title}` }),
       screen.getByRole("button", {
         name: [

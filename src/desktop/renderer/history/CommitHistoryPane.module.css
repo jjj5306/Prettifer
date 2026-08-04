@@ -223,3 +223,16 @@
 .commitRow .mainlineParent select[aria-invalid="true"] {
   border-color: var(--color-warning);
 }
+
+/* A quiet undo beside the state it undoes, not competing with the main actions. */
+.panel .reset {
+  flex: 0 0 auto;
+  min-height: 1.55rem;
+  padding: 0.1rem var(--space-2);
+  color: var(--color-muted);
+  font-size: 0.6875rem;
+}
+
+.panel .reset:hover:not(:disabled) {
+  color: var(--color-text);
+}
