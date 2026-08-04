@@ -4,6 +4,7 @@ import type {
   ApiResult,
   DesktopApi,
   Diagnostic,
+  GroupRuleDto,
   RepositorySession,
   SymbolHitDto,
 } from "../../shared/index.js";
@@ -42,6 +43,8 @@ export interface AppController {
   readonly goToHit: (hit: SymbolHitDto, symbol: string) => void;
   readonly dismissSymbolLookup: () => void;
   readonly goBack: () => void;
+  /** Replaces the grouping rules of the open repository and saves them. */
+  readonly saveGroupingRules: (rules: readonly GroupRuleDto[]) => Promise<void>;
 }
 
 export function useAppController(
@@ -105,6 +108,73 @@ export function useAppController(
     // to them would reopen the repository on every render (issue #53).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /*
+   * Grouping rules live in the application settings, outside the repository
+   * under review, so they are read once per repository session and kept in
+   * state from then on. Switching repositories resets them, which is what makes
+   * this run again for the next one.
+   */
+  const openSession = selectRepositorySession(state.repository);
+  const openSessionId = openSession?.repositorySessionId ?? null;
+  const openSessionRevision = openSession?.sessionRevision ?? null;
+  useEffect(() => {
+    if (openSessionId === null || openSessionRevision === null) {
+      return undefined;
+    }
+    let applies = true;
+    const requestId = createRequestId();
+    dispatch({ type: "rules/loading", requestId });
+    api.readGroupingRules({
+      repositorySessionId: openSessionId,
+      sessionRevision: openSessionRevision,
+    }).then((result) => {
+      if (!applies) {
+        return;
+      }
+      if (result.status === "success") {
+        dispatch({ type: "rules/loaded", requestId, rules: result.data.rules });
+      } else if (result.status === "error") {
+        dispatch({ type: "rules/failed", requestId, diagnostic: result.diagnostic });
+      }
+    }).catch((error: unknown) => {
+      if (applies) {
+        dispatch({ type: "rules/failed", requestId, diagnostic: connectionDiagnostic(error) });
+      }
+    });
+    return () => { applies = false; };
+    // Reading is tied to the repository session, not to the identity `api` and
+    // `createRequestId` happen to have on a render. Reacting to those would read
+    // the settings again on every render, the same trap as issue #53. The rule
+    // state is deliberately absent too: it changes as a result of this read, and
+    // depending on it would cancel the read that set it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSessionId, openSessionRevision]);
+
+  /*
+   * The edit is put on screen before the settings file answers, and stays there
+   * when the answer is a failure, so a settings folder that cannot be written
+   * never costs the user the rule they just wrote.
+   */
+  const saveGroupingRules = async (rules: readonly GroupRuleDto[]): Promise<void> => {
+    const session = selectRepositorySession(state.repository);
+    if (session === null) {
+      return;
+    }
+    dispatch({ type: "rules/changed", rules });
+    try {
+      const result = await api.saveGroupingRules({
+        repositorySessionId: session.repositorySessionId,
+        sessionRevision: session.sessionRevision,
+        rules: rules.map((rule) => ({ ...rule })),
+      });
+      if (result.status === "error") {
+        dispatch({ type: "rules/saveFailed", diagnostic: result.diagnostic });
+      }
+    } catch (error) {
+      dispatch({ type: "rules/saveFailed", diagnostic: connectionDiagnostic(error) });
+    }
+  };
 
   const openRepository = async (): Promise<void> => {
     const requestId = createRequestId();
@@ -476,6 +546,7 @@ export function useAppController(
       dispatch({ type: "symbol/dismissed" });
     },
     goBack,
+    saveGroupingRules,
   };
 }
 

@@ -218,3 +218,82 @@
 .problem {
   color: var(--color-warning);
 }
+
+.configView,
+.notice,
+.editor,
+.editorForm {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.configView,
+.notice,
+.editor {
+  padding: var(--space-2);
+}
+
+.notice,
+.editor {
+  border: 1px solid var(--color-border);
+}
+
+.configActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.editorForm label {
+  color: var(--color-muted);
+  font-size: 0.6875rem;
+}
+
+.editorForm input {
+  min-width: 0;
+  padding: 0.25rem var(--space-1);
+  font-family: var(--font-code);
+  font-size: 0.75rem;
+}
+
+.editorActions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.editorList,
+.groupList {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.editorRow {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.editorRow button {
+  flex: 0 0 auto;
+  padding: 0.1rem var(--space-1);
+  font-size: 0.6875rem;
+}
+
+.rulePrefix,
+.groupCount {
+  flex: 0 0 auto;
+  color: var(--color-muted);
+  font-family: var(--font-code);
+  font-size: 0.6875rem;
+}
+
+.groupList .directory {
+  justify-content: flex-start;
+}
+
+.groupList .groupCount {
+  margin-left: auto;
+}

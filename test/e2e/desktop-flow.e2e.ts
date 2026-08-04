@@ -874,6 +874,63 @@ test("replaces repository state without showing the previous repository", async 
   await expect(running.page.getByText(/Result ready · \d+ changed files/u)).not.toBeVisible();
 });
 
+test("groups changed files by a saved rule and restores the rule after a restart", async () => {
+  const fixture = await createFixture();
+  const settingsPath = await createSettingsDirectory();
+  const before = await fixture.snapshotWorktree();
+
+  const first = await launch([fixture.path], {}, settingsPath);
+  await composeAuthResult(first.page, fixture.path);
+  await first.page.getByRole("button", { name: "Config View" }).click();
+
+  await expect(first.page.getByText("No group rules for this repository yet.")).toBeVisible();
+  await first.page.getByRole("button", { name: "Add a rule" }).click();
+  await first.page.getByLabel("Path prefix").fill("src/auth");
+  await first.page.getByLabel("Group name").fill("Auth code");
+  await first.page.getByRole("button", { name: "Add rule" }).click();
+
+  const authGroup = /^Auth code, rule src\/auth to Auth code, \d+ files$/u;
+  await expect(first.page.getByRole("button", { name: authGroup })).toBeVisible();
+  await expect(first.page.getByRole("button", { name: /^Ungrouped, no rule matched/u }))
+    .toBeVisible();
+  await expect(first.page.getByRole("button", {
+    name: /View file: src\/auth\/login\.ts .*rule src\/auth to Auth code/u,
+  })).toBeVisible();
+  await closeApplication(first.application);
+
+  const second = await launch([fixture.path], {}, settingsPath);
+  await composeAuthResult(second.page, fixture.path);
+  await second.page.getByRole("button", { name: "Config View" }).click();
+
+  await expect(second.page.getByRole("button", { name: authGroup })).toBeVisible();
+  await expect(second.page.getByText("No group rules for this repository yet.")).toBeHidden();
+  // Rules live in the application settings, so the repository is left as it was.
+  expect(await fixture.snapshotWorktree()).toEqual(before);
+});
+
+test("opens the group rule editor from the activity rail", async () => {
+  const fixture = await createFixture();
+  const settingsPath = await createSettingsDirectory();
+  const running = await launch([fixture.path], {}, settingsPath);
+  await composeAuthResult(running.page, fixture.path);
+
+  // Start in List View, the default, so the rail has to switch the view too.
+  await expect(running.page.getByRole("button", { name: "List View" }))
+    .toHaveAttribute("aria-pressed", "true");
+  await running.page.getByRole("button", { name: "Group Rules" }).click();
+
+  await expect(running.page.getByRole("button", { name: "Config View" }))
+    .toHaveAttribute("aria-pressed", "true");
+  await expect(running.page.getByRole("region", { name: "Group rules" })).toBeVisible();
+  await running.page.getByLabel("Path prefix").fill("src/auth");
+  await running.page.getByLabel("Group name").fill("Auth code");
+  await running.page.getByRole("button", { name: "Add rule" }).click();
+
+  await expect(running.page.getByRole("button", {
+    name: /^Auth code, rule src\/auth to Auth code, \d+ files$/u,
+  })).toBeVisible();
+});
+
 async function createFixture(): Promise<GitFixture> {
   const fixture = await createAuthHistoryFixture();
   fixtures.push(fixture);
@@ -910,13 +967,45 @@ async function createInvalidRepositoryFixture(): Promise<string> {
   return path;
 }
 
+async function createSettingsDirectory(): Promise<string> {
+  const path = await mkdtemp(join(tmpdir(), "prettifer-settings-"));
+  fixtures.push({ dispose: () => rm(path, { force: true, recursive: true }) });
+  return path;
+}
+
+/** Opens the auth fixture and builds the two-commit result the rules group. */
+async function composeAuthResult(page: Page, repositoryPath: string): Promise<void> {
+  await openRepository(page, repositoryPath);
+  await page.getByRole("button", { name: "Load Commit Range" }).click();
+  await page.getByRole("checkbox", {
+    name: "Include in selected result: docs(auth): explain session lifecycle",
+  }).check();
+  await page.getByRole("checkbox", {
+    name: "Include in selected result: feat(auth): validate login request",
+  }).check();
+  await page.getByRole("button", { name: "Build Selected Result" }).click();
+  await expect(page.getByText(/Result ready · \d+ changed files/u)).toBeVisible();
+}
+
+/** Closes one application early, so the shared teardown does not close it twice. */
+async function closeApplication(application: ElectronApplication): Promise<void> {
+  const index = applications.indexOf(application);
+  if (index >= 0) {
+    applications.splice(index, 1);
+  }
+  await application.close();
+}
+
 async function launch(
   repositoryPaths: readonly string[],
   environment: Readonly<Record<string, string>> = {},
+  settingsPath?: string,
 ): Promise<RunningApplication> {
   const application = await electron.launch({
     executablePath,
-    args: [applicationPath],
+    args: settingsPath === undefined
+      ? [applicationPath]
+      : [applicationPath, `--user-data-dir=${settingsPath}`],
     env: {
       ...process.env,
       PRETTIFER_E2E: "1",

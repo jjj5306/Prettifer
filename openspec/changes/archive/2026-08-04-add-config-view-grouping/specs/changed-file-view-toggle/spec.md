@@ -1,10 +1,4 @@
-# changed-file-view-toggle Specification
-
-## Purpose
-`Changed Files` 패널에서 변경 파일을 Tree View, List View와 Config View로 전환해
-탐색하고, 보기 전환 뒤에도 선택 파일과 현재 diff 맥락을 유지하게 한다.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: 변경 파일 보기 전환
 시스템은 `Changed Files` 패널에서 Tree View, List View와 Config View를 선택하는 토글을
@@ -29,45 +23,6 @@
 - **WHEN** 그룹화 규칙이 하나도 없는 저장소에서 사용자가 Config View 토글을 선택한다
 - **THEN** Config View 토글이 선택 상태로 표시된다
 - **THEN** 규칙이 없다는 사실과 규칙을 만드는 방법이 표시된다
-
-### Requirement: Tree View 폴더 접기와 계층선
-시스템은 Tree View의 각 폴더를 접고 펼 수 있게 해야 하며(MUST), 현재 펼침
-상태를 보조 기술에 제공해야 한다(MUST). 폴더 계층선은 각 행 옆에서 가로
-연결선으로 끝나야 한다(MUST). Tree View의 행은 자기 내용 너비만큼만 차지해야 한다(MUST).
-
-#### Scenario: 폴더 접기
-- **WHEN** 사용자가 Tree View에서 폴더 행을 실행한다
-- **THEN** 해당 폴더의 하위 폴더와 파일이 표시되지 않는다
-- **THEN** 폴더 행이 접힌 상태로 표시된다
-
-#### Scenario: 폴더 다시 펼치기
-- **WHEN** 사용자가 접힌 폴더 행을 다시 실행한다
-- **THEN** 해당 폴더의 하위 항목이 다시 표시된다
-- **THEN** 선택 파일과 현재 diff는 변경되지 않는다
-
-#### Scenario: 계층선 표시
-- **WHEN** Tree View에 하위 항목이 있는 폴더가 표시된다
-- **THEN** 각 하위 행 옆에서 세로 계층선이 가로 연결선으로 끝난다
-- **THEN** 마지막 하위 행 아래로는 세로 계층선이 이어지지 않는다
-
-#### Scenario: 단일 하위 폴더 경로 합치기
-- **WHEN** 하위 항목이 폴더 하나뿐인 폴더가 연속으로 이어진다
-- **THEN** 이어지는 폴더 이름이 하나의 행에 경로 형태로 함께 표시된다
-- **THEN** 해당 경로 전체가 한 단계만 들여쓰기된다
-
-#### Scenario: 하위 파일이 있는 폴더
-- **WHEN** 폴더가 파일을 하나만 포함한다
-- **THEN** 해당 폴더는 파일과 합쳐지지 않고 자신의 행으로 표시된다
-
-#### Scenario: 행 너비가 내용에 맞음
-- **WHEN** 사용자가 Tree View에서 변경 파일 영역을 넓힌다
-- **THEN** 각 파일과 폴더 행은 자기 이름을 담을 만큼만 넓어진다
-- **AND** 영역 전체 너비로 늘어나지 않는다
-
-#### Scenario: 이름이 영역보다 긴 행
-- **WHEN** Tree View의 파일 이름이 변경 파일 영역보다 길다
-- **THEN** 행은 영역을 넘지 않는다
-- **AND** 사용자는 보이는 이름 또는 접근 가능한 이름으로 전체 경로를 확인할 수 있다
 
 ### Requirement: 보기 사이의 선택 맥락 보존
 시스템은 Tree View, List View와 Config View를 전환한 뒤 선택 파일과 현재 diff를 유지해야
@@ -105,15 +60,6 @@
 - **WHEN** 문제 파일이 있는 통합 결과에서 사용자가 세 보기를 차례로 확인한다
 - **THEN** 세 보기 모두 그 파일을 문제 상태로 표시한다
 - **THEN** 문제 파일도 경로 계층, 전체 경로 목록과 규칙 그룹에서 같은 위치에 나타난다
-
-### Requirement: 안전한 경로 렌더링
-시스템은 파일 경로를 텍스트로 렌더링해야 하며(MUST), 경로 내용을 HTML로
-실행하거나 해석하지 않아야 한다(MUST).
-
-#### Scenario: 마크업 형태의 경로
-- **WHEN** 파일 경로에 HTML 마크업처럼 보이는 문자가 포함된다
-- **THEN** 시스템은 해당 문자를 파일 경로 텍스트로 표시한다
-- **THEN** renderer에서 경로 내용이 실행되지 않는다
 
 ### Requirement: 접근 가능한 보기 토글
 시스템은 키보드로 Tree View, List View와 Config View를 선택할 수 있게 해야 하며(MUST),

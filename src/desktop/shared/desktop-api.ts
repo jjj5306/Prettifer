@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { GROUP_RULE_LIMIT } from "../../grouping/group-rule.js";
+
 const commitIdSchema = z.string().regex(/^[0-9a-f]{40}$/u);
 const branchNameSchema = z.string().trim().min(1).max(255);
 const sessionIdentitySchema = z.object({
@@ -187,6 +189,26 @@ export const compositeDiffResultSchema = z.object({
   unifiedDiff: z.string(),
 }).strict();
 
+/**
+ * One grouping rule as it travels between the window and the main process. Only
+ * the shape and a bounded size are checked here; whether a rule can be applied
+ * is decided by the grouping core, which both sides share.
+ */
+export const groupRuleSchema = z.object({
+  prefix: z.string().max(512),
+  name: z.string().max(120),
+}).strict();
+
+export const groupingRulesRequestSchema = sessionIdentitySchema.strict();
+
+export const saveGroupingRulesRequestSchema = sessionIdentitySchema.extend({
+  rules: z.array(groupRuleSchema).max(GROUP_RULE_LIMIT),
+}).strict();
+
+export const groupingRulesSchema = z.object({
+  rules: z.array(groupRuleSchema),
+}).strict();
+
 export const rangeResultSchema = z.object({
   range: repositoryRangeSchema,
   page: repositoryCommitPageSchema,
@@ -209,6 +231,10 @@ export type DeclarationKindDto = z.infer<typeof declarationKindSchema>;
 export type SymbolSearchResultDto = z.infer<typeof symbolSearchResultSchema>;
 export type BaseFileRequest = z.infer<typeof baseFileRequestSchema>;
 export type BaseFileDto = z.infer<typeof baseFileSchema>;
+export type GroupRuleDto = z.infer<typeof groupRuleSchema>;
+export type GroupingRulesRequest = z.infer<typeof groupingRulesRequestSchema>;
+export type SaveGroupingRulesRequest = z.infer<typeof saveGroupingRulesRequestSchema>;
+export type GroupingRulesDto = z.infer<typeof groupingRulesSchema>;
 export type ApiResult<T> =
   | Readonly<{ status: "success"; data: T }>
   | Readonly<{ status: "cancelled" }>
@@ -223,6 +249,8 @@ export const DESKTOP_CHANNELS = Object.freeze({
   cancelComposition: "composition:cancel",
   searchSymbol: "symbols:search",
   readBaseFile: "files:read-base",
+  readGroupingRules: "grouping:read-rules",
+  saveGroupingRules: "grouping:save-rules",
 });
 
 export interface DesktopApi {
@@ -237,4 +265,8 @@ export interface DesktopApi {
   cancelComposition(request: CancelCompositionRequest): Promise<ApiResult<null>>;
   /** Reads one file at the range's comparison base, for navigation outside the result. */
   readBaseFile(request: BaseFileRequest): Promise<ApiResult<BaseFileDto>>;
+  /** Reads the grouping rules kept for the session's repository. */
+  readGroupingRules(request: GroupingRulesRequest): Promise<ApiResult<GroupingRulesDto>>;
+  /** Replaces the grouping rules kept for the session's repository. */
+  saveGroupingRules(request: SaveGroupingRulesRequest): Promise<ApiResult<GroupingRulesDto>>;
 }

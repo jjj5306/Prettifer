@@ -30,6 +30,7 @@ const baseState: AppState = {
   composition: { status: "idle" },
   selectedFilePath: null,
   symbolLookup: { status: "idle" },
+  groupingRules: { status: "idle" },
   externalFile: { status: "idle" },
   reveal: null,
   navigationHistory: [],

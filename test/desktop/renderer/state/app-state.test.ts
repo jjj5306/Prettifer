@@ -357,4 +357,38 @@ describe("app reducer", () => {
     expect(state.selectedCommitIds).toEqual([]);
     expect(state.composition).toEqual({ status: "idle" });
   });
+  it("drops the grouping rules of the previous repository", () => {
+    const withRules = appReducer(readyState(), {
+      type: "rules/changed",
+      rules: [{ prefix: "tests", name: "Tests" }],
+    });
+
+    const other = appReducer(appReducer(withRules, {
+      type: "repository/selecting",
+      requestId: "repository-2",
+    }), {
+      type: "repository/loaded",
+      requestId: "repository-2",
+      session: {
+        ...session,
+        repositorySessionId: "00000000-0000-4000-8000-000000000002",
+        rootPath: "C:\\work\\other",
+      },
+    });
+
+    // Idle is what makes the next repository read its own rules.
+    expect(other.groupingRules).toEqual({ status: "idle" });
+  });
+
+  it("ignores a rule reply that answered an earlier read", () => {
+    const loading = appReducer(readyState(), { type: "rules/loading", requestId: "rules-2" });
+
+    const late = appReducer(loading, {
+      type: "rules/loaded",
+      requestId: "rules-1",
+      rules: [{ prefix: "stale", name: "Stale" }],
+    });
+
+    expect(late.groupingRules).toEqual({ status: "loading", requestId: "rules-2" });
+  });
 });

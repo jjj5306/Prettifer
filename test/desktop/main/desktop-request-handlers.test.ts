@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createDesktopRequestHandlers } from "../../../src/desktop/main/desktop-request-handlers.js";
 import { RepositorySessionError } from "../../../src/desktop/main/repository-session.js";
+import { GroupingRuleStoreError } from "../../../src/desktop/main/grouping-rule-store.js";
 import { BaseFileError } from "../../../src/symbols/base-file-reader.js";
 
 const repositorySessionId = "00000000-0000-4000-8000-000000000001";
@@ -69,6 +70,10 @@ function createDependencies() {
         commits: [],
         nextOffset: null,
       }),
+    },
+    groupingRules: {
+      read: vi.fn().mockResolvedValue([{ prefix: "tests", name: "Tests" }]),
+      write: vi.fn().mockResolvedValue(undefined),
     },
     composition: {
       compose: vi.fn().mockResolvedValue({ status: "success", data: {
@@ -366,5 +371,86 @@ describe("desktop request handlers", () => {
       diagnostic: { code: "RANGE_EXPIRED" },
     });
     expect(dependencies.baseFiles.read).not.toHaveBeenCalled();
+  });
+  it("reads the grouping rules of the session repository", async () => {
+    const dependencies = createDependencies();
+    const handlers = createDesktopRequestHandlers(dependencies);
+
+    const result = await handlers.readGroupingRules(trustedEvent, {
+      repositorySessionId,
+      sessionRevision: 1,
+    });
+
+    expect(result).toEqual({
+      status: "success",
+      data: { rules: [{ prefix: "tests", name: "Tests" }] },
+    });
+    expect(dependencies.groupingRules.read).toHaveBeenCalledWith(session.rootPath);
+  });
+
+  it("reports a storage failure with a cause and a next action", async () => {
+    const dependencies = createDependencies();
+    dependencies.groupingRules.read.mockRejectedValue(new GroupingRuleStoreError(
+      "GROUPING_RULES_UNREADABLE",
+      "Fix or remove the file, then reopen the repository.",
+      "The saved grouping rules are not in a form Prettifer understands.",
+    ));
+    const handlers = createDesktopRequestHandlers(dependencies);
+
+    await expect(handlers.readGroupingRules(trustedEvent, {
+      repositorySessionId,
+      sessionRevision: 1,
+    })).resolves.toMatchObject({
+      status: "error",
+      diagnostic: {
+        code: "GROUPING_RULES_UNREADABLE",
+        nextAction: "Fix or remove the file, then reopen the repository.",
+      },
+    });
+  });
+
+  it("saves the grouping rules of the session repository", async () => {
+    const dependencies = createDependencies();
+    const handlers = createDesktopRequestHandlers(dependencies);
+    const rules = [{ prefix: "tests", name: "Tests" }, { prefix: "docs", name: "Docs" }];
+
+    const result = await handlers.saveGroupingRules(trustedEvent, {
+      repositorySessionId,
+      sessionRevision: 1,
+      rules,
+    });
+
+    expect(result).toEqual({ status: "success", data: { rules } });
+    expect(dependencies.groupingRules.write).toHaveBeenCalledWith(session.rootPath, rules);
+  });
+
+  it("refuses to save a rule the panel could not apply", async () => {
+    const dependencies = createDependencies();
+    const handlers = createDesktopRequestHandlers(dependencies);
+
+    await expect(handlers.saveGroupingRules(trustedEvent, {
+      repositorySessionId,
+      sessionRevision: 1,
+      rules: [{ prefix: "../outside", name: "Outside" }],
+    })).resolves.toMatchObject({
+      status: "error",
+      diagnostic: { code: "GROUP_RULE_PREFIX_NOT_RELATIVE" },
+    });
+    expect(dependencies.groupingRules.write).not.toHaveBeenCalled();
+  });
+
+  it("refuses to save two rules that claim the same prefix", async () => {
+    const dependencies = createDependencies();
+    const handlers = createDesktopRequestHandlers(dependencies);
+
+    await expect(handlers.saveGroupingRules(trustedEvent, {
+      repositorySessionId,
+      sessionRevision: 1,
+      rules: [{ prefix: "tests", name: "Tests" }, { prefix: "tests/", name: "Suites" }],
+    })).resolves.toMatchObject({
+      status: "error",
+      diagnostic: { code: "GROUP_RULE_PREFIX_DUPLICATE" },
+    });
+    expect(dependencies.groupingRules.write).not.toHaveBeenCalled();
   });
 });

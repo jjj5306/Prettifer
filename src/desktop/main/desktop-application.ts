@@ -1,3 +1,6 @@
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
+
 import type { IpcMain } from "electron";
 
 import { CompositeDiffCoordinator } from "../../composition/composite-diff-coordinator.js";
@@ -8,6 +11,11 @@ import { BaseFileReader } from "../../symbols/base-file-reader.js";
 import { SymbolSearchService } from "../../symbols/symbol-search.js";
 import { DesktopCompositionController } from "./desktop-composition-controller.js";
 import { createDesktopRequestHandlers } from "./desktop-request-handlers.js";
+import {
+  createGroupingRuleStore,
+  unavailableGroupingRuleStore,
+  type GroupingRuleStore,
+} from "./grouping-rule-store.js";
 import {
   registerDesktopRequestHandlers,
   removeDesktopRequestHandlers,
@@ -32,6 +40,11 @@ export interface ApplicationSeams {
   beforeComposition?(): Promise<void>;
   /** Repository the app was started with, when the user passed a path. */
   initialRepositoryPath?(): string | null;
+  /**
+   * File the grouping rules of every repository are kept in. It sits in the
+   * application's own settings folder, never inside a repository under review.
+   */
+  readonly groupingRulesPath?: string;
 }
 
 interface ApplicationWebContents {
@@ -61,6 +74,23 @@ export interface ApplicationHost {
   /** URL the window loads and the only origin treated as trusted. */
   readonly entryUrl: string;
   readonly ipc: Pick<IpcMain, "handle" | "removeHandler">;
+}
+
+/**
+ * The rules live at a path the entry decided, so nothing a window sends can
+ * choose where the application writes.
+ */
+function groupingRuleStore(filePath: string | undefined): GroupingRuleStore {
+  if (filePath === undefined) {
+    return unavailableGroupingRuleStore();
+  }
+  return createGroupingRuleStore(filePath, dirname(filePath), {
+    readFile: (path) => readFile(path, "utf8"),
+    writeFile: (path, contents) => writeFile(path, contents, "utf8"),
+    makeDirectory: async (path) => {
+      await mkdir(path, { recursive: true });
+    },
+  });
 }
 
 /**
@@ -108,6 +138,7 @@ export async function startDesktopApplication(
     composition,
     symbols: new SymbolSearchService(git),
     baseFiles: new BaseFileReader(git),
+    groupingRules: groupingRuleStore(seams.groupingRulesPath),
     signal: lifetime.signal,
   });
   registerDesktopRequestHandlers(host.ipc, handlers);
