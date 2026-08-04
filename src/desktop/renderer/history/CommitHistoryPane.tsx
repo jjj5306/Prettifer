@@ -3,9 +3,12 @@ import { useEffect, useRef } from "react";
 import type { RepositoryCommitDto } from "../../shared/index.js";
 import type { RangeState } from "../state/app-state.js";
 import { DiagnosticMessage } from "../errors/DiagnosticMessage.js";
+import { panelClass } from "../panel-class.js";
 import styles from "./CommitHistoryPane.module.css";
 
 interface CommitHistoryPaneProps {
+  /** True while the activity rail points at this region. */
+  readonly isCurrentRegion: boolean;
   readonly range: RangeState;
   readonly selectedCommitIds: readonly string[];
   readonly mergeParents: Readonly<Record<string, number>>;
@@ -18,6 +21,7 @@ interface CommitHistoryPaneProps {
 
 export const CommitHistoryPane = ({
   range,
+  isCurrentRegion,
   selectedCommitIds,
   mergeParents,
   inspectedCommitId,
@@ -50,7 +54,7 @@ export const CommitHistoryPane = ({
     return (
       <section
         id="commit-history"
-        className={styles.panel}
+        className={panelClass(styles.panel, isCurrentRegion)}
         aria-label="Commit History"
         tabIndex={-1}
       >
@@ -62,7 +66,7 @@ export const CommitHistoryPane = ({
     return (
       <section
         id="commit-history"
-        className={styles.panel}
+        className={panelClass(styles.panel, isCurrentRegion)}
         aria-label="Commit History"
         aria-live="polite"
         tabIndex={-1}
@@ -75,7 +79,7 @@ export const CommitHistoryPane = ({
     return (
       <section
         id="commit-history"
-        className={styles.panel}
+        className={panelClass(styles.panel, isCurrentRegion)}
         aria-label="Commit History"
         tabIndex={-1}
       >
@@ -99,7 +103,7 @@ export const CommitHistoryPane = ({
   return (
     <section
       id="commit-history"
-      className={`${styles.panel} ${styles.readyPanel}`}
+      className={panelClass(`${styles.panel} ${styles.readyPanel}`, isCurrentRegion)}
       aria-labelledby="commit-history-heading"
       tabIndex={-1}
     >

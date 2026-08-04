@@ -10,6 +10,7 @@ import {
   type MonacoApi,
   type SymbolRequestHandler,
 } from "./MonacoDiffAdapter.js";
+import { panelClass } from "../panel-class.js";
 import styles from "./DiffPane.module.css";
 
 type CompositeFile = CompositeDiffResultDto["files"][number];
@@ -37,6 +38,8 @@ interface DiffAdapter {
 type CompositeProblemFile = CompositeDiffResultDto["problemFiles"][number];
 
 interface DiffPaneProps {
+  /** True while the activity rail points at this region. */
+  readonly isCurrentRegion: boolean;
   readonly identity: DiffIdentity;
   readonly file: CompositeFile | null;
   readonly problem?: CompositeProblemFile | null;
@@ -59,6 +62,7 @@ type ReviewTarget =
 
 export const DiffPane = ({
   identity,
+  isCurrentRegion,
   file,
   problem = null,
   externalFile = { status: "idle" },
@@ -177,7 +181,7 @@ export const DiffPane = ({
 
   if (externalFile.status === "loading") {
     return (
-      <ReviewPanel heading="Outside the Selected Result" subheading={externalFile.path}>
+      <ReviewPanel heading="Outside the Selected Result" subheading={externalFile.path} isCurrentRegion={isCurrentRegion}>
         <p aria-live="polite">Opening the file at the comparison base…</p>
       </ReviewPanel>
     );
@@ -185,7 +189,7 @@ export const DiffPane = ({
 
   if (externalFile.status === "error") {
     return (
-      <ReviewPanel heading="Outside the Selected Result" subheading={externalFile.path}>
+      <ReviewPanel heading="Outside the Selected Result" subheading={externalFile.path} isCurrentRegion={isCurrentRegion}>
         <div className={styles.problemState} role="alert">
           <strong>This file could not be opened</strong>
           <p>{externalFile.diagnostic.message}</p>
@@ -203,7 +207,7 @@ export const DiffPane = ({
     return (
       <section
         id="diff-review"
-        className={styles.panel}
+        className={panelClass(styles.panel, isCurrentRegion)}
         aria-labelledby="diff-heading"
         tabIndex={-1}
       >
@@ -240,7 +244,7 @@ export const DiffPane = ({
 
   if (problem !== null) {
     return (
-      <ReviewPanel heading="Problem File" subheading={problem.path}>
+      <ReviewPanel heading="Problem File" subheading={problem.path} isCurrentRegion={isCurrentRegion}>
         <div className={styles.problemState} role="alert">
           <strong>This file needs a content choice</strong>
           <p>
@@ -256,7 +260,7 @@ export const DiffPane = ({
 
   if (file?.binary === true) {
     return (
-      <ReviewPanel heading={reviewView(file).heading} subheading={file.path}>
+      <ReviewPanel heading={reviewView(file).heading} subheading={file.path} isCurrentRegion={isCurrentRegion}>
         <div className={styles.binaryState}>
           <strong>Binary file</strong>
           <p>Text diff is not available for this file. Its binary contents were not loaded.</p>
@@ -268,7 +272,7 @@ export const DiffPane = ({
   return (
     <section
       id="diff-review"
-      className={styles.panel}
+      className={panelClass(styles.panel, isCurrentRegion)}
       aria-labelledby="diff-heading"
       tabIndex={-1}
     >
@@ -355,15 +359,17 @@ const ReviewedPath = ({ path }: { readonly path: string }) => {
 const ReviewPanel = ({
   heading,
   subheading,
+  isCurrentRegion,
   children,
 }: {
   readonly heading: string;
   readonly subheading: string;
+  readonly isCurrentRegion: boolean;
   readonly children: React.ReactNode;
 }) => (
   <section
     id="diff-review"
-    className={styles.panel}
+    className={panelClass(styles.panel, isCurrentRegion)}
     aria-labelledby="diff-heading"
     tabIndex={-1}
   >

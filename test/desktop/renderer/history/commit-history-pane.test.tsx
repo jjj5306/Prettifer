@@ -94,6 +94,7 @@ describe("CommitHistoryPane", () => {
   it("names the region Commit History and displays oldest commits on the left", () => {
     render(
       <CommitHistoryPane
+        isCurrentRegion={false}
         range={readyRange({ commits: [secondCommit, firstCommit] })}
         selectedCommitIds={[]}
         inspectedCommitId={null}
@@ -122,6 +123,7 @@ describe("CommitHistoryPane", () => {
     render(
       <StrictMode>
         <CommitHistoryPane
+          isCurrentRegion={false}
           range={readyRange()}
           selectedCommitIds={[]}
           inspectedCommitId={null}
@@ -149,6 +151,7 @@ describe("CommitHistoryPane", () => {
   it("shows the authored month and day and keeps the full timestamp available", () => {
     render(
       <CommitHistoryPane
+        isCurrentRegion={false}
         range={readyRange({ commits: [firstCommit] })}
         selectedCommitIds={[]}
         inspectedCommitId={null}
@@ -173,6 +176,7 @@ describe("CommitHistoryPane", () => {
     render(
       <StrictMode>
         <CommitHistoryPane
+          isCurrentRegion={false}
           range={readyRange()}
           selectedCommitIds={[firstCommit.id]}
           inspectedCommitId={mergeCommit.id}
@@ -212,6 +216,7 @@ describe("CommitHistoryPane", () => {
     const [inspectedCommitId, setInspectedCommitId] = useState<string | null>(null);
     return (
       <CommitHistoryPane
+        isCurrentRegion={false}
         range={readyRange({ commits: [firstCommit, secondCommit] })}
         selectedCommitIds={selectedCommitIds}
         inspectedCommitId={inspectedCommitId}
@@ -266,6 +271,7 @@ describe("CommitHistoryPane", () => {
     const onInspectCommit = vi.fn();
     render(
       <CommitHistoryPane
+        isCurrentRegion={false}
         range={readyRange({ commits: [unselectableCommit] })}
         selectedCommitIds={[]}
         inspectedCommitId={null}
@@ -326,6 +332,7 @@ describe("CommitHistoryPane", () => {
     render(
       <StrictMode>
         <CommitHistoryPane
+          isCurrentRegion={false}
           range={readyRange()}
           selectedCommitIds={[]}
           inspectedCommitId={null}
@@ -344,6 +351,7 @@ describe("CommitHistoryPane", () => {
     render(
       <StrictMode>
         <CommitHistoryPane
+          isCurrentRegion={false}
           range={readyRange({ commits: [], nextOffset: null })}
           selectedCommitIds={[]}
           inspectedCommitId={null}
@@ -367,6 +375,7 @@ describe("CommitHistoryPane", () => {
     render(
       <StrictMode>
         <CommitHistoryPane
+          isCurrentRegion={false}
           range={readyRange()}
           selectedCommitIds={[]}
           inspectedCommitId={null}
@@ -391,6 +400,7 @@ describe("CommitHistoryPane", () => {
     const { rerender } = render(
       <StrictMode>
         <CommitHistoryPane
+          isCurrentRegion={false}
           range={readyRange()}
           selectedCommitIds={[]}
           inspectedCommitId={null}
@@ -408,6 +418,7 @@ describe("CommitHistoryPane", () => {
     rerender(
       <StrictMode>
         <CommitHistoryPane
+          isCurrentRegion={false}
           range={readyRange({ nextOffset: null })}
           selectedCommitIds={[]}
           inspectedCommitId={null}
@@ -430,6 +441,7 @@ describe("CommitHistoryPane", () => {
     const onLoadMore = vi.fn();
     const { rerender } = render(
       <CommitHistoryPane
+        isCurrentRegion={false}
         range={readyRange({ commits: [unselectableCommit] })}
         selectedCommitIds={[]}
         inspectedCommitId={null}
@@ -444,6 +456,7 @@ describe("CommitHistoryPane", () => {
 
     rerender(
       <CommitHistoryPane
+        isCurrentRegion={false}
         range={readyRange({ commits: [unselectableCommit], nextOffset: null })}
         selectedCommitIds={[]}
         inspectedCommitId={null}
@@ -461,6 +474,7 @@ describe("CommitHistoryPane", () => {
   it("offers a mainline parent for each parent of a merge commit", () => {
     render(
       <CommitHistoryPane
+        isCurrentRegion={false}
         range={readyRange()}
         selectedCommitIds={[]}
         inspectedCommitId={null}
@@ -487,6 +501,7 @@ describe("CommitHistoryPane", () => {
   it("marks a selected merge commit that still needs a mainline parent", () => {
     render(
       <CommitHistoryPane
+        isCurrentRegion={false}
         range={readyRange()}
         selectedCommitIds={[mergeCommit.id]}
         inspectedCommitId={null}
@@ -518,6 +533,7 @@ describe("CommitHistoryPane", () => {
     const onToggleCommit = vi.fn();
     render(
       <CommitHistoryPane
+        isCurrentRegion={false}
         range={readyRange()}
         selectedCommitIds={[mergeCommit.id]}
         inspectedCommitId={null}

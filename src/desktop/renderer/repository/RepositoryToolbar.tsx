@@ -2,11 +2,14 @@ import type { SyntheticEvent } from "react";
 
 import type { RepositorySession } from "../../shared/index.js";
 import { DiagnosticMessage } from "../errors/DiagnosticMessage.js";
+import { panelClass } from "../panel-class.js";
 import { selectRepositorySession } from "../state/app-selectors.js";
 import type { RangeState, RepositoryState } from "../state/app-state.js";
 import styles from "./RepositoryToolbar.module.css";
 
 interface RepositoryToolbarProps {
+  /** True while the activity rail points at this region. */
+  readonly isCurrentRegion: boolean;
   readonly repository: RepositoryState;
   readonly range: RangeState;
   readonly onOpenRepository: () => void | Promise<void>;
@@ -15,6 +18,7 @@ interface RepositoryToolbarProps {
 
 export const RepositoryToolbar = ({
   repository,
+  isCurrentRegion,
   range,
   onOpenRepository,
   onLoadRange,
@@ -37,7 +41,7 @@ export const RepositoryToolbar = ({
   return (
     <section
       id="repository-workspace"
-      className={styles.toolbar}
+      className={panelClass(styles.toolbar, isCurrentRegion)}
       aria-labelledby="repository-heading"
       tabIndex={-1}
     >

@@ -4,6 +4,7 @@ import {
   test,
   type ElectronApplication,
   type JSHandle,
+  type Locator,
   type Page,
 } from "@playwright/test";
 import type { BrowserWindow } from "electron";
@@ -931,6 +932,25 @@ test("opens the group rule editor from the activity rail", async () => {
   })).toBeVisible();
 });
 
+test("shows which region the activity rail moved to after a mouse click", async () => {
+  const fixture = await createFixture();
+  const running = await launch([fixture.path]);
+  await composeAuthResult(running.page, fixture.path);
+
+  const history = running.page.getByRole("region", { name: "Commit History" });
+  const before = await borderColorOf(history);
+  // A plain click, which is the case that used to change nothing on screen.
+  await running.page.getByRole("button", { name: "Commit History" }).click();
+
+  await expect.poll(() => borderColorOf(history)).not.toBe(before);
+  await expect(running.page.getByRole("button", { name: "Commit History" }))
+    .toHaveAttribute("aria-current", "page");
+
+  // Moving focus elsewhere leaves the marker where the rail points.
+  await running.page.getByRole("button", { name: "Change Repository" }).focus();
+  expect(await borderColorOf(history)).not.toBe(before);
+});
+
 async function createFixture(): Promise<GitFixture> {
   const fixture = await createAuthHistoryFixture();
   fixtures.push(fixture);
@@ -965,6 +985,11 @@ async function createInvalidRepositoryFixture(): Promise<string> {
   const path = await mkdtemp(join(tmpdir(), "prettifer-not-repository-"));
   fixtures.push({ dispose: () => rm(path, { force: true, recursive: true }) });
   return path;
+}
+
+/** Resolved border colour of a region, which carries the current-region marker. */
+async function borderColorOf(region: Locator): Promise<string> {
+  return region.evaluate((element) => getComputedStyle(element).borderTopColor);
 }
 
 async function createSettingsDirectory(): Promise<string> {
