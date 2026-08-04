@@ -55,14 +55,42 @@ describe("workbench layout styles", () => {
     expect(splitter).toMatch(/@media \(forced-colors: active\)/u);
   });
 
-  it("ends the Tree View guide with a connector beside each row", async () => {
+  it("draws tree rows flat and full width instead of as buttons", async () => {
     const styles = await readStyles("files/ChangedFilePane.module.css");
 
-    expect(styles).not.toContain("border-left: 1px solid var(--color-border)");
-    expect(styles).toMatch(/\.tree \.tree > li::before\s*\{[^}]*width:\s*1px;/u);
-    expect(styles).toMatch(/\.tree \.tree > li::after\s*\{[^}]*height:\s*1px;/u);
+    // The panel class is what beats the global button border in App.module.css.
+    expect(styles).toMatch(/\.panel \.directory\s*\{[^}]*border:\s*0;/u);
+    expect(styles).toMatch(/\.panel \.directory\s*\{[^}]*border-radius:\s*0;/u);
+    expect(styles).toMatch(/\.panel \.directory\s*\{[^}]*width:\s*100%;/u);
     expect(styles).toMatch(
-      /\.tree \.tree > li:last-child::before\s*\{[^}]*height:\s*var\(--tree-row-center\);/u,
+      /\.panel \.file,[\s\S]*?\.panel \.selectedFile\s*\{[^}]*border:\s*0;/u,
+    );
+    expect(styles).toMatch(
+      /\.panel \.file,[\s\S]*?\.panel \.selectedFile\s*\{[^}]*width:\s*100%;/u,
+    );
+    expect(styles).not.toContain("width: fit-content");
+  });
+
+  it("indents one step per level and draws no hierarchy lines", async () => {
+    const styles = await readStyles("files/ChangedFilePane.module.css");
+
+    expect(styles).toMatch(/\.tree \.tree\s*\{[^}]*margin-left:\s*var\(--tree-indent\);/u);
+    // The guide and its connector were drawn with these pseudo elements.
+    expect(styles).not.toContain(".tree .tree > li::before");
+    expect(styles).not.toContain(".tree .tree > li::after");
+  });
+
+  it("keeps the tree from scrolling sideways", async () => {
+    const styles = await readStyles("files/ChangedFilePane.module.css");
+
+    expect(styles).toMatch(/\.content\s*\{[^}]*overflow-x:\s*hidden;/u);
+  });
+
+  it("marks the selected row in forced colors too", async () => {
+    const styles = await readStyles("files/ChangedFilePane.module.css");
+
+    expect(styles).toMatch(
+      /@media \(forced-colors: active\)\s*\{\s*\.panel \.selectedFile\s*\{[^}]*Highlight/u,
     );
   });
 });

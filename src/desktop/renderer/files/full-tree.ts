@@ -47,6 +47,10 @@ type MutableNode = MutableDirectory | FullTreeFile;
  *
  * Directories are ordered before files at each level, and each group keeps the
  * order Git reported, so the layout is stable between renders.
+ *
+ * Chains of directories that hold a single directory are joined into one row, so
+ * a repository whose sources sit ten packages deep does not spend ten rows
+ * getting there.
  */
 export function buildFullTree(
   basePaths: readonly string[],
@@ -66,7 +70,39 @@ export function buildFullTree(
     });
   }
 
-  return freeze([...root.values()]);
+  return joinSingleChildDirectories(freeze([...root.values()]));
+}
+
+/**
+ * Joins a directory that holds nothing but one directory into its child, so the
+ * pair reads as one path. The joined row keeps the deepest directory's path as
+ * its identity, which is what the folded set and the change marker key on.
+ */
+function joinSingleChildDirectories(
+  nodes: readonly FullTreeNode[],
+): readonly FullTreeNode[] {
+  return nodes.map((node) => {
+    if (node.kind === "file") {
+      return node;
+    }
+    const segments = [node.name];
+    let deepest = node;
+    while (deepest.children.length === 1) {
+      const [onlyChild] = deepest.children;
+      if (onlyChild?.kind !== "directory") {
+        break;
+      }
+      segments.push(onlyChild.name);
+      deepest = onlyChild;
+    }
+    return {
+      kind: "directory" as const,
+      name: segments.join("/"),
+      path: deepest.path,
+      hasChanges: deepest.hasChanges,
+      children: joinSingleChildDirectories(deepest.children),
+    };
+  });
 }
 
 /**
