@@ -102,13 +102,54 @@ describe("buildFullTree", () => {
 
   it("marks a folder that holds a change anywhere below it", () => {
     const tree = buildFullTree(
-      ["a/b/c/deep.ts", "other/plain.ts"],
+      ["a/b/c/deep.ts", "a/b/sibling.ts", "other/plain.ts"],
+      [changed("a/b/c/deep.ts", "modified")],
+    );
+    const ab = directory(tree, "a/b");
+
+    expect(ab.hasChanges).toBe(true);
+    expect(directory(ab.children, "c").hasChanges).toBe(true);
+    expect(directory(tree, "other").hasChanges).toBe(false);
+  });
+
+  it("joins a chain of single-child folders into one row", () => {
+    const tree = buildFullTree(["a/b/c/deep.ts"], []);
+    const joined = directory(tree, "a/b/c");
+
+    expect(joined.path).toBe("a/b/c");
+    expect(joined.children.map((node) => node.name)).toEqual(["deep.ts"]);
+  });
+
+  it("keeps the deepest folder path as the joined row identity", () => {
+    const tree = buildFullTree(["src/main/java/app/Main.java"], []);
+    const [joined] = tree;
+
+    // The folded set and the change marker key on this path.
+    expect(joined?.kind === "directory" && joined.path).toBe("src/main/java/app");
+  });
+
+  it("marks a joined row from anything below the whole chain", () => {
+    const tree = buildFullTree(
+      ["a/b/c/deep.ts"],
       [changed("a/b/c/deep.ts", "modified")],
     );
 
-    expect(directory(tree, "a").hasChanges).toBe(true);
-    expect(directory(directory(tree, "a").children, "b").hasChanges).toBe(true);
-    expect(directory(tree, "other").hasChanges).toBe(false);
+    expect(directory(tree, "a/b/c").hasChanges).toBe(true);
+  });
+
+  it("stops joining where a folder holds more than one entry", () => {
+    const tree = buildFullTree(["a/b/one/x.ts", "a/b/two/y.ts"], []);
+    const ab = directory(tree, "a/b");
+
+    expect(ab.children.map((node) => node.name)).toEqual(["one", "two"]);
+  });
+
+  it("does not join a folder with its only file", () => {
+    const tree = buildFullTree(["a/b/only.ts"], []);
+    const joined = directory(tree, "a/b");
+
+    expect(joined.name).toBe("a/b");
+    expect(joined.children.map((node) => node.name)).toEqual(["only.ts"]);
   });
 
   it("keeps the order the paths arrived in within each group", () => {

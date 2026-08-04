@@ -162,10 +162,28 @@ describe("Full Tree", () => {
 
     await openFullTree(user);
 
-    expect(screen.getByRole("button", { name: "docs, no changes" }))
+    // The single-child chain is one row, and it opens because the file is below it.
+    expect(screen.getByRole("button", { name: "docs/deep, no changes" }))
       .toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("button", {
       name: "Currently viewing file: docs/deep/note.md (Unchanged)",
+    })).toBeInTheDocument();
+  });
+
+  it("joins a deep single-child chain into one row", async () => {
+    const user = userEvent.setup();
+    renderPane(ready(["src/main/java/app/Main.java", "README.md"]), {
+      result: { ...result, files: [] },
+    });
+
+    await openFullTree(user);
+
+    const joined = screen.getByRole("button", { name: /^src\/main\/java\/app, / });
+    expect(joined).toBeInTheDocument();
+    await user.click(joined);
+    expect(joined).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", {
+      name: "View file: src/main/java/app/Main.java (Unchanged)",
     })).toBeInTheDocument();
   });
 

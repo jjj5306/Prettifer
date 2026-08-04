@@ -241,7 +241,7 @@ test("reviews an added file as full contents and collapses its Tree View folder"
   expect(running.pageErrors).toEqual([]);
 });
 
-test("sizes tree rows to their own name and keeps list rows full width", async () => {
+test("fills the panel width with tree rows and never scrolls sideways", async () => {
   const fixture = await createFixture();
   const running = await launch([fixture.path]);
   const browserWindow = await running.application.browserWindow(running.page) as JSHandle<BrowserWindow>;
@@ -269,6 +269,11 @@ test("sizes tree rows to their own name and keeps list rows full width", async (
       overflowing: rows.filter(
         (row) => row.getBoundingClientRect().width > available,
       ).length,
+      // A tree that fits never has more to scroll to than it already shows.
+      scrollableX: (() => {
+        const content = panel.querySelector<HTMLElement>("div");
+        return content === null ? 0 : content.scrollWidth - content.clientWidth;
+      })(),
     };
   });
 
@@ -282,17 +287,19 @@ test("sizes tree rows to their own name and keeps list rows full width", async (
   await expect(running.page.getByRole("button", { name: "Tree View" }))
     .toHaveAttribute("aria-pressed", "true");
   const tree = await measure();
-  // Every tree row hugs its own label instead of filling the widened panel.
-  expect(Math.max(...tree.widths)).toBeLessThan(tree.available - 40);
-  // A long name still stays inside the panel.
+  // Every row fills the panel, so selection and hover read as a full-width band.
+  expect(Math.min(...tree.widths)).toBeGreaterThan(tree.available - 40);
+  // A long name is truncated instead of pushing the row past the panel.
   expect(tree.overflowing).toBe(0);
+  expect(tree.scrollableX).toBe(0);
 
   await running.page.getByRole("button", { name: "List View" }).click();
   await expect(running.page.getByRole("button", { name: "List View" }))
     .toHaveAttribute("aria-pressed", "true");
   const list = await measure();
-  // The flat list keeps full-width rows, which this change must not alter.
+  // The flat list was already full width and stays that way.
   expect(Math.min(...list.widths)).toBeGreaterThan(list.available - 40);
+  expect(list.scrollableX).toBe(0);
 });
 
 test("resizes the changed files and diff panes and keeps the width", async () => {
