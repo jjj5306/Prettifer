@@ -634,7 +634,7 @@ describe("CommitHistoryPane", () => {
       />,
     );
 
-    const clear = screen.getByRole("button", { name: "Clear selection" });
+    const clear = within(resetGroup()).getByRole("button", { name: "Clear selection" });
     clear.focus();
     await user.keyboard("{Enter}");
     expect(onClearSelection).toHaveBeenCalledOnce();
@@ -667,7 +667,7 @@ describe("CommitHistoryPane", () => {
       firstPageOffset: 2,
     })));
 
-    const reset = screen.getByRole("button", { name: "Reset loaded commits" });
+    const reset = within(resetGroup()).getByRole("button", { name: "Reset loaded commits" });
     reset.focus();
     await user.keyboard(" ");
     expect(onResetLoaded).toHaveBeenCalledOnce();
@@ -692,4 +692,107 @@ describe("CommitHistoryPane", () => {
 
     expect(screen.queryByRole("button", { name: "Reset loaded commits" })).toBeNull();
   });
+
+  it("gathers both resets beside the panel title and leaves loading out of them", () => {
+    render(
+      <CommitHistoryPane
+        isCurrentRegion={false}
+        range={readyRange({
+          commits: [firstCommit, mergeCommit, secondCommit],
+          firstPageOffset: 2,
+        })}
+        selectedCommitIds={[firstCommit.id]}
+        inspectedCommitId={null}
+        mergeParents={{}}
+        onChooseMainlineParent={vi.fn()}
+        onToggleCommit={vi.fn()}
+        onInspectCommit={vi.fn()}
+        onLoadMore={vi.fn()}
+        onResetLoaded={vi.fn()}
+        onClearSelection={vi.fn()}
+      />,
+    );
+
+    const group = resetGroup();
+    expect(within(group).getAllByRole("button").map((button) => button.textContent))
+      .toEqual(["", ""]);
+    expect(within(group).getByRole("button", { name: "Clear selection" })).toBeVisible();
+    expect(within(group).getByRole("button", { name: "Reset loaded commits" }))
+      .toBeVisible();
+
+    // The panel title and the resets share one row.
+    const titleRow = screen.getByRole("heading", { name: "Commit History" }).parentElement;
+    expect(titleRow).toContainElement(group);
+
+    // Loading more is the main action on the list, not an undo.
+    expect(within(group).queryByRole("button", { name: "Load 100 older commits" }))
+      .toBeNull();
+    expect(screen.getByRole("button", { name: "Load 100 older commits" })).toBeVisible();
+  });
+
+  it("describes what each reset undoes and what it leaves alone", () => {
+    render(
+      <CommitHistoryPane
+        isCurrentRegion={false}
+        range={readyRange({
+          commits: [firstCommit, mergeCommit, secondCommit],
+          firstPageOffset: 2,
+        })}
+        selectedCommitIds={[firstCommit.id]}
+        inspectedCommitId={null}
+        mergeParents={{}}
+        onChooseMainlineParent={vi.fn()}
+        onToggleCommit={vi.fn()}
+        onInspectCommit={vi.fn()}
+        onLoadMore={vi.fn()}
+        onResetLoaded={vi.fn()}
+        onClearSelection={vi.fn()}
+      />,
+    );
+
+    const group = resetGroup();
+    const clear = within(group).getByRole("button", { name: "Clear selection" });
+    const reset = within(group).getByRole("button", { name: "Reset loaded commits" });
+
+    // `title` is both the hover text and, next to a name, the description.
+    expect(clear).toHaveAttribute(
+      "title",
+      "Clear the commit selection. The loaded commits stay.",
+    );
+    expect(clear).toHaveAccessibleDescription(
+      "Clear the commit selection. The loaded commits stay.",
+    );
+    expect(reset).toHaveAttribute(
+      "title",
+      "Reset the loaded commits to the first page. The selection stays.",
+    );
+    expect(reset).toHaveAccessibleDescription(
+      "Reset the loaded commits to the first page. The selection stays.",
+    );
+  });
+
+  it("keeps the reset group out of the title row when there is nothing to undo", () => {
+    render(
+      <CommitHistoryPane
+        isCurrentRegion={false}
+        range={readyRange({ firstPageOffset: 2 })}
+        selectedCommitIds={[]}
+        inspectedCommitId={null}
+        mergeParents={{}}
+        onChooseMainlineParent={vi.fn()}
+        onToggleCommit={vi.fn()}
+        onInspectCommit={vi.fn()}
+        onLoadMore={vi.fn()}
+        onResetLoaded={vi.fn()}
+        onClearSelection={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("group", { name: "Commit history resets" })).toBeNull();
+  });
 });
+
+/** The one place the panel's undo controls live. */
+function resetGroup(): HTMLElement {
+  return screen.getByRole("group", { name: "Commit history resets" });
+}

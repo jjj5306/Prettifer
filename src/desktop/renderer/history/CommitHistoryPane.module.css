@@ -21,11 +21,16 @@
   display: flex;
   min-width: 8.75rem;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
+/*
+ * The count and the resets read as one trailing block, so the title keeps the
+ * left edge and they share the right. Spreading all three apart would leave the
+ * count floating between them.
+ */
 .headingRow strong {
+  margin-inline-start: auto;
   color: var(--color-muted);
   font-size: 0.75rem;
   white-space: nowrap;
@@ -224,15 +229,30 @@
   border-color: var(--color-warning);
 }
 
-/* A quiet undo beside the state it undoes, not competing with the main actions. */
-.panel .reset {
+/* The panel's undo controls, gathered at the end of its title row. */
+.resetGroup {
+  display: flex;
   flex: 0 0 auto;
-  min-height: 1.55rem;
-  padding: 0.1rem var(--space-2);
+  gap: var(--space-1);
+  padding-inline: var(--space-1);
+}
+
+/*
+ * A quiet icon action, sized for the fixed-height bar. Both classes are needed:
+ * the app-wide `.app button` rule outranks a single local class.
+ */
+.panel .reset {
+  display: grid;
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
   color: var(--color-muted);
-  font-size: 0.6875rem;
+  place-content: center;
 }
 
 .panel .reset:hover:not(:disabled) {
+  border-color: var(--color-border);
   color: var(--color-text);
 }

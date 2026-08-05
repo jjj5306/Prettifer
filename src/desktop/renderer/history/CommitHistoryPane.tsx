@@ -124,11 +124,12 @@ export const CommitHistoryPane = ({
       <div className={styles.headingRow}>
         <h2 id="commit-history-heading">Commit History</h2>
         <strong>{selectedCommitIds.length} selected</strong>
-        {selectedCommitIds.length === 0 ? null : (
-          <button type="button" className={styles.reset} onClick={onClearSelection}>
-            Clear selection
-          </button>
-        )}
+        <ResetGroup
+          canClearSelection={selectedCommitIds.length > 0}
+          canResetLoaded={hasAddedPages(range)}
+          onClearSelection={onClearSelection}
+          onResetLoaded={onResetLoaded}
+        />
       </div>
       {range.commits.length === 0 ? (
         <p>No commits are available in this range. Choose another branch range.</p>
@@ -220,17 +221,82 @@ export const CommitHistoryPane = ({
             : "Load 100 older commits"}
         </button>
       )}
-      {hasAddedPages(range) ? (
-        <button type="button" className={styles.reset} onClick={onResetLoaded}>
-          Reset loaded commits
-        </button>
-      ) : null}
       {range.pagination.status === "error" ? (
         <DiagnosticMessage diagnostic={range.pagination.diagnostic} />
       ) : null}
     </section>
   );
 };
+
+interface ResetGroupProps {
+  readonly canClearSelection: boolean;
+  readonly canResetLoaded: boolean;
+  readonly onClearSelection: () => void;
+  readonly onResetLoaded: () => void;
+}
+
+/**
+ * The panel's undo controls, gathered beside its title. Loading more commits
+ * stays next to the list: it grows the list rather than undoing anything.
+ *
+ * Each button is an icon, because the bar is a fixed-height strip and the labels
+ * would take the width the commit titles need. `title` carries the hover text
+ * and, next to an `aria-label`, doubles as the accessible description.
+ */
+const ResetGroup = ({
+  canClearSelection,
+  canResetLoaded,
+  onClearSelection,
+  onResetLoaded,
+}: ResetGroupProps) => {
+  if (!canClearSelection && !canResetLoaded) {
+    return null;
+  }
+  return (
+    <div role="group" aria-label="Commit history resets" className={styles.resetGroup}>
+      {canClearSelection ? (
+        <button
+          type="button"
+          className={styles.reset}
+          aria-label="Clear selection"
+          title="Clear the commit selection. The loaded commits stay."
+          onClick={onClearSelection}
+        >
+          {/* A check box holding no check: the cleared state of the rows. */}
+          <ResetIcon path="M5 5h14v14H5zM9 12h6" />
+        </button>
+      ) : null}
+      {canResetLoaded ? (
+        <button
+          type="button"
+          className={styles.reset}
+          aria-label="Reset loaded commits"
+          title="Reset the loaded commits to the first page. The selection stays."
+          onClick={onResetLoaded}
+        >
+          {/* A list that gets shorter from the bottom. */}
+          <ResetIcon path="M4 7h16M4 12h9M4 17h5" />
+        </button>
+      ) : null}
+    </div>
+  );
+};
+
+const ResetIcon = ({ path }: Readonly<{ path: string }>) => (
+  <svg
+    aria-hidden="true"
+    viewBox="0 0 24 24"
+    width="16"
+    height="16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d={path} />
+  </svg>
+);
 
 /**
  * The commit card is one line, so only the authored month and day are shown.
