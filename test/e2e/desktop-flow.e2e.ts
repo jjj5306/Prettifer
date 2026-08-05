@@ -1018,6 +1018,14 @@ test("resets the loaded commits and the selection independently", async () => {
   await commits.first().check();
   await expect(history.getByText("1 selected")).toBeVisible();
 
+  // With both undos available, they share one group beside the panel title.
+  const resets = history.getByRole("group", { name: "Commit history resets" });
+  await expect(resets.getByRole("button", { name: "Clear selection" })).toBeVisible();
+  await expect(resets.getByRole("button", { name: "Reset loaded commits" }))
+    .toBeVisible();
+  await expect(resets.getByRole("button", { name: "Load 100 older commits" }))
+    .toBeHidden();
+
   await running.page.getByRole("button", { name: "Reset loaded commits" }).click();
   await expect.poll(() => commits.count()).toBe(firstPage);
   await expect(history.getByText("1 selected")).toBeVisible();
