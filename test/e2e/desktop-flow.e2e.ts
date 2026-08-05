@@ -30,6 +30,10 @@ import {
   type ConflictFixture,
 } from "../support/conflict-fixture.js";
 import {
+  createRenameFixture,
+  type RenameFixture,
+} from "../support/rename-fixture.js";
+import {
   createSymbolFixture,
   type SymbolFixture,
 } from "../support/symbol-fixture.js";
@@ -1071,6 +1075,67 @@ test("resets the loaded commits and the selection independently", async () => {
   expect(fixture.git(["status", "--porcelain"])).toBe("");
 });
 
+test("reviews a moved file as one change naming both of its paths", async () => {
+  const fixture = await createRenameE2eFixture();
+  const running = await launch([fixture.path]);
+  await openRepository(running.page, fixture.path, fixture.headRef);
+  await running.page.getByRole("button", { name: "Load Commit Range" }).click();
+
+  await running.page.getByRole("checkbox", {
+    name: "Include in selected result: refactor: move moved.txt to lib",
+  }).check();
+  await running.page.getByRole("checkbox", {
+    name: "Include in selected result: refactor: rename rewritten.txt and rewrite it",
+  }).check();
+  await running.page.getByRole("button", { name: "Build Selected Result" }).click();
+  await expect(running.page.getByText(/Result ready · \d+ changed files/u)).toBeVisible();
+
+  /*
+   * The first file is selected on arrival, so a row reads either "View file:" or
+   * "Currently viewing file:". Matching from "file:" covers both. A row for the
+   * path a rename left would be followed by its own "(", which is what tells it
+   * apart from the rename row that merely names that path.
+   */
+  const fileRow = (path: string, state: string): Locator =>
+    running.page.getByRole("button", {
+      name: new RegExp(`file: ${escapeForRegExp(path)} \\(${state}`, "u"),
+    });
+
+  // The move is one row at the path it moved to, and the path it left is gone.
+  const moved = fileRow(
+    fixture.paths.pureTo,
+    `Renamed from ${escapeForRegExp(fixture.paths.pureFrom)}\\)`,
+  );
+  await expect(moved).toBeVisible();
+  await expect(fileRow(fixture.paths.pureFrom, "")).toBeHidden();
+
+  // A rewrite is too far from the original to be one file, so both paths stay.
+  await expect(fileRow(fixture.paths.rewrittenTo, "Added")).toBeVisible();
+  await expect(fileRow(fixture.paths.rewrittenFrom, "Deleted")).toBeVisible();
+
+  await moved.click();
+  await expect(running.page.getByRole("heading", { name: "Renamed File" })).toBeVisible();
+  await expect(running.page.getByText(
+    `Renamed from ${fixture.paths.pureFrom} · 100% of the content matched`,
+  )).toBeVisible();
+  await expect(running.page.getByRole("textbox", {
+    name: `Read-only diff: ${fixture.paths.pureTo} `
+      + `· base at ${fixture.paths.pureFrom} and selected result`,
+  })).toBeVisible();
+
+  // Full Tree draws the repository structure, where the move left its old path.
+  await running.page.getByRole("button", { name: "Full Tree" }).click();
+  await expect(moved).toBeVisible();
+  await expect(fileRow(fixture.paths.pureFrom, "")).toBeHidden();
+
+  expect(fixture.git(["status", "--porcelain"])).toBe("");
+});
+
+/** Escapes a repository path so it reads as literal text inside a pattern. */
+function escapeForRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
 async function createFixture(): Promise<GitFixture> {
   const fixture = await createAuthHistoryFixture();
   fixtures.push(fixture);
@@ -1091,6 +1156,12 @@ async function createMergeE2eFixture(): Promise<MergeFixture> {
 
 async function createConflictE2eFixture(): Promise<ConflictFixture> {
   const fixture = await createConflictFixture();
+  fixtures.push(fixture);
+  return fixture;
+}
+
+async function createRenameE2eFixture(): Promise<RenameFixture> {
+  const fixture = await createRenameFixture();
   fixtures.push(fixture);
   return fixture;
 }

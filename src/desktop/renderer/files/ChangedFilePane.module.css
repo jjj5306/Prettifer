@@ -173,6 +173,10 @@
   color: var(--color-deleted);
 }
 
+.renamed {
+  color: var(--color-renamed);
+}
+
 .path {
   min-width: 0;
   overflow: hidden;

@@ -13,7 +13,7 @@ import {
   GitCommandRunner,
 } from "../git/git-command-runner.js";
 
-export type CompositeFileStatus = "added" | "modified" | "deleted";
+export type CompositeFileStatus = "added" | "modified" | "deleted" | "renamed";
 
 interface CompositeFileChangeBase {
   readonly path: string;
@@ -46,17 +46,46 @@ export type CompositeFileChange =
     >
   | Readonly<
       CompositeFileChangeBase & {
-        status: CompositeFileStatus;
+        status: "renamed";
+        binary?: never;
+        previousPath: string;
+        similarity: number;
+        beforeContent: string;
+        afterContent: string;
+      }
+    >
+  | Readonly<
+      CompositeFileChangeBase & {
+        status: Exclude<CompositeFileStatus, "renamed">;
         binary: true;
+        beforeContent: null;
+        afterContent: null;
+      }
+    >
+  | Readonly<
+      CompositeFileChangeBase & {
+        status: "renamed";
+        binary: true;
+        previousPath: string;
+        similarity: number;
         beforeContent: null;
         afterContent: null;
       }
     >;
 
-interface CompositeFilePathChange {
-  readonly path: string;
-  readonly status: CompositeFileStatus;
-}
+type CompositeFilePathChange =
+  | Readonly<{
+      path: string;
+      status: Exclude<CompositeFileStatus, "renamed">;
+    }>
+  | Readonly<{
+      path: string;
+      status: "renamed";
+      /** Path this file had at the comparison base. */
+      previousPath: string;
+      /** How much of the content Git matched, 0 to 100. */
+      similarity: number;
+    }>;
 
 export type CompositeProblemCode = "CONTENT_CHOICE_REQUIRED";
 
@@ -90,6 +119,21 @@ export interface CompositeDiffRequest {
 }
 
 const MAX_CONCURRENT_GIT_REQUESTS = 4;
+
+/**
+ * How rename detection is asked for on the result diff.
+ *
+ * Both values are spelled out rather than left to Git's defaults, because the
+ * calculation inherits the user's Git configuration: `diff.renames` and
+ * `diff.renameLimit` would otherwise decide whether a moved file reads as one
+ * rename or as an add and a delete, and the same selection would answer
+ * differently on two machines.
+ *
+ * Passing the limit also fixes what happens when a change is too large to
+ * search: Git stops looking and reports those paths as an add and a delete,
+ * which is the result this feature replaces, not a result that loses a path.
+ */
+const RENAME_DETECTION = ["--find-renames=50%", "-l1000"] as const;
 
 export class CompositeDiffService {
   private readonly git: GitCommandRunner;
@@ -226,7 +270,7 @@ export class CompositeDiffService {
         [
           "diff",
           "--cached",
-          "--no-renames",
+          ...RENAME_DETECTION,
           "--no-ext-diff",
           "--no-textconv",
           "--src-prefix=a/",
@@ -235,11 +279,11 @@ export class CompositeDiffService {
         gitRunOptions(workspace.path, signal),
       ),
       this.git.run(
-        ["diff", "--cached", "--name-status", "-z", "--no-renames"],
+        ["diff", "--cached", "--name-status", "-z", ...RENAME_DETECTION],
         gitRunOptions(workspace.path, signal),
       ),
       this.git.run(
-        ["diff", "--cached", "--numstat", "-z", "--no-renames"],
+        ["diff", "--cached", "--numstat", "-z", ...RENAME_DETECTION],
         gitRunOptions(workspace.path, signal),
       ),
     ]);
@@ -379,6 +423,28 @@ export class CompositeDiffService {
         afterContent: null,
       };
     }
+    if (change.status === "renamed") {
+      // The current path does not exist at the base, so the content before the
+      // move is read from the path the file had there.
+      const [beforeContent, afterContent] = await Promise.all([
+        this.git.run(
+          ["show", `${workspace.baseCommit}:${change.previousPath}`],
+          gitRunOptions(workspace.path, signal),
+        ),
+        this.git.run(
+          ["show", `:${change.path}`],
+          gitRunOptions(workspace.path, signal),
+        ),
+      ]);
+      return {
+        path: change.path,
+        status: "renamed",
+        previousPath: change.previousPath,
+        similarity: change.similarity,
+        beforeContent: beforeContent.stdout,
+        afterContent: afterContent.stdout,
+      };
+    }
     switch (change.status) {
       case "added":
         return {
@@ -424,18 +490,30 @@ export class CompositeDiffService {
   }
 }
 
+/**
+ * The paths Git reported no line counts for, which is how it says binary.
+ *
+ * A rename record carries the counts, the previous path and the current path,
+ * and the current path is the one the file list is keyed by.
+ */
 function parseBinaryPaths(output: string): ReadonlySet<string> {
-  return new Set(
-    output
-      .split("\0")
-      .filter((record) => record.length > 0)
-      .flatMap((record) => {
-        const [added, deleted, path] = record.split("\t");
-        return added === "-" && deleted === "-" && path !== undefined
-          ? [path]
-          : [];
-      }),
-  );
+  const records = output.split("\0").filter((record) => record.length > 0);
+  const binary = new Set<string>();
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index];
+    if (record === undefined) {
+      continue;
+    }
+    const [added, deleted, path] = record.split("\t");
+    // A rename leaves its two paths in the records that follow the counts.
+    const currentPath = path === undefined || path.length === 0
+      ? records[(index += 2)]
+      : path;
+    if (added === "-" && deleted === "-" && currentPath !== undefined) {
+      binary.add(currentPath);
+    }
+  }
+  return binary;
 }
 
 function parseNameStatus(
@@ -455,7 +533,22 @@ function parseNameStatus(
     if (path === undefined) {
       throw new Error("The Git changed-file list could not be parsed.");
     }
-    changes.push({ path, status: parseStatus(statusCode) });
+    const status = parseStatus(statusCode);
+    if (status !== "renamed") {
+      changes.push({ path, status });
+      continue;
+    }
+    // A rename names both paths: the base one first, then the current one.
+    const currentPath = tokens[++index];
+    if (currentPath === undefined) {
+      throw new Error("The Git changed-file list could not be parsed.");
+    }
+    changes.push({
+      path: currentPath,
+      status,
+      previousPath: path,
+      similarity: parseSimilarity(statusCode),
+    });
   }
   return changes;
 }
@@ -468,10 +561,21 @@ function parseStatus(status: string): CompositeFileStatus {
       return "modified";
     case "D":
       return "deleted";
+    case "R":
+      return "renamed";
     case undefined:
     default:
       throw new Error(`Unsupported file change status: ${status}`);
   }
+}
+
+/** The score Git appends to a rename status, as in `R100` or `R087`. */
+function parseSimilarity(status: string): number {
+  const score = Number(status.slice(1));
+  if (!Number.isInteger(score) || score < 0 || score > 100) {
+    throw new Error(`Unsupported rename similarity: ${status}`);
+  }
+  return score;
 }
 
 function comparePath(left: string, right: string): number {

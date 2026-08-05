@@ -24,14 +24,19 @@ export const FileButton = ({
   const status = fileStatus(entryStatus(entry));
   const isSelected = path === selectedFilePath;
   const rule = ruleDescription === undefined ? "" : `, ${ruleDescription}`;
+  // A renamed file is one row at its current path, so the path it moved from is
+  // only reachable from the row itself.
+  const movedFrom = previousPathOf(entry);
+  const moved = movedFrom === null ? "" : ` from ${movedFrom}`;
 
   return (
     <button
       type="button"
-      title={ruleDescription === undefined ? path : `${path} (${ruleDescription})`}
+      title={fileTitle(path, movedFrom, ruleDescription)}
       aria-pressed={isSelected}
       aria-label={
-        `${isSelected ? "Currently viewing" : "View"} file: ${path} (${status.label})${rule}`
+        `${isSelected ? "Currently viewing" : "View"} file: ${path} `
+        + `(${status.label}${moved})${rule}`
       }
       className={isSelected ? styles.selectedFile : styles.file}
       onClick={() => { onSelectFile(path); }}
@@ -47,10 +52,29 @@ export const FileButton = ({
   );
 };
 
-type ReviewStatus = "added" | "modified" | "deleted" | "problem";
+type ReviewStatus = "added" | "modified" | "deleted" | "renamed" | "problem";
 
 function entryStatus(entry: ReviewEntry): ReviewStatus {
   return entry.kind === "problem" ? "problem" : entry.file.status;
+}
+
+/** The path a renamed file had at the base, or null for every other entry. */
+function previousPathOf(entry: ReviewEntry): string | null {
+  return entry.kind === "problem" || entry.file.status !== "renamed"
+    ? null
+    : entry.file.previousPath;
+}
+
+function fileTitle(
+  path: string,
+  movedFrom: string | null,
+  ruleDescription: string | undefined,
+): string {
+  const notes = [
+    ...(movedFrom === null ? [] : [`renamed from ${movedFrom}`]),
+    ...(ruleDescription === undefined ? [] : [ruleDescription]),
+  ];
+  return notes.length === 0 ? path : `${path} (${notes.join(", ")})`;
 }
 
 function fileStatus(
@@ -63,6 +87,8 @@ function fileStatus(
       return { code: "M", label: "Modified" };
     case "deleted":
       return { code: "D", label: "Deleted" };
+    case "renamed":
+      return { code: "R", label: "Renamed" };
     case "problem":
       return { code: "!", label: "Problem" };
   }

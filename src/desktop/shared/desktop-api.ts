@@ -170,6 +170,16 @@ const textFileFields = {
   binary: z.never().optional(),
 } as const;
 
+/**
+ * What a renamed file carries beyond its current path: the path it had at the
+ * comparison base, and how much of the content Git matched to decide the two
+ * are the same file.
+ */
+const renamedFileFields = {
+  previousPath: compositeFilePathSchema,
+  similarity: z.number().int().min(0).max(100),
+} as const;
+
 export const compositeFileChangeSchema = z.union([
   z.object({
     ...textFileFields,
@@ -190,8 +200,23 @@ export const compositeFileChangeSchema = z.union([
     afterContent: z.null(),
   }).strict(),
   z.object({
+    ...textFileFields,
+    status: z.literal("renamed"),
+    ...renamedFileFields,
+    beforeContent: z.string(),
+    afterContent: z.string(),
+  }).strict(),
+  z.object({
     path: compositeFilePathSchema,
     status: z.enum(["added", "modified", "deleted"]),
+    binary: z.literal(true),
+    beforeContent: z.null(),
+    afterContent: z.null(),
+  }).strict(),
+  z.object({
+    path: compositeFilePathSchema,
+    status: z.literal("renamed"),
+    ...renamedFileFields,
     binary: z.literal(true),
     beforeContent: z.null(),
     afterContent: z.null(),
