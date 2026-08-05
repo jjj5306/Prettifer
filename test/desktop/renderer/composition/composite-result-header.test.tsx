@@ -113,6 +113,29 @@ describe("CompositeResultHeader", () => {
     expect(screen.getByRole("button", { name: "Rebuild Selected Result" })).toBeEnabled();
   });
 
+  it("reports a merge's mainline parent by side rather than by number", () => {
+    const merge = "d".repeat(40);
+    const mergedIn = "e".repeat(40);
+    renderHeader({
+      status: "ready",
+      requestId: "composition-1",
+      result: {
+        baseCommit: range.baseCommit,
+        selectedCommits: [merge, mergedIn],
+        files: [],
+        mainlineParents: { [merge]: 1, [mergedIn]: 2 },
+        problemFiles: [],
+        unifiedDiff: "",
+      },
+    }, 2);
+
+    expect(screen.getByText("mainline"))
+      .toHaveAttribute("title", "Composed against its mainline parent");
+    expect(screen.getByText("merged-in"))
+      .toHaveAttribute("title", "Composed against its merged-in parent");
+    expect(screen.queryByText(/parent [12]$/u)).toBeNull();
+  });
+
   it("announces a cancelled calculation and keeps the retry action", () => {
     renderHeader({ status: "cancelled", requestId: "composition-1" }, 1);
 

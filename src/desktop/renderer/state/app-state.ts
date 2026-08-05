@@ -871,7 +871,7 @@ function chooseMainlineParent(
   if (commit?.isMerge !== true) {
     return state;
   }
-  if (mainlineParent < 1 || mainlineParent > commit.parentIds.length) {
+  if (mainlineParent < 1 || mainlineParent > commit.parents.length) {
     return state;
   }
   return {

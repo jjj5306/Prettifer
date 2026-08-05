@@ -8,10 +8,15 @@ import { describe, expect, it, vi } from "vitest";
 import { CommitHistoryPane } from "../../../../src/desktop/renderer/history/CommitHistoryPane.js";
 import type { RangeState } from "../../../../src/desktop/renderer/state/app-state.js";
 
+/** A parent of a non-merge commit: never offered as a choice, so never read. */
+function unreadParent(id: string) {
+  return { id, shortId: id.slice(0, 7), title: null };
+}
+
 const firstCommit = {
   id: "a".repeat(40),
   shortId: "a".repeat(7),
-  parentIds: ["b".repeat(40)],
+  parents: [unreadParent("b".repeat(40))],
   title: "add desktop shell",
   authorName: "Prettifer Test",
   authoredAt: "2026-07-23T00:00:00.000Z",
@@ -21,7 +26,14 @@ const firstCommit = {
 const mergeCommit = {
   id: "c".repeat(40),
   shortId: "c".repeat(7),
-  parentIds: ["d".repeat(40), "e".repeat(40)],
+  parents: [
+    { id: "d".repeat(40), shortId: "d".repeat(7), title: "chore: bump dependencies" },
+    {
+      id: "e".repeat(40),
+      shortId: "e".repeat(7),
+      title: "feat(auth): validate login request",
+    },
+  ],
   title: "merge feature branch",
   authorName: "Prettifer Test",
   authoredAt: "2026-07-23T00:01:00.000Z",
@@ -41,7 +53,7 @@ const secondCommit = {
   ...firstCommit,
   id: "d".repeat(40),
   shortId: "d".repeat(7),
-  parentIds: [firstCommit.id],
+  parents: [unreadParent(firstCommit.id)],
   title: "refine desktop navigation",
   authoredAt: "2026-07-23T00:02:00.000Z",
 };
@@ -589,7 +601,7 @@ describe("CommitHistoryPane", () => {
         mergeCommit.id,
         mergeCommit.authorName,
         mergeCommit.authoredAt,
-        "Merge commit using parent 2",
+        "Merge commit using its merged-in parent",
       ].join(" · "),
     })).toBeVisible();
 
@@ -597,6 +609,112 @@ describe("CommitHistoryPane", () => {
     expect(onChooseMainlineParent).toHaveBeenCalledWith(mergeCommit.id, 1);
     expect(onToggleCommit).not.toHaveBeenCalled();
     expect(screen.getByText("1 selected")).toBeVisible();
+  });
+
+  it("names each mainline parent by its side, short id and subject", () => {
+    render(
+      <CommitHistoryPane
+        isCurrentRegion={false}
+        range={readyRange()}
+        selectedCommitIds={[]}
+        inspectedCommitId={null}
+        mergeParents={{}}
+        onChooseMainlineParent={vi.fn()}
+        onToggleCommit={vi.fn()}
+        onInspectCommit={vi.fn()}
+        onLoadMore={vi.fn()}
+        onResetLoaded={vi.fn()}
+        onClearSelection={vi.fn()}
+      />,
+    );
+
+    const picker = screen.getByRole("combobox", {
+      name: `Mainline parent for merge commit: ${mergeCommit.title}`,
+    });
+    // The number Git recorded the parent at stays the value and leaves the text.
+    expect(Array.from(picker.querySelectorAll("option")).map((option) => [
+      option.value,
+      option.textContent,
+    ])).toEqual([
+      ["", "Choose"],
+      ["1", "mainline · ddddddd  chore: bump dependencies"],
+      ["2", "merged-in · eeeeeee  feat(auth): validate login request"],
+    ]);
+  });
+
+  it("marks only the first parent as the mainline when a merge has three", () => {
+    const octopus = {
+      ...mergeCommit,
+      id: "8".repeat(40),
+      shortId: "8".repeat(7),
+      title: "merge three branches",
+      parents: [
+        { id: "1".repeat(40), shortId: "1".repeat(7), title: "base tip" },
+        { id: "2".repeat(40), shortId: "2".repeat(7), title: "first branch" },
+        { id: "3".repeat(40), shortId: "3".repeat(7), title: "second branch" },
+      ],
+    };
+    render(
+      <CommitHistoryPane
+        isCurrentRegion={false}
+        range={readyRange({ commits: [octopus] })}
+        selectedCommitIds={[]}
+        inspectedCommitId={null}
+        mergeParents={{}}
+        onChooseMainlineParent={vi.fn()}
+        onToggleCommit={vi.fn()}
+        onInspectCommit={vi.fn()}
+        onLoadMore={vi.fn()}
+        onResetLoaded={vi.fn()}
+        onClearSelection={vi.fn()}
+      />,
+    );
+
+    const picker = screen.getByRole("combobox", {
+      name: `Mainline parent for merge commit: ${octopus.title}`,
+    });
+    expect(Array.from(picker.querySelectorAll("option"))
+      .map((option) => option.textContent)).toEqual([
+      "Choose",
+      "mainline · 1111111  base tip",
+      "merged-in · 2222222  first branch",
+      "merged-in · 3333333  second branch",
+    ]);
+  });
+
+  it("shortens a parent subject that would widen the commit card", () => {
+    const longSubject = "refactor: move the session lifecycle out of the controller";
+    const wordy = {
+      ...mergeCommit,
+      parents: [
+        { id: "d".repeat(40), shortId: "d".repeat(7), title: longSubject },
+        { id: "e".repeat(40), shortId: "e".repeat(7), title: "short one" },
+      ],
+    };
+    render(
+      <CommitHistoryPane
+        isCurrentRegion={false}
+        range={readyRange({ commits: [wordy] })}
+        selectedCommitIds={[]}
+        inspectedCommitId={null}
+        mergeParents={{}}
+        onChooseMainlineParent={vi.fn()}
+        onToggleCommit={vi.fn()}
+        onInspectCommit={vi.fn()}
+        onLoadMore={vi.fn()}
+        onResetLoaded={vi.fn()}
+        onClearSelection={vi.fn()}
+      />,
+    );
+
+    const options = Array.from(
+      screen.getByRole("combobox", {
+        name: `Mainline parent for merge commit: ${wordy.title}`,
+      }).querySelectorAll("option"),
+    ).map((option) => option.textContent);
+    // The side and the short id stay whole; only the subject gives way.
+    expect(options[1]).toBe("mainline · ddddddd  refactor: move the session lifecycle…");
+    expect(options[2]).toBe("merged-in · eeeeeee  short one");
   });
   it("offers a selection reset only while something is selected", async () => {
     const user = userEvent.setup();

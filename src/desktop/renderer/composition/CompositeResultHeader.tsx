@@ -2,6 +2,7 @@ import type { RepositoryRangeDto } from "../../shared/index.js";
 import type { CompositionState } from "../state/app-state.js";
 
 type CompositionReadyResult = Extract<CompositionState, { status: "ready" }>["result"];
+import { mainlineParentSide } from "../mainline-parent.js";
 import { OperationStatus } from "./OperationStatus.js";
 import styles from "./CompositeResultHeader.module.css";
 
@@ -71,9 +72,12 @@ export const CompositeResultHeader = ({
                   {mainlineParent === undefined ? null : (
                     <span
                       className={styles.mainlineParent}
-                      title={`Composed against parent ${String(mainlineParent)}`}
+                      title={
+                        "Composed against its "
+                        + `${mainlineParentSide(mainlineParent)} parent`
+                      }
                     >
-                      {`parent ${String(mainlineParent)}`}
+                      {mainlineParentSide(mainlineParent)}
                     </span>
                   )}
                 </span>

@@ -9,7 +9,11 @@ import {
   RepositoryHistoryService,
   type RepositoryRange,
 } from "../../src/history/repository-history-service.js";
-import { GitCommandRunner, type ProcessExecutor } from "../../src/git/git-command-runner.js";
+import {
+  GitCommandRunner,
+  NodeProcessExecutor,
+  type ProcessExecutor,
+} from "../../src/git/git-command-runner.js";
 import { createHistoryFixture, type HistoryFixture } from "../support/history-fixture.js";
 
 describe("RepositoryHistoryService", () => {
@@ -201,7 +205,65 @@ describe("RepositoryHistoryService", () => {
       selectedCommits: [sideCommit],
     })).rejects.toMatchObject({ code: "COMMIT_NOT_SELECTABLE", subject: sideCommit });
   });
+
+  it("carries the subject of every parent a merge offers as a choice", async () => {
+    const service = new RepositoryHistoryService();
+    const range = await createRange(service, fixture);
+
+    const page = await service.listCommits({ repositoryPath: fixture.path, range });
+    const merge = page.commits.find((commit) => commit.id === fixture.mergeCommit);
+    const plain = page.commits.find((commit) => !commit.isMerge);
+
+    expect(merge?.parents).toHaveLength(2);
+    // Its first parent is the head branch before the merge, its second the side
+    // branch that came in.
+    expect(merge?.parents.map((parent) => parent.title)).toEqual([
+      "feat(history): commit 103",
+      "feat(history): add side branch",
+    ]);
+    for (const parent of merge?.parents ?? []) {
+      expect(parent.shortId).toBe(parent.id.slice(0, 7));
+    }
+    // A parent that is never offered as a choice is never read.
+    expect(plain?.parents.map((parent) => parent.title)).toEqual([null]);
+  });
+
+  it("reads parent subjects once per page, and not at all without a merge", async () => {
+    const range = await new RepositoryHistoryService().createRange({
+      repositoryPath: fixture.path,
+      baseRef: fixture.baseRef,
+      headRef: fixture.headRef,
+    });
+    const runs: string[][] = [];
+    const realGit = new NodeProcessExecutor();
+    const recorder: ProcessExecutor = {
+      execute: async (request) => {
+        runs.push([...request.args]);
+        return await realGit.execute(request);
+      },
+    };
+    const service = new RepositoryHistoryService(
+      new GitCommandRunner({ executor: recorder }),
+    );
+
+    // The merge sits on the newest page; the oldest page holds none.
+    await service.listCommits({ repositoryPath: fixture.path, range });
+    const withMerge = subjectReads(runs);
+    runs.length = 0;
+    await service.listCommits({ repositoryPath: fixture.path, range, offset: 100 });
+
+    expect(withMerge).toHaveLength(1);
+    expect(subjectReads(runs)).toEqual([]);
+    // Every id asked for is distinct: a commit parenting two merges is read once.
+    const asked = withMerge[0]?.filter((argument) => /^[0-9a-f]{40}$/u.test(argument)) ?? [];
+    expect(new Set(asked).size).toBe(asked.length);
+  });
 });
+
+/** The reads that fetch parent subjects, told apart by their walk-free form. */
+function subjectReads(runs: readonly string[][]): string[][] {
+  return runs.filter((args) => args.includes("--no-walk"));
+}
 
 async function createRange(
   service: RepositoryHistoryService,

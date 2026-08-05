@@ -404,7 +404,7 @@ function toCommitPageDto(page: RepositoryCommitPage): RepositoryCommitPageDto {
     rangeRevision: page.rangeRevision,
     commits: page.commits.map((commit) => ({
       ...commit,
-      parentIds: [...commit.parentIds],
+      parents: commit.parents.map((parent) => ({ ...parent })),
     })),
     nextOffset: page.nextOffset,
   };

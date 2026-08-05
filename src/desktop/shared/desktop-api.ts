@@ -53,10 +53,21 @@ export const repositoryRangeSchema = z.object({
   }
 });
 
+export const repositoryCommitParentSchema = z.object({
+  id: commitIdSchema,
+  shortId: z.string().regex(/^[0-9a-f]{7}$/u),
+  /**
+   * Subject of the parent commit, or null when it was not read. Only a merge
+   * offers its parents as a choice, so only a merge's parents carry a subject.
+   */
+  title: z.string().nullable(),
+}).strict();
+
 export const repositoryCommitSchema = z.object({
   id: commitIdSchema,
   shortId: z.string().regex(/^[0-9a-f]{7}$/u),
-  parentIds: z.array(commitIdSchema),
+  /** Parents in the order Git records them: the first one is the mainline. */
+  parents: z.array(repositoryCommitParentSchema),
   title: z.string(),
   authorName: z.string(),
   authoredAt: z.iso.datetime({ offset: true }),

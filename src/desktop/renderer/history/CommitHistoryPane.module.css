@@ -218,15 +218,43 @@
   white-space: nowrap;
 }
 
+/*
+ * A `select` is as wide as its widest option, and a choice now carries a commit
+ * subject, so left alone it would take the whole card. A fixed width keeps the
+ * commit title its share: the closed control clips to the side the parent is on,
+ * which is the part worth reading at a glance, and the open list still shows
+ * every choice in full.
+ */
 .commitRow .mainlineParent select {
+  width: 5.5rem;
+  min-width: 0;
   min-height: 1.35rem;
   padding: 0 0.15rem;
   font-family: var(--font-code);
   font-size: 0.625rem;
+  text-overflow: ellipsis;
 }
 
 .commitRow .mainlineParent select[aria-invalid="true"] {
   border-color: var(--color-warning);
+}
+
+/*
+ * A merge row carries the parent choice inside the same card width as every
+ * other row, so its metadata has less room than its content asks for. Clipping
+ * is what keeps the row readable: left to overflow, the short id and authored
+ * day are drawn on top of the choice beside them.
+ *
+ * The author name goes first, because it is the part that identifies the commit
+ * least and the parent choice has to take its room from somewhere.
+ */
+.commitRow:has(.mainlineParent) .metadata {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.commitRow:has(.mainlineParent) .metadata span {
+  display: none;
 }
 
 /* The panel's undo controls, gathered at the end of its title row. */

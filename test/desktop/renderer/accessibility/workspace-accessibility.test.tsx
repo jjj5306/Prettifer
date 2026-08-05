@@ -12,7 +12,7 @@ import surface from "../../../../src/desktop/renderer/PanelSurface.module.css";
 const firstCommit = {
   id: "a".repeat(40),
   shortId: "a".repeat(7),
-  parentIds: ["b".repeat(40)],
+  parents: [{ id: "b".repeat(40), shortId: "b".repeat(7), title: null }],
   title: "add desktop shell",
   authorName: "Prettifer Test",
   authoredAt: "2026-07-23T00:00:00.000Z",

@@ -251,7 +251,7 @@ describe("useAppController", () => {
             commits: [{
               id: commitId,
               shortId: commitId.slice(0, 7),
-              parentIds: [commonCommit],
+              parents: [{ id: commonCommit, shortId: commonCommit.slice(0, 7), title: null }],
               title: "select me",
               authorName: "Prettifer Test",
               authoredAt: "2026-07-23T00:00:00.000Z",
@@ -326,7 +326,7 @@ describe("useAppController symbol lookup", () => {
             commits: [{
               id: commitId,
               shortId: commitId.slice(0, 7),
-              parentIds: [commonCommit],
+              parents: [{ id: commonCommit, shortId: commonCommit.slice(0, 7), title: null }],
               title: "select me",
               authorName: "Prettifer Test",
               authoredAt: "2026-07-23T00:00:00.000Z",
@@ -635,7 +635,7 @@ describe("useAppController navigation outside the result", () => {
             commits: [{
               id: commitId,
               shortId: commitId.slice(0, 7),
-              parentIds: [commonCommit],
+              parents: [{ id: commonCommit, shortId: commonCommit.slice(0, 7), title: null }],
               title: "select me",
               authorName: "Prettifer Test",
               authoredAt: "2026-07-23T00:00:00.000Z",
@@ -905,7 +905,7 @@ describe("useAppController base tree", () => {
             commits: [{
               id: commitId,
               shortId: commitId.slice(0, 7),
-              parentIds: [commonCommit],
+              parents: [{ id: commonCommit, shortId: commonCommit.slice(0, 7), title: null }],
               title: "select me",
               authorName: "Prettifer Test",
               authoredAt: "2026-07-23T00:00:00.000Z",
