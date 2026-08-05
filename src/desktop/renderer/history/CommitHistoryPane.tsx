@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import type { RepositoryCommitDto } from "../../shared/index.js";
 import type { RangeState } from "../state/app-state.js";
 import { DiagnosticMessage } from "../errors/DiagnosticMessage.js";
+import { mainlineParentSide } from "../mainline-parent.js";
 import { panelClass } from "../panel-class.js";
 import styles from "./CommitHistoryPane.module.css";
 
@@ -344,9 +345,9 @@ const MainlineParentPicker = ({
           }}
         >
           <option value="" disabled>Choose</option>
-          {commit.parentIds.map((parentId, index) => (
-            <option key={parentId} value={String(index + 1)}>
-              {`${String(index + 1)}: ${parentId.slice(0, 7)}`}
+          {commit.parents.map((parent, index) => (
+            <option key={parent.id} value={String(index + 1)}>
+              {parentChoiceText(parent, index + 1)}
             </option>
           ))}
         </select>
@@ -354,6 +355,43 @@ const MainlineParentPicker = ({
     </div>
   );
 };
+
+/**
+ * How much of a parent's subject a choice carries. A `select` is as wide as its
+ * widest option, and the commit card is one line in a fixed-height bar, so an
+ * unbounded subject would widen the card.
+ */
+const PARENT_TITLE_LIMIT = 40;
+
+/**
+ * Names the side a parent is on rather than the position Git recorded it at.
+ * The number is what the calculation takes; on screen it says nothing, because
+ * knowing that `1` is the merged-into side is exactly what the reader lacks.
+ */
+function parentChoiceText(
+  parent: RepositoryCommitDto["parents"][number],
+  parentNumber: number,
+): string {
+  const side = mainlineParentSide(parentNumber);
+  return parent.title === null
+    ? `${side} · ${parent.shortId}`
+    : `${side} · ${parent.shortId}  ${shortenTitle(parent.title)}`;
+}
+
+/**
+ * Cuts at the last word that fits, so the kept part still reads as words. A
+ * first word longer than half the limit has no boundary worth keeping, so that
+ * one is cut mid-word rather than reduced to almost nothing.
+ */
+function shortenTitle(title: string): string {
+  if (title.length <= PARENT_TITLE_LIMIT) {
+    return title;
+  }
+  const head = title.slice(0, PARENT_TITLE_LIMIT - 1);
+  const lastSpace = head.lastIndexOf(" ");
+  const kept = lastSpace > PARENT_TITLE_LIMIT / 2 ? head.slice(0, lastSpace) : head;
+  return `${kept.trimEnd()}…`;
+}
 
 /** Tells assistive technology whether a selected merge still needs a parent. */
 function mergeAccessibleState(
@@ -369,5 +407,5 @@ function mergeAccessibleState(
   }
   return mainlineParent === undefined
     ? ["Merge commit needs a mainline parent"]
-    : [`Merge commit using parent ${String(mainlineParent)}`];
+    : [`Merge commit using its ${mainlineParentSide(mainlineParent)} parent`];
 }

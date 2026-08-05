@@ -56,10 +56,21 @@ export interface RepositoryRange {
   readonly revision: string;
 }
 
+export interface RepositoryCommitParent {
+  readonly id: string;
+  readonly shortId: string;
+  /**
+   * Subject of the parent commit, or null when it was not read. Only a merge
+   * offers its parents as a choice, so only a merge's parents are read.
+   */
+  readonly title: string | null;
+}
+
 export interface RepositoryCommit {
   readonly id: string;
   readonly shortId: string;
-  readonly parentIds: readonly string[];
+  /** Parents in the order Git records them: the first one is the mainline. */
+  readonly parents: readonly RepositoryCommitParent[];
   readonly title: string;
   readonly authorName: string;
   readonly authoredAt: string;
@@ -204,11 +215,65 @@ export class RepositoryHistoryService {
 
     const parsed = parseCommits(output.stdout);
     const hasNextPage = parsed.length > limit;
+    const page = parsed.slice(0, limit);
     return {
       rangeRevision: request.range.revision,
-      commits: parsed.slice(0, limit),
+      commits: await this.withMergeParentTitles(
+        page,
+        resolve(request.repositoryPath),
+        request.signal,
+      ),
       nextOffset: hasNextPage ? offset + limit : null,
     };
+  }
+
+  /**
+   * Fills in the subject of every parent a merge on this page offers as a
+   * choice. The commit format cannot carry a parent's subject, so this is a
+   * second read; it is skipped when the page holds no merge, and the subjects
+   * for the whole page are read together rather than once per merge.
+   */
+  private async withMergeParentTitles(
+    commits: readonly RepositoryCommit[],
+    repositoryPath: string,
+    signal: AbortSignal | undefined,
+  ): Promise<readonly RepositoryCommit[]> {
+    const wanted = [
+      ...new Set(
+        commits
+          .filter((commit) => commit.isMerge)
+          .flatMap((commit) => commit.parents.map((parent) => parent.id)),
+      ),
+    ];
+    if (wanted.length === 0) {
+      return commits;
+    }
+
+    const titles = new Map<string, string>();
+    for (const batch of inBatches(wanted, PARENT_TITLE_BATCH)) {
+      let output: ProcessOutput;
+      try {
+        output = await this.git.run(
+          ["log", "--no-walk", "--format=%H%x00%s%x1e", ...batch],
+          runOptions(repositoryPath, signal),
+        );
+      } catch (error) {
+        throw mapHistoryFailure(error, batch[0] ?? "commit-output");
+      }
+      for (const [id, title] of parseCommitTitles(output.stdout)) {
+        titles.set(id, title);
+      }
+    }
+
+    return commits.map((commit) => commit.isMerge
+      ? {
+        ...commit,
+        parents: commit.parents.map((parent) => ({
+          ...parent,
+          title: titles.get(parent.id) ?? null,
+        })),
+      }
+      : commit);
   }
 
   async assertRangeCurrent(request: {
@@ -326,6 +391,30 @@ function parseBranches(output: string): RepositoryBranch[] {
   return branches.sort((left, right) => left.name.localeCompare(right.name));
 }
 
+/**
+ * How many commit ids one parent-subject read carries. A page holds at most 100
+ * commits, so a single read would still fit the command line; batching keeps
+ * that true for a merge with an unusual number of parents.
+ */
+const PARENT_TITLE_BATCH = 100;
+
+function* inBatches<T>(items: readonly T[], size: number): Generator<readonly T[]> {
+  for (let start = 0; start < items.length; start += size) {
+    yield items.slice(start, start + size);
+  }
+}
+
+function parseCommitTitles(output: string): [string, string][] {
+  return output
+    .split("\x1e")
+    .map((record) => stripRecordBreaks(record))
+    .filter((record) => record.length > 0)
+    .flatMap((record) => {
+      const [id, title = ""] = record.split("\0");
+      return id === undefined || id.length === 0 ? [] : [[id, title] as [string, string]];
+    });
+}
+
 function parseCommits(output: string): RepositoryCommit[] {
   return output
     .split("\x1e")
@@ -345,7 +434,11 @@ function parseCommits(output: string): RepositoryCommit[] {
       return {
         id,
         shortId: id.slice(0, 7),
-        parentIds,
+        parents: parentIds.map((parentId) => ({
+          id: parentId,
+          shortId: parentId.slice(0, 7),
+          title: null,
+        })),
         title,
         authorName,
         authoredAt,

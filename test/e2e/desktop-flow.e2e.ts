@@ -532,6 +532,22 @@ test("keeps a merge commit card inside the commit history bar", async () => {
         if (plain === undefined) { return -1; }
         return Math.round(plain.getBoundingClientRect().bottom - listBox.bottom);
       })(),
+      /*
+       * The row is too narrow for everything it holds, so its parts have to give
+       * way rather than be drawn over one another. This is measured left to
+       * right: the commit information ends before the choice beside it starts.
+       */
+      choiceOverlap: (() => {
+        const choice = select.closest("label");
+        const information = row.querySelector<HTMLElement>("button > span:last-child");
+        if (choice === null || information === null) {
+          throw new Error("The merge commit row parts could not be measured.");
+        }
+        return Math.round(
+          information.getBoundingClientRect().right
+          - choice.getBoundingClientRect().left,
+        );
+      })(),
     };
   });
   // The card and its picker stay within the list box instead of being cut off.
@@ -539,6 +555,7 @@ test("keeps a merge commit card inside the commit history bar", async () => {
   expect(fit.selectOverflowBelow).toBeLessThanOrEqual(0);
   expect(fit.plainRowOverflowBelow).toBeLessThanOrEqual(0);
   expect(fit.listScrollHeight).toBeLessThanOrEqual(fit.listClientHeight);
+  expect(fit.choiceOverlap).toBeLessThanOrEqual(0);
 });
 
 test("composes a merge commit against the chosen mainline parent", async () => {
@@ -564,6 +581,13 @@ test("composes a merge commit against the chosen mainline parent", async () => {
     name: `Mainline parent for merge commit: ${mergeTitle}`,
   });
   await expect(picker).toHaveAttribute("aria-invalid", "true");
+  // Each choice names the side it is on and the commit it points at, because a
+  // bare parent number does not say which side of the merge it is.
+  expect(await picker.locator("option").allTextContents()).toEqual([
+    "Choose",
+    expect.stringMatching(/^mainline · [0-9a-f]{7} {2}\S/u),
+    expect.stringMatching(/^merged-in · [0-9a-f]{7} {2}\S/u),
+  ]);
   await picker.selectOption("1");
   await expect(picker).not.toHaveAttribute("aria-invalid", "true");
 
@@ -574,7 +598,8 @@ test("composes a merge commit against the chosen mainline parent", async () => {
     name: /file: side-one\.txt/u,
   })).toBeVisible();
   await expect(
-    running.page.getByRole("region", { name: "Selected Result" }).getByText("parent 1"),
+    running.page.getByRole("region", { name: "Selected Result" })
+      .getByText("mainline", { exact: true }),
   ).toBeVisible();
 
   // Choosing the other parent composes the other side of the merge.
@@ -585,7 +610,8 @@ test("composes a merge commit against the chosen mainline parent", async () => {
     name: /file: mainline\.txt/u,
   })).toBeVisible();
   await expect(
-    running.page.getByRole("region", { name: "Selected Result" }).getByText("parent 2"),
+    running.page.getByRole("region", { name: "Selected Result" })
+      .getByText("merged-in", { exact: true }),
   ).toBeVisible();
 
   expect(running.consoleErrors).toEqual([]);

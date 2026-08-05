@@ -34,7 +34,7 @@ const commits = [
   {
     id: "d".repeat(40),
     shortId: "d".repeat(7),
-    parentIds: [commonCommit],
+    parents: [{ id: commonCommit, shortId: commonCommit.slice(0, 7), title: null }],
     title: "first",
     authorName: "Prettifer Test",
     authoredAt: "2026-07-23T00:00:00.000Z",
@@ -44,7 +44,7 @@ const commits = [
   {
     id: "e".repeat(40),
     shortId: "e".repeat(7),
-    parentIds: ["d".repeat(40)],
+    parents: [{ id: "d".repeat(40), shortId: "d".repeat(7), title: null }],
     title: "merge",
     authorName: "Prettifer Test",
     authoredAt: "2026-07-23T00:01:00.000Z",
