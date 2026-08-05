@@ -74,6 +74,70 @@ describe("DiffPane", () => {
     })).toBeVisible();
   });
 
+  it("reviews a renamed file as a comparison naming both of its paths", async () => {
+    const adapter = { show: vi.fn(), dispose: vi.fn() };
+    const loadAdapter = vi.fn().mockResolvedValue(adapter);
+    const movedFile = {
+      path: "lib/moved.ts",
+      status: "renamed" as const,
+      previousPath: "src/moved.ts",
+      similarity: 87,
+      beforeContent: "before",
+      afterContent: "after",
+    };
+    render(
+      <StrictMode>
+        <DiffPane isCurrentRegion={false} identity={identity} file={movedFile} loadAdapter={loadAdapter} />
+      </StrictMode>,
+    );
+
+    await waitFor(() => {
+      expect(adapter.show).toHaveBeenCalledWith(
+        expect.any(HTMLElement),
+        identity,
+        movedFile,
+        { view: "sideBySide" },
+      );
+    });
+    expect(screen.getByRole("heading", { name: "Renamed File" })).toBeVisible();
+    expect(screen.getByTitle("lib/moved.ts")).toBeVisible();
+    // Both paths and the judgement the rename rests on.
+    expect(screen.getByTitle("src/moved.ts")).toBeVisible();
+    expect(screen.getByText(/87% of the content matched/u))
+      .toHaveTextContent("Renamed from src/moved.ts · 87% of the content matched");
+    // The left side is the file where it used to be, so the name says so.
+    expect(screen.getByRole("textbox", {
+      name: "Read-only diff: lib/moved.ts · base at src/moved.ts and selected result",
+    })).toBeVisible();
+    // A rename still has two sides, so the layout can be arranged.
+    expect(screen.getByRole("group", { name: "Diff layout" })).toBeVisible();
+  });
+
+  it("names both paths of a renamed binary file", () => {
+    const loadAdapter = vi.fn();
+    render(
+      <DiffPane
+        isCurrentRegion={false}
+        identity={identity}
+        file={{
+          path: "assets/logo-v2.png",
+          status: "renamed",
+          previousPath: "assets/logo.png",
+          similarity: 100,
+          binary: true,
+          beforeContent: null,
+          afterContent: null,
+        }}
+        loadAdapter={loadAdapter}
+      />,
+    );
+
+    expect(loadAdapter).not.toHaveBeenCalled();
+    expect(screen.getByText("Binary file")).toBeVisible();
+    expect(screen.getByText(/100% of the content matched/u))
+      .toHaveTextContent("Renamed from assets/logo.png · 100% of the content matched");
+  });
+
   it("shows a readable binary state without loading Monaco", () => {
     const loadAdapter = vi.fn();
     render(

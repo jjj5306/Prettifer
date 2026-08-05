@@ -146,6 +146,23 @@ describe("desktop shared contracts", () => {
       beforeContent: null,
       afterContent: null,
     },
+    {
+      path: "lib/moved.ts",
+      status: "renamed",
+      previousPath: "src/moved.ts",
+      similarity: 100,
+      beforeContent: "moved",
+      afterContent: "moved",
+    },
+    {
+      path: "assets/logo-v2.png",
+      status: "renamed",
+      previousPath: "assets/logo.png",
+      similarity: 74,
+      binary: true,
+      beforeContent: null,
+      afterContent: null,
+    },
   ])("accepts a valid composite file state: $status", (file) => {
     expect(compositeFileChangeSchema.parse(file)).toEqual(file);
   });
@@ -175,6 +192,22 @@ describe("desktop shared contracts", () => {
       binary: true,
       beforeContent: "decoded",
       afterContent: null,
+    },
+    // A rename without the path it moved from is not reviewable.
+    {
+      path: "lib/moved.ts",
+      status: "renamed",
+      similarity: 100,
+      beforeContent: "moved",
+      afterContent: "moved",
+    },
+    {
+      path: "lib/moved.ts",
+      status: "renamed",
+      previousPath: "src/moved.ts",
+      similarity: 101,
+      beforeContent: "moved",
+      afterContent: "moved",
     },
   ])("rejects an impossible composite file state: $status", (file) => {
     expect(() => compositeFileChangeSchema.parse(file)).toThrow();

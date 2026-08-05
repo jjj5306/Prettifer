@@ -264,4 +264,37 @@ describe("ChangedFilePane", () => {
     }));
     expect(onSelectFile).toHaveBeenCalledWith("src/broken.ts");
   });
+
+  it("shows a renamed file once, at the path it moved to", () => {
+    const withRename = {
+      ...result,
+      files: [{
+        path: "lib/moved.ts",
+        status: "renamed" as const,
+        previousPath: "src/moved.ts",
+        similarity: 100,
+        beforeContent: "moved",
+        afterContent: "moved",
+      }],
+    };
+    render(
+      <Pane
+        result={withRename}
+        selectedFilePath={null}
+        onSelectFile={vi.fn()}
+      />,
+    );
+
+    const files = screen.getAllByRole("button", { name: /file: /iu });
+    // One row, marked apart from added, modified and deleted.
+    expect(files.map((button) => button.textContent)).toEqual(["Rlib/moved.ts"]);
+    // The path it came from is only reachable from the row, so the row carries it.
+    expect(files[0]).toHaveAccessibleName(
+      "View file: lib/moved.ts (Renamed from src/moved.ts)",
+    );
+    expect(files[0]).toHaveAttribute(
+      "title",
+      "lib/moved.ts (renamed from src/moved.ts)",
+    );
+  });
 });

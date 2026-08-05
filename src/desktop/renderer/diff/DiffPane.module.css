@@ -84,6 +84,34 @@
 }
 
 /*
+ * The path the file moved from, beside the path it moved to. It gives up width
+ * before the current path does, because the current path is the file's identity
+ * everywhere else in the review.
+ */
+/*
+ * A flex row drops the whitespace around the path, which is its own item, so the
+ * gap is what keeps the words apart.
+ */
+.renameNote {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-items: baseline;
+  gap: var(--space-1);
+  margin: 0;
+  color: var(--color-renamed);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.renamePath {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-code);
+  text-overflow: ellipsis;
+}
+
+/*
  * The host always occupies the flexible row so the editor fills the panel even
  * when the loading and error rows are absent.
  */

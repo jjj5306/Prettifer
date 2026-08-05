@@ -6,6 +6,7 @@ export type FullTreeStatus =
   | "added"
   | "modified"
   | "deleted"
+  | "renamed"
   | "problem"
   | "unchanged";
 
@@ -141,11 +142,22 @@ function unionOfPaths(
   basePaths: readonly string[],
   entries: readonly ReviewEntry[],
 ): readonly string[] {
-  const seen = new Set(basePaths);
+  // A renamed file is at its current path now. Its base path holds nothing, so
+  // leaving it in would draw the file twice: once where it went and once, as an
+  // untouched file, where it no longer is.
+  const moved = new Set(entries.flatMap(previousPathOf));
+  const kept = basePaths.filter((path) => !moved.has(path));
+  const seen = new Set(kept);
   const added = entries
     .map((entry) => entry.path)
     .filter((path) => !seen.has(path));
-  return [...basePaths, ...added];
+  return [...kept, ...added];
+}
+
+function previousPathOf(entry: ReviewEntry): string[] {
+  return entry.kind === "problem" || entry.file.status !== "renamed"
+    ? []
+    : [entry.file.previousPath];
 }
 
 function statusOf(entry: ReviewEntry | null): FullTreeStatus {

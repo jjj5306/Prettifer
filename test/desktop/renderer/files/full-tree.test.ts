@@ -18,6 +18,19 @@ const changed = (path: string, status: "added" | "modified" | "deleted"): Review
       : { path, status, beforeContent: "b", afterContent: "a" },
 });
 
+const renamed = (previousPath: string, path: string): ReviewEntry => ({
+  kind: "file",
+  path,
+  file: {
+    path,
+    status: "renamed",
+    previousPath,
+    similarity: 100,
+    beforeContent: "b",
+    afterContent: "b",
+  },
+});
+
 const problem = (path: string): ReviewEntry => ({
   kind: "problem",
   path,
@@ -92,6 +105,33 @@ describe("buildFullTree", () => {
     );
 
     expect(utility?.kind === "file" && utility.status).toBe("deleted");
+  });
+
+  it("places a renamed file where it moved to and drops the path it left", () => {
+    const tree = buildFullTree(basePaths, [renamed("src/util.ts", "lib/util.ts")]);
+
+    // Kept base paths first, then the path the move introduced.
+    expect(paths(tree)).toEqual([
+      "docs/guide.md",
+      "src/app.ts",
+      "lib/util.ts",
+      "README.md",
+    ]);
+    const moved = directory(tree, "lib").children.at(0);
+    expect(moved?.kind === "file" && moved.status).toBe("renamed");
+  });
+
+  it("does not leave the path a rename left behind as an untouched file", () => {
+    const tree = buildFullTree(basePaths, [renamed("src/util.ts", "lib/util.ts")]);
+
+    // The base still lists it, but nothing is there any more.
+    expect(paths(tree)).not.toContain("src/util.ts");
+  });
+
+  it("keeps the folder a rename emptied out of the tree", () => {
+    const tree = buildFullTree(["docs/only.md"], [renamed("docs/only.md", "kept.md")]);
+
+    expect(paths(tree)).toEqual(["kept.md"]);
   });
 
   it("does not list a path twice when the result and the base share it", () => {

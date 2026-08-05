@@ -214,6 +214,7 @@ export const DiffPane = ({
         <div className={styles.headingRow}>
           <h2 id="diff-heading">{shown.heading}</h2>
           <ReviewedPath path={shown.path} />
+          {shown.rename === undefined ? null : <RenameNote rename={shown.rename} />}
           {comparable ? (
             <DiffViewToggle view={view} onChange={setView} />
           ) : null}
@@ -264,6 +265,7 @@ export const DiffPane = ({
         <div className={styles.binaryState}>
           <strong>Binary file</strong>
           <p>Text diff is not available for this file. Its binary contents were not loaded.</p>
+          {file.status === "renamed" ? <RenameNote rename={file} /> : null}
         </div>
       </ReviewPanel>
     );
@@ -395,12 +397,19 @@ function reviewTarget(
   return { kind: "diff", file };
 }
 
+interface Rename {
+  readonly previousPath: string;
+  readonly similarity: number;
+}
+
 interface ReviewView {
   readonly heading: string;
   readonly path: string;
   readonly editorLabel: string;
   /** Says what the editor holds; kept in the accessible name, not on screen. */
   readonly editorContext: string;
+  /** Present only for a file the selection moved. */
+  readonly rename?: Rename;
 }
 
 function targetView(target: ReviewTarget): ReviewView {
@@ -412,16 +421,33 @@ function targetView(target: ReviewTarget): ReviewView {
       editorContext: "contents at the comparison base",
     };
   }
-  return { ...reviewView(target.file), path: target.file.path };
+  const file = target.file;
+  return {
+    ...reviewView(file),
+    path: file.path,
+    ...(file.status === "renamed"
+      ? { rename: { previousPath: file.previousPath, similarity: file.similarity } }
+      : {}),
+  };
 }
 
 /** An added file has no base revision, so it is reviewed as one added document. */
-function reviewView(file: CompositeFile): Omit<ReviewView, "path"> {
+function reviewView(file: CompositeFile): Omit<ReviewView, "path" | "rename"> {
   if (file.status === "added") {
     return {
       heading: "Added File",
       editorLabel: "Read-only added file",
       editorContext: "full contents added by the selected result",
+    };
+  }
+  if (file.status === "renamed") {
+    // The left side is the file at the path it used to have, so the accessible
+    // name says so: otherwise "base" reads as the base of the current path,
+    // which holds nothing.
+    return {
+      heading: "Renamed File",
+      editorLabel: "Read-only diff",
+      editorContext: `base at ${file.previousPath} and selected result`,
     };
   }
   return {
@@ -430,6 +456,21 @@ function reviewView(file: CompositeFile): Omit<ReviewView, "path"> {
     editorContext: "base and selected result",
   };
 }
+
+/**
+ * Where a moved file came from and how much of it Git matched to call the two
+ * paths the same file. The percentage is the judgement the result rests on: 100
+ * is a pure move, and anything less was moved and edited.
+ */
+const RenameNote = ({ rename }: { readonly rename: Rename }) => (
+  <p className={styles.renameNote}>
+    {"Renamed from "}
+    <span className={styles.renamePath} title={rename.previousPath}>
+      {rename.previousPath}
+    </span>
+    {` · ${String(rename.similarity)}% of the content matched`}
+  </p>
+);
 
 async function loadMonacoAdapter(): Promise<DiffAdapter> {
   const monaco = await import("monaco-editor");

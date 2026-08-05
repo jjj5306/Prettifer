@@ -26,6 +26,8 @@
   --color-added: #5bb98c;
   --color-deleted: #e06c75;
   --color-modified: #f9bc45;
+  /* A move is not a content change, so it reads apart from added and modified. */
+  --color-renamed: #56a8d8;
   --color-danger: var(--color-deleted);
   --color-warning: var(--color-modified);
   --font-ui: "Hanken Grotesk Variable", "Segoe UI Variable", "Segoe UI", sans-serif;
