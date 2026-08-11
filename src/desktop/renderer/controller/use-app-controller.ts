@@ -4,6 +4,7 @@ import type {
   ApiResult,
   DesktopApi,
   Diagnostic,
+  FileHistoryPageDto,
   GroupRuleDto,
   RepositorySession,
   SymbolHitDto,
@@ -38,6 +39,11 @@ export interface AppController {
   readonly chooseMainlineParent: (commitId: string, mainlineParent: number) => void;
   readonly cancelComposition: () => Promise<void>;
   readonly selectFile: (path: string) => void;
+  readonly loadFileHistory: () => Promise<void>;
+  readonly loadMoreFileHistory: () => Promise<void>;
+  readonly openFileCommit: (commitId: string, path: string) => Promise<void>;
+  readonly closeFileCommit: () => void;
+  readonly focusFileHistoryCommit: (commitId: string) => void;
   /** Finds where a symbol is declared and used, for the file under review. */
   readonly lookUpSymbol: (
     symbol: string,
@@ -61,6 +67,31 @@ export function useAppController(
   createRequestId: () => string = defaultRequestId,
 ): AppController {
   const [state, dispatch] = useReducer(appReducer, initialAppState);
+  const fileHistoryCache = useRef(new Map<string, FileHistoryPageDto>());
+
+  const cancelFileReads = (): void => {
+    const session = selectRepositorySession(state.repository);
+    if (session === null) {
+      return;
+    }
+    const requestIds = new Set<string>();
+    if (state.fileCommit.status === "loading") {
+      requestIds.add(state.fileCommit.requestId);
+    }
+    if (state.fileHistory.status === "loading") {
+      requestIds.add(state.fileHistory.requestId);
+    }
+    if (state.fileHistory.status === "ready" && state.fileHistory.pagination.status === "loading") {
+      requestIds.add(state.fileHistory.pagination.requestId);
+    }
+    for (const requestId of requestIds) {
+      void api.cancelFileHistory({
+        repositorySessionId: session.repositorySessionId,
+        sessionRevision: session.sessionRevision,
+        requestId,
+      }).catch(() => undefined);
+    }
+  };
 
   const cancelActiveForStateChange = (): void => {
     const session = selectRepositorySession(state.repository);
@@ -185,6 +216,200 @@ export function useAppController(
     }
   };
 
+  const loadFileHistory = async (): Promise<void> => {
+    const session = selectRepositorySession(state.repository);
+    const path = state.selectedFilePath;
+    if (session === null || path === null || state.range.status !== "ready") {
+      return;
+    }
+    const { range } = state.range;
+    if (state.fileHistory.status === "ready" &&
+      state.fileHistory.path === path &&
+      state.fileHistory.rangeRevision === range.rangeRevision) {
+      return;
+    }
+    const key = fileHistoryCacheKey(
+      session.repositorySessionId,
+      range.rangeRevision,
+      path,
+      state.mergeParents,
+    );
+    const cached = fileHistoryCache.current.get(key);
+    const requestId = createRequestId();
+    dispatch({ type: "fileHistory/loading", requestId, rangeRevision: range.rangeRevision, path });
+    if (cached !== undefined) {
+      dispatch({
+        type: "fileHistory/loaded",
+        requestId,
+        rangeRevision: range.rangeRevision,
+        page: cached,
+      });
+      return;
+    }
+    try {
+      const result = await api.listFileHistory({
+        repositorySessionId: session.repositorySessionId,
+        sessionRevision: session.sessionRevision,
+        range,
+        requestId,
+        path,
+        offset: 0,
+        mainlineParents: state.mergeParents,
+      });
+      if (result.status === "success") {
+        fileHistoryCache.current.set(key, result.data);
+        dispatch({
+          type: "fileHistory/loaded",
+          requestId,
+          rangeRevision: range.rangeRevision,
+          page: result.data,
+        });
+      } else if (result.status === "error") {
+        dispatch({
+          type: "fileHistory/failed",
+          requestId,
+          rangeRevision: range.rangeRevision,
+          path,
+          diagnostic: result.diagnostic,
+        });
+      }
+    } catch (error) {
+      dispatch({
+        type: "fileHistory/failed",
+        requestId,
+        rangeRevision: range.rangeRevision,
+        path,
+        diagnostic: connectionDiagnostic(error),
+      });
+    }
+  };
+
+  const loadMoreFileHistory = async (): Promise<void> => {
+    const session = selectRepositorySession(state.repository);
+    if (session === null || state.range.status !== "ready" ||
+      state.fileHistory.status !== "ready" || state.fileHistory.nextOffset === null) {
+      return;
+    }
+    const { range } = state.range;
+    const history = state.fileHistory;
+    const offset = history.nextOffset;
+    if (offset === null) {
+      return;
+    }
+    const requestId = createRequestId();
+    dispatch({
+      type: "fileHistory/page-loading",
+      requestId,
+      rangeRevision: range.rangeRevision,
+      path: history.path,
+    });
+    try {
+      const result = await api.listFileHistory({
+        repositorySessionId: session.repositorySessionId,
+        sessionRevision: session.sessionRevision,
+        range,
+        requestId,
+        path: history.path,
+        offset,
+        mainlineParents: state.mergeParents,
+      });
+      if (result.status === "success") {
+        const page = {
+          ...result.data,
+          entries: [...history.entries, ...result.data.entries],
+        };
+        fileHistoryCache.current.set(
+          fileHistoryCacheKey(
+            session.repositorySessionId,
+            range.rangeRevision,
+            history.path,
+            state.mergeParents,
+          ),
+          page,
+        );
+        dispatch({
+          type: "fileHistory/page-loaded",
+          requestId,
+          rangeRevision: range.rangeRevision,
+          path: history.path,
+          page: result.data,
+        });
+      } else if (result.status === "error") {
+        dispatch({
+          type: "fileHistory/page-failed",
+          requestId,
+          rangeRevision: range.rangeRevision,
+          path: history.path,
+          diagnostic: result.diagnostic,
+        });
+      }
+    } catch (error) {
+      dispatch({
+        type: "fileHistory/page-failed",
+        requestId,
+        rangeRevision: range.rangeRevision,
+        path: history.path,
+        diagnostic: connectionDiagnostic(error),
+      });
+    }
+  };
+
+  const openFileCommit = async (commitId: string, path: string): Promise<void> => {
+    const session = selectRepositorySession(state.repository);
+    if (session === null || state.range.status !== "ready") {
+      return;
+    }
+    const { range } = state.range;
+    const requestId = createRequestId();
+    dispatch({
+      type: "fileCommit/loading",
+      requestId,
+      rangeRevision: range.rangeRevision,
+      path,
+      commitId,
+    });
+    try {
+      const selected = state.selectedCommitIds.includes(commitId);
+      const mainlineParent = state.mergeParents[commitId];
+      const result = await api.readFileCommit({
+        repositorySessionId: session.repositorySessionId,
+        sessionRevision: session.sessionRevision,
+        range,
+        requestId,
+        path,
+        commitId,
+        selected,
+        ...(mainlineParent === undefined ? {} : { mainlineParent }),
+      });
+      if (result.status === "success") {
+        dispatch({
+          type: "fileCommit/loaded",
+          requestId,
+          rangeRevision: range.rangeRevision,
+          change: result.data,
+        });
+      } else if (result.status === "error") {
+        dispatch({
+          type: "fileCommit/failed",
+          requestId,
+          rangeRevision: range.rangeRevision,
+          path,
+          commitId,
+          diagnostic: result.diagnostic,
+        });
+      }
+    } catch (error) {
+      dispatch({
+        type: "fileCommit/failed",
+        requestId,
+        rangeRevision: range.rangeRevision,
+        path,
+        commitId,
+        diagnostic: connectionDiagnostic(error),
+      });
+    }
+  };
+
   /*
    * The path list belongs to the comparison base, not to a calculation, so it is
    * read at most once per range. Asking again while an answer for the same range
@@ -246,6 +471,7 @@ export function useAppController(
       const result = await api.selectRepository();
       if (result.status === "success") {
         cancelActiveForStateChange();
+        cancelFileReads();
       }
       dispatch(repositoryResultAction(requestId, result));
     } catch (error) {
@@ -264,6 +490,7 @@ export function useAppController(
     }
     const requestId = createRequestId();
     cancelActiveForStateChange();
+    cancelFileReads();
     dispatch({
       type: "range/loading",
       requestId,
@@ -590,6 +817,7 @@ export function useAppController(
     loadMoreCommits,
     toggleCommit: (commitId) => {
       cancelActiveForStateChange();
+      cancelFileReads();
       dispatch({ type: "commit/toggled", commitId });
     },
     resetLoadedCommits: () => {
@@ -597,6 +825,7 @@ export function useAppController(
     },
     clearCommitSelection: () => {
       cancelActiveForStateChange();
+      cancelFileReads();
       dispatch({ type: "commit/selectionCleared" });
     },
     inspectCommit: (commitId) => {
@@ -613,11 +842,19 @@ export function useAppController(
      * result takes: read at the comparison base and shown as one document.
      */
     selectFile: (path) => {
+      cancelFileReads();
       if (resultHoldsPath(state, path)) {
         dispatch({ type: "file/selected", path });
         return;
       }
       void openBaseFile({ path, line: 1, column: 1 }, false);
+    },
+    loadFileHistory,
+    loadMoreFileHistory,
+    openFileCommit,
+    closeFileCommit: () => { dispatch({ type: "fileCommit/closed" }); },
+    focusFileHistoryCommit: (commitId) => {
+      dispatch({ type: "fileHistory/focused", commitId });
     },
     lookUpSymbol,
     goToHit,
@@ -628,6 +865,19 @@ export function useAppController(
     loadBaseTree,
     saveGroupingRules,
   };
+}
+
+function fileHistoryCacheKey(
+  repositorySessionId: string,
+  rangeRevision: string,
+  path: string,
+  mainlineParents: Readonly<Record<string, number>>,
+): string {
+  const mainlines = Object.entries(mainlineParents)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([commit, parent]) => `${commit}=${String(parent)}`)
+    .join(",");
+  return `${repositorySessionId}:${rangeRevision}:${path}:${mainlines}`;
 }
 
 /**

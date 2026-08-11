@@ -495,4 +495,137 @@ describe("app reducer", () => {
 
     expect(appReducer(state, { type: "commit/selectionCleared" })).toBe(state);
   });
+
+  it("loads, pages and focuses file history without changing commit selection", () => {
+    let state = appReducer(readyState(), { type: "commit/toggled", commitId: commits[0]!.id });
+    state = appReducer(state, {
+      type: "fileHistory/loading",
+      requestId: "history-1",
+      rangeRevision: range.rangeRevision,
+      path: "src/app.ts",
+    });
+    state = appReducer(state, {
+      type: "fileHistory/loaded",
+      requestId: "history-1",
+      rangeRevision: range.rangeRevision,
+      page: {
+        rangeRevision: range.rangeRevision,
+        path: "src/app.ts",
+        entries: [{
+          id: commits[0]!.id,
+          shortId: commits[0]!.shortId,
+          parents: [commonCommit],
+          title: "first",
+          authorName: "Prettifer Test",
+          authoredAt: commits[0]!.authoredAt,
+          status: "modified",
+          path: "src/app.ts",
+        }],
+        nextOffset: 100,
+        partial: null,
+      },
+    });
+    state = appReducer(state, {
+      type: "fileHistory/page-loading",
+      requestId: "history-2",
+      rangeRevision: range.rangeRevision,
+      path: "src/app.ts",
+    });
+    state = appReducer(state, {
+      type: "fileHistory/page-loaded",
+      requestId: "history-2",
+      rangeRevision: range.rangeRevision,
+      path: "src/app.ts",
+      page: {
+        rangeRevision: range.rangeRevision,
+        path: "src/app.ts",
+        entries: [{
+          id: commonCommit,
+          shortId: commonCommit.slice(0, 7),
+          parents: [],
+          title: "created",
+          authorName: "Prettifer Test",
+          authoredAt: "2026-07-22T00:00:00.000Z",
+          status: "added",
+          path: "src/app.ts",
+        }],
+        nextOffset: null,
+        partial: null,
+      },
+    });
+
+    expect(state.fileHistory).toMatchObject({
+      status: "ready",
+      entries: [{ id: commits[0]!.id }, { id: commonCommit }],
+      nextOffset: null,
+    });
+    expect(state.selectedCommitIds).toEqual([commits[0]!.id]);
+  });
+
+  it("ignores a stale file history response after the range changes", () => {
+    const loading = appReducer(readyState(), {
+      type: "fileHistory/loading",
+      requestId: "history-1",
+      rangeRevision: range.rangeRevision,
+      path: "src/app.ts",
+    });
+    const changed = appReducer(loading, {
+      type: "range/loading",
+      requestId: "range-2",
+      sessionRevision: 1,
+      baseRef: "main",
+      headRef: "feature/ui",
+    });
+    const replied = appReducer(changed, {
+      type: "fileHistory/loaded",
+      requestId: "history-1",
+      rangeRevision: range.rangeRevision,
+      page: {
+        rangeRevision: range.rangeRevision,
+        path: "src/app.ts",
+        entries: [],
+        nextOffset: null,
+        partial: null,
+      },
+    });
+
+    expect(replied.fileHistory).toEqual({ status: "idle" });
+  });
+
+  it("opens and closes a history commit without changing file or commit selection", () => {
+    const selected = appReducer(readyState(), {
+      type: "commit/toggled",
+      commitId: commits[0]!.id,
+    });
+    const loading = appReducer(selected, {
+      type: "fileCommit/loading",
+      requestId: "file-commit-1",
+      rangeRevision: range.rangeRevision,
+      path: "src/app.ts",
+      commitId: commits[0]!.id,
+    });
+    const loaded = appReducer(loading, {
+      type: "fileCommit/loaded",
+      requestId: "file-commit-1",
+      rangeRevision: range.rangeRevision,
+      change: {
+        commitId: commits[0]!.id,
+        parentCommit: commonCommit,
+        parentNumber: 1,
+        path: "src/app.ts",
+        status: "modified",
+        binary: false,
+        beforeContent: "before",
+        afterContent: "after",
+        beforeSize: 6,
+        afterSize: 5,
+      },
+    });
+    const closed = appReducer(loaded, { type: "fileCommit/closed" });
+
+    expect(loaded.fileCommit.status).toBe("ready");
+    expect(closed.fileCommit).toEqual({ status: "idle" });
+    expect(closed.selectedCommitIds).toEqual(selected.selectedCommitIds);
+    expect(closed.selectedFilePath).toBe(selected.selectedFilePath);
+  });
 });

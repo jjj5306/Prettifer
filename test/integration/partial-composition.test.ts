@@ -38,6 +38,11 @@ describe("CompositeDiffService partial results", () => {
       commit: fixture.commits.conflicting,
     });
     expect(result.problemFiles[0]?.nextAction).toContain("prerequisite");
+    expect(result.fileContributions).toEqual([
+      { path: "clean.txt", commits: [fixture.commits.conflicting] },
+      { path: "later.txt", commits: [fixture.commits.independent] },
+      { path: "shared.txt", commits: [] },
+    ]);
   });
 
   it("leaves the problem file out of the unified diff", async () => {

@@ -43,6 +43,15 @@ export function registerDesktopRequestHandlers(
   ipcMain.handle(DESKTOP_CHANNELS.listBaseTree, (event, input) =>
     handlers.listBaseTree(toDesktopEvent(event), input),
   );
+  ipcMain.handle(DESKTOP_CHANNELS.listFileHistory, (event, input) =>
+    handlers.listFileHistory(toDesktopEvent(event), input),
+  );
+  ipcMain.handle(DESKTOP_CHANNELS.readFileCommit, (event, input) =>
+    handlers.readFileCommit(toDesktopEvent(event), input),
+  );
+  ipcMain.handle(DESKTOP_CHANNELS.cancelFileHistory, (event, input) =>
+    handlers.cancelFileHistory(toDesktopEvent(event), input),
+  );
   ipcMain.handle(DESKTOP_CHANNELS.readGroupingRules, (event, input) =>
     handlers.readGroupingRules(toDesktopEvent(event), input),
   );

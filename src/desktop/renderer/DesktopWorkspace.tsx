@@ -8,6 +8,7 @@ import { ChangedFilePane } from "./files/ChangedFilePane.js";
 import { changedPathsOf } from "./files/full-tree.js";
 import { useChangedFileView } from "./files/use-changed-file-view.js";
 import { CommitHistoryPane } from "./history/CommitHistoryPane.js";
+import { FileHistoryPane } from "./history/FileHistoryPane.js";
 import { ActivityRail } from "./navigation/ActivityRail.js";
 import {
   currentPanel,
@@ -49,7 +50,8 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
    * took them. The rail decides the same thing for its own current item, so both
    * read it from one place and cannot disagree.
    */
-  const markedPanel = currentPanel(activeRegion, resultAvailable);
+  const fileSelected = controller.state.selectedFilePath !== null;
+  const markedPanel = currentPanel(activeRegion, resultAvailable, fileSelected);
   const changedFileView = useChangedFileView(
     controller.state.selectedFilePath,
     controller.state.groupingRules,
@@ -70,6 +72,9 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
     if (region === "rules") {
       changedFileView.openRuleEditor();
     }
+    if (region === "fileHistory") {
+      void controller.loadFileHistory();
+    }
     setActiveRegion(region);
   };
   const {
@@ -81,6 +86,7 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
       <ActivityRail
         activeRegion={activeRegion}
         resultAvailable={resultAvailable}
+        fileSelected={fileSelected}
         onActivate={handleActivateRegion}
       />
       <div className={styles.appContent}>
@@ -143,19 +149,34 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
                   className={styles.resultGrid}
                   style={changedFilesColumn(changedFilesWidth.width)}
                 >
-                  <ChangedFilePane
-                    isCurrentRegion={markedPanel === "files"}
-                    result={controller.state.composition.result}
-                    selectedFilePath={controller.state.selectedFilePath}
-                    repositoryPath={repositorySession?.rootPath ?? ""}
-                    groupingRules={controller.state.groupingRules}
-                    baseTree={controller.state.baseTree}
-                    control={changedFileView}
-                    onSelectFile={controller.selectFile}
-                    onChangeRules={(rules) => {
-                      void controller.saveGroupingRules(rules);
-                    }}
-                  />
+                  {activeRegion === "fileHistory" ? (
+                    <FileHistoryPane
+                      isCurrentRegion={markedPanel === "files"}
+                      history={controller.state.fileHistory}
+                      selectedCommits={controller.state.selectedCommitIds}
+                      result={controller.state.composition.result}
+                      onFocusCommit={controller.focusFileHistoryCommit}
+                      onOpenCommit={(commitId, path) => {
+                        void controller.openFileCommit(commitId, path);
+                      }}
+                      onLoadMore={() => { void controller.loadMoreFileHistory(); }}
+                      onReturnToComposite={controller.closeFileCommit}
+                    />
+                  ) : (
+                    <ChangedFilePane
+                      isCurrentRegion={markedPanel === "files"}
+                      result={controller.state.composition.result}
+                      selectedFilePath={controller.state.selectedFilePath}
+                      repositoryPath={repositorySession?.rootPath ?? ""}
+                      groupingRules={controller.state.groupingRules}
+                      baseTree={controller.state.baseTree}
+                      control={changedFileView}
+                      onSelectFile={controller.selectFile}
+                      onChangeRules={(rules) => {
+                        void controller.saveGroupingRules(rules);
+                      }}
+                    />
+                  )}
                   <PaneSplitter
                     label="Resize Changed Files"
                     controls="changed-files"
@@ -174,6 +195,8 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
                         problem={selectSelectedProblemFile(controller.state)}
                         externalFile={controller.state.externalFile}
                         reveal={controller.state.reveal}
+                        fileCommit={controller.state.fileCommit}
+                        onCloseFileCommit={controller.closeFileCommit}
                         onSymbol={(symbol, mode, usage) => {
                           void controller.lookUpSymbol(symbol, mode, usage);
                         }}

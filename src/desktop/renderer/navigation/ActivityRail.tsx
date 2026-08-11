@@ -1,5 +1,6 @@
 import {
   currentRegion,
+  regionNeedsFile,
   regionNeedsResult,
   type WorkbenchRegion,
 } from "./workbench-region.js";
@@ -8,6 +9,7 @@ import styles from "./ActivityRail.module.css";
 interface ActivityRailProps {
   readonly activeRegion: WorkbenchRegion;
   readonly resultAvailable: boolean;
+  readonly fileSelected?: boolean;
   readonly onActivate: (region: WorkbenchRegion) => void;
 }
 
@@ -19,6 +21,7 @@ const items: readonly Readonly<{
   { id: "repository", label: "Repository", targetId: "repository-workspace" },
   { id: "history", label: "Commit History", targetId: "commit-history" },
   { id: "files", label: "Changed Files", targetId: "changed-files" },
+  { id: "fileHistory", label: "File History", targetId: "file-history" },
   { id: "rules", label: "Group Rules", targetId: "changed-files" },
   { id: "diff", label: "Diff Review", targetId: "diff-review" },
 ];
@@ -26,14 +29,16 @@ const items: readonly Readonly<{
 export const ActivityRail = ({
   activeRegion,
   resultAvailable,
+  fileSelected = resultAvailable,
   onActivate,
 }: ActivityRailProps) => {
-  const marked = currentRegion(activeRegion, resultAvailable);
+  const marked = currentRegion(activeRegion, resultAvailable, fileSelected);
 
   return (
     <nav className={styles.rail} aria-label="Workbench">
       {items.map((item) => {
-        const disabled = regionNeedsResult(item.id) && !resultAvailable;
+        const disabled = (regionNeedsResult(item.id) && !resultAvailable) ||
+          (regionNeedsFile(item.id) && !fileSelected);
         return (
           <button
             key={item.id}
@@ -83,6 +88,8 @@ function iconPath(region: WorkbenchRegion): string {
       return "M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5M12 8v4l3 2";
     case "files":
       return "M5 4h5v5H5zM14 4h5v5h-5zM9 16h6M7.5 9v4h9V9M12 13v3";
+    case "fileHistory":
+      return "M5 5h8M5 10h11M5 15h8M18 5v6l2 2M18 11l-2 2";
     // Three rules, each with its own knob: the panel's own rule list, in small.
     case "rules":
       return "M4 6h6M14 6h6M4 12h10M18 12h2M4 18h4M12 18h8"
@@ -95,5 +102,14 @@ function iconPath(region: WorkbenchRegion): string {
 }
 
 function focusRegion(targetId: string): void {
-  document.getElementById(targetId)?.focus();
+  const target = document.getElementById(targetId);
+  if (target !== null) {
+    target.focus();
+    return;
+  }
+  // File History replaces the Changed Files panel, so its target is mounted by
+  // the state update triggered by this click. Retry once after that render. (#14)
+  window.requestAnimationFrame(() => {
+    document.getElementById(targetId)?.focus();
+  });
 }

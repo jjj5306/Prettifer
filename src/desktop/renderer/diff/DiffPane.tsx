@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { CompositeDiffResultDto } from "../../shared/index.js";
-import type { ExternalFileState, ReviewPosition } from "../state/app-state.js";
+import type {
+  ExternalFileState,
+  FileCommitState,
+  ReviewPosition,
+} from "../state/app-state.js";
 import {
   MonacoDiffAdapter,
   type DiffIdentity,
@@ -32,6 +36,8 @@ interface DiffAdapter {
     hooks?: DiffViewHooks,
   ): void;
   reveal(line: number, column?: number): void;
+  saveViewState?(): object | null;
+  restoreViewState?(state: object): void;
   dispose(): void;
 }
 
@@ -47,6 +53,8 @@ interface DiffPaneProps {
   readonly externalFile?: ExternalFileState;
   /** Position a navigation asked to show. */
   readonly reveal?: ReviewPosition | null;
+  readonly fileCommit?: FileCommitState;
+  readonly onCloseFileCommit?: () => void;
   readonly onSymbol?: SymbolRequestHandler;
   readonly loadAdapter?: () => Promise<DiffAdapter>;
 }
@@ -58,6 +66,11 @@ type LoadOutcome =
 /** What the review area shows, once problems and binaries are ruled out. */
 type ReviewTarget =
   | Readonly<{ kind: "diff"; file: TextCompositeFile }>
+  | Readonly<{
+      kind: "history";
+      file: TextCompositeFile;
+      change: Extract<FileCommitState, { status: "ready" }>["change"];
+    }>
   | Readonly<{ kind: "document"; path: string; contents: string }>;
 
 export const DiffPane = ({
@@ -67,11 +80,17 @@ export const DiffPane = ({
   problem = null,
   externalFile = { status: "idle" },
   reveal = null,
+  fileCommit = { status: "idle" },
+  onCloseFileCommit,
   onSymbol,
   loadAdapter = loadMonacoAdapter,
 }: DiffPaneProps) => {
   const hostRef = useRef<HTMLDivElement>(null);
   const adapterRef = useRef<DiffAdapter | null>(null);
+  const savedCompositeViewRef = useRef<Readonly<{
+    key: string;
+    state: object;
+  }> | null>(null);
   /*
    * The editor is told about symbol requests through a stable function that reads
    * the current handler. Passing the handler itself would tie the editor's life to
@@ -99,12 +118,17 @@ export const DiffPane = ({
   const [outcome, setOutcome] = useState<LoadOutcome | null>(null);
   const { repositorySessionId, requestId } = identity;
   // A file outside the result replaces the diff, so it decides the target first.
-  const target = reviewTarget(file, problem, externalFile);
+  const target = reviewTarget(file, problem, externalFile, fileCommit);
   const currentKey = target === null
     ? "empty"
     : target.kind === "document"
       ? `base:${repositorySessionId}:${target.path}`
-      : `${repositorySessionId}:${requestId}:${target.file.path}:${String(retry)}`;
+      : target.kind === "history"
+        ? `${repositorySessionId}:history:${target.change.commitId}:${target.file.path}:${String(retry)}`
+        : `${repositorySessionId}:${requestId}:${target.file.path}:${String(retry)}`;
+  const compositeViewKey = target?.kind === "diff"
+    ? `${repositorySessionId}:${requestId}:${target.file.path}`
+    : null;
 
   useEffect(() => {
     if (target === null) {
@@ -112,13 +136,13 @@ export const DiffPane = ({
     }
     let active = true;
     let adapter: DiffAdapter | undefined;
+    const effectHost = hostRef.current;
     void loadAdapter().then((loadedAdapter) => {
       if (!active) {
         loadedAdapter.dispose();
         return;
       }
-      const host = hostRef.current;
-      if (host === null) {
+      if (effectHost === null) {
         loadedAdapter.dispose();
         return;
       }
@@ -130,18 +154,24 @@ export const DiffPane = ({
       const identityForModel = { repositorySessionId, requestId };
       if (target.kind === "document") {
         loadedAdapter.showDocument(
-          host,
+          effectHost,
           identityForModel,
           target.path,
           target.contents,
           hooks,
         );
       } else {
-        loadedAdapter.show(host, identityForModel, target.file, hooks);
+        loadedAdapter.show(effectHost, identityForModel, target.file, hooks);
+      }
+      if (
+        target.kind === "diff"
+        && savedCompositeViewRef.current?.key === compositeViewKey
+      ) {
+        loadedAdapter.restoreViewState?.(savedCompositeViewRef.current.state);
       }
       setOutcome({ key: currentKey, status: "ready" });
       if (retry > 0) {
-        host.focus();
+        effectHost.focus();
       }
     }).catch(() => {
       if (active) {
@@ -153,7 +183,16 @@ export const DiffPane = ({
     });
     return () => {
       active = false;
+      if (target.kind === "diff" && compositeViewKey !== null) {
+        const savedState = adapter?.saveViewState?.();
+        if (savedState != null) {
+          savedCompositeViewRef.current = { key: compositeViewKey, state: savedState };
+        }
+      }
       adapter?.dispose();
+      // Monaco owns every child it creates in the host. Clearing the disposed
+      // tree lets a third view (result → history → result) mount reliably. (#14)
+      effectHost?.replaceChildren();
       if (adapterRef.current === adapter) {
         adapterRef.current = null;
       }
@@ -187,6 +226,42 @@ export const DiffPane = ({
     );
   }
 
+  if (fileCommit.status === "loading") {
+    return (
+      <ReviewPanel heading="File History Change" subheading={fileCommit.path} isCurrentRegion={isCurrentRegion}>
+        <p aria-live="polite">Loading the file change…</p>
+      </ReviewPanel>
+    );
+  }
+
+  if (fileCommit.status === "error") {
+    return (
+      <ReviewPanel heading="File History Change" subheading={fileCommit.path} isCurrentRegion={isCurrentRegion}>
+        <div className={styles.problemState} role="alert">
+          <strong>This file change could not be opened</strong>
+          <p>{fileCommit.diagnostic.message}</p>
+          <p>{fileCommit.diagnostic.nextAction}</p>
+          <button type="button" onClick={onCloseFileCommit}>Return to Selected Result</button>
+        </div>
+      </ReviewPanel>
+    );
+  }
+
+  if (fileCommit.status === "ready" && fileCommit.change.binary) {
+    const change = fileCommit.change;
+    return (
+      <ReviewPanel heading="Binary File History Change" subheading={change.path} isCurrentRegion={isCurrentRegion}>
+        <div className={styles.binaryState}>
+          <strong>Binary content comparison is not available</strong>
+          <p>{historyChangeSummary(change)}</p>
+          <p>Compared with {parentLabel(change)}.</p>
+          <p>Blob sizes: {sizeLabel(change.beforeSize)} → {sizeLabel(change.afterSize)}</p>
+          <button type="button" onClick={onCloseFileCommit}>Return to Selected Result</button>
+        </div>
+      </ReviewPanel>
+    );
+  }
+
   if (externalFile.status === "error") {
     return (
       <ReviewPanel heading="Outside the Selected Result" subheading={externalFile.path} isCurrentRegion={isCurrentRegion}>
@@ -214,6 +289,9 @@ export const DiffPane = ({
         <div className={styles.headingRow}>
           <h2 id="diff-heading">{shown.heading}</h2>
           <ReviewedPath path={shown.path} />
+          {target.kind === "history" ? (
+            <button type="button" onClick={onCloseFileCommit}>Return to Selected Result</button>
+          ) : null}
           {shown.rename === undefined ? null : <RenameNote rename={shown.rename} />}
           {comparable ? (
             <DiffViewToggle view={view} onChange={setView} />
@@ -387,7 +465,18 @@ function reviewTarget(
   file: CompositeFile | null,
   problem: CompositeProblemFile | null,
   externalFile: ExternalFileState,
+  fileCommit: FileCommitState,
 ): ReviewTarget | null {
+  if (fileCommit.status === "ready" && !fileCommit.change.binary) {
+    return {
+      kind: "history",
+      file: historyTextFile(fileCommit.change),
+      change: fileCommit.change,
+    };
+  }
+  if (fileCommit.status === "ready" && fileCommit.change.binary) {
+    return null;
+  }
   if (externalFile.status === "ready") {
     return { kind: "document", path: externalFile.path, contents: externalFile.contents };
   }
@@ -421,6 +510,23 @@ function targetView(target: ReviewTarget): ReviewView {
       editorContext: "contents at the comparison base",
     };
   }
+  if (target.kind === "history") {
+    return {
+      ...reviewView(target.file),
+      heading: "File History Change",
+      path: target.file.path,
+      editorLabel: "Read-only file history diff",
+      editorContext: `commit ${target.change.commitId.slice(0, 7)} compared with ${parentLabel(target.change)}`,
+      ...(target.file.status === "renamed"
+        ? {
+            rename: {
+              previousPath: target.file.previousPath,
+              similarity: target.file.similarity,
+            },
+          }
+        : {}),
+    };
+  }
   const file = target.file;
   return {
     ...reviewView(file),
@@ -429,6 +535,48 @@ function targetView(target: ReviewTarget): ReviewView {
       ? { rename: { previousPath: file.previousPath, similarity: file.similarity } }
       : {}),
   };
+}
+
+function historyTextFile(
+  change: Extract<Extract<FileCommitState, { status: "ready" }>["change"], { binary: false }>,
+): TextCompositeFile {
+  switch (change.status) {
+    case "added":
+      return { path: change.path, status: "added", beforeContent: null, afterContent: change.afterContent };
+    case "modified":
+      return { path: change.path, status: "modified", beforeContent: change.beforeContent, afterContent: change.afterContent };
+    case "deleted":
+      return { path: change.path, status: "deleted", beforeContent: change.beforeContent, afterContent: null };
+    case "renamed":
+      return {
+        path: change.path,
+        status: "renamed",
+        previousPath: change.previousPath,
+        similarity: change.similarity,
+        beforeContent: change.beforeContent,
+        afterContent: change.afterContent,
+      };
+  }
+}
+
+function parentLabel(change: Readonly<{ parentCommit: string | null; parentNumber: number | null }>): string {
+  return change.parentCommit === null
+    ? "the empty repository state"
+    : `parent ${String(change.parentNumber ?? 1)} (${change.parentCommit.slice(0, 7)})`;
+}
+
+function historyChangeSummary(change: Readonly<{
+  status: string;
+  path: string;
+  previousPath?: string | undefined;
+}>): string {
+  return change.status === "renamed" && change.previousPath !== undefined
+    ? `Renamed ${change.previousPath} to ${change.path}.`
+    : `${change.status[0]?.toUpperCase() ?? ""}${change.status.slice(1)} ${change.path}.`;
+}
+
+function sizeLabel(size: number | null): string {
+  return size === null ? "none" : `${String(size)} bytes`;
 }
 
 /** An added file has no base revision, so it is reviewed as one added document. */

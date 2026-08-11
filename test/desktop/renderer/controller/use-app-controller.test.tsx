@@ -43,6 +43,9 @@ function createApi(overrides: Partial<DesktopApi> = {}): DesktopApi {
       status: "success",
       data: { paths: [], truncated: false },
     }),
+    listFileHistory: vi.fn().mockResolvedValue({ status: "cancelled" }),
+    readFileCommit: vi.fn().mockResolvedValue({ status: "cancelled" }),
+    cancelFileHistory: vi.fn().mockResolvedValue({ status: "success", data: null }),
     readGroupingRules: vi.fn().mockResolvedValue({
       status: "success",
       data: { rules: [] },

@@ -1,0 +1,104 @@
+.panel {
+  composes: surface from "../PanelSurface.module.css";
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-3);
+  overflow: auto;
+}
+
+.heading {
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
+.heading h2,
+.heading p,
+.item p,
+.partial p {
+  margin: 0;
+}
+
+.heading p {
+  overflow: hidden;
+  color: var(--color-muted);
+  font-family: var(--font-code);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.item .commit {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: var(--space-1);
+  text-align: left;
+}
+
+.title,
+.change {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  display: flex;
+  min-width: 0;
+  gap: var(--space-2);
+  color: var(--color-muted);
+  font-size: 0.75rem;
+}
+
+.meta span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.change {
+  color: var(--color-muted);
+  font-size: 0.75rem;
+}
+
+.state {
+  color: var(--color-focus);
+  font-size: 0.75rem;
+}
+
+.contribution {
+  border-inline-start: 3px solid var(--color-accent);
+}
+
+.problem {
+  border-color: var(--color-danger);
+}
+
+.partial {
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--color-warning);
+}
+
+@media (forced-colors: active) {
+  .contribution,
+  .problem,
+  .partial {
+    border-color: Highlight;
+  }
+}

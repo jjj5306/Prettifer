@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
 import { CompositeDiffService } from "../../src/composition/composite-diff-service.js";
 import {
   createRenameFixture,
   type RenameFixture,
 } from "../support/rename-fixture.js";
+import { createFileHistoryFixture } from "../support/file-history-fixture.js";
 
 describe("composing a selection that moved files", () => {
   let fixture: RenameFixture | undefined;
@@ -34,6 +37,10 @@ describe("composing a selection that moved files", () => {
     // The move is one change in the diff, not a delete beside an add.
     expect(result.unifiedDiff).toContain(`rename from ${fixture.paths.pureFrom}`);
     expect(result.unifiedDiff).toContain(`rename to ${fixture.paths.pureTo}`);
+    expect(result.fileContributions).toEqual([{
+      path: fixture.paths.pureTo,
+      commits: [fixture.commits.pureMove],
+    }]);
   });
 
   it("carries both contents for a file that moved and changed", async () => {
@@ -62,6 +69,10 @@ describe("composing a selection that moved files", () => {
     // The left side comes from the path the file had at the base.
     expect(moved.beforeContent).toContain("edited line 0");
     expect(moved.afterContent).toContain("edited line zero, reworked");
+    expect(result.fileContributions).toEqual([{
+      path: fixture.paths.editedTo,
+      commits: [fixture.commits.moveWithEdit],
+    }]);
   });
 
   it("leaves a rewritten file as a delete and an add", async () => {
@@ -117,5 +128,41 @@ describe("composing a selection that moved files", () => {
 
     expect(result.files.map((file) => file.path))
       .not.toContain(fixture.paths.untouched);
+  });
+
+  it("keeps overwritten and reverted commits as contributors to the file lineage", async () => {
+    const history = await createFileHistoryFixture();
+    try {
+      await writeFile(join(history.path, history.paths.current), "temporary overwrite\n", "utf8");
+      history.git(["add", "--", history.paths.current]);
+      history.git(["commit", "-m", "test: overwrite current file"]);
+      const overwrite = history.git(["rev-parse", "HEAD"]).trim();
+      history.git(["revert", "--no-edit", overwrite]);
+      const revert = history.git(["rev-parse", "HEAD"]).trim();
+
+      const result = await new CompositeDiffService().compose({
+        repositoryPath: history.path,
+        baseRef: "main",
+        headRef: "feature/file-history",
+        selectedCommits: [
+          history.commits.modified,
+          history.commits.renamed,
+          overwrite,
+          revert,
+        ],
+      });
+
+      expect(result.fileContributions).toContainEqual({
+        path: history.paths.current,
+        commits: [
+          history.commits.modified,
+          history.commits.renamed,
+          overwrite,
+          revert,
+        ],
+      });
+    } finally {
+      await history.dispose();
+    }
   });
 });

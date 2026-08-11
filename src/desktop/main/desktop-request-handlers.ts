@@ -2,8 +2,11 @@ import {
   baseFileRequestSchema,
   baseTreeRequestSchema,
   cancelCompositionRequestSchema,
+  cancelFileHistoryRequestSchema,
   commitPageRequestSchema,
   compositionRequestSchema,
+  fileCommitRequestSchema,
+  fileHistoryRequestSchema,
   groupingRulesRequestSchema,
   rangeRequestSchema,
   saveGroupingRulesRequestSchema,
@@ -14,10 +17,15 @@ import {
   type BaseTreeDto,
   type BaseTreeRequest,
   type CancelCompositionRequest,
+  type CancelFileHistoryRequest,
   type CommitPageRequest,
   type CompositeDiffResultDto,
   type CompositionRequest,
   type Diagnostic,
+  type FileCommitChangeDto,
+  type FileCommitRequest,
+  type FileHistoryPageDto,
+  type FileHistoryRequest,
   type GroupingRulesDto,
   type GroupingRulesRequest,
   type RangeRequest,
@@ -118,12 +126,25 @@ interface CompositionBoundary {
   ): ApiResult<null> | Promise<ApiResult<null>>;
 }
 
+interface FileHistoryBoundary {
+  list(
+    request: FileHistoryRequest,
+    repositoryPath: string,
+  ): Promise<ApiResult<FileHistoryPageDto>>;
+  readCommit(
+    request: FileCommitRequest,
+    repositoryPath: string,
+  ): Promise<ApiResult<FileCommitChangeDto>>;
+  cancel(request: CancelFileHistoryRequest): ApiResult<null> | Promise<ApiResult<null>>;
+}
+
 interface DesktopRequestDependencies {
   readonly trustedWindow: () => TrustedWindow | undefined;
   readonly sessions: SessionReader;
   readonly repositoryController: RepositorySelector;
   readonly history: HistoryReader;
   readonly composition: CompositionBoundary;
+  readonly fileHistory: FileHistoryBoundary;
   readonly symbols: SymbolSearcher;
   readonly baseFiles: BaseFileSource;
   readonly baseTree: BaseTreeSource;
@@ -167,6 +188,35 @@ export function createDesktopRequestHandlers(dependencies: DesktopRequestDepende
       event,
       dependencies,
       async () => listBaseTree(dependencies, parseRequest(baseTreeRequestSchema, input)),
+    ),
+    listFileHistory: (event: DesktopInvokeEvent, input: unknown) => handleRequest(
+      event,
+      dependencies,
+      async () => {
+        const request = parseRequest(fileHistoryRequestSchema, input);
+        const session = requireSession(dependencies, request);
+        assertRangeBelongsToSession(session, request.range);
+        return dependencies.fileHistory.list(request, session.rootPath);
+      },
+    ),
+    readFileCommit: (event: DesktopInvokeEvent, input: unknown) => handleRequest(
+      event,
+      dependencies,
+      async () => {
+        const request = parseRequest(fileCommitRequestSchema, input);
+        const session = requireSession(dependencies, request);
+        assertRangeBelongsToSession(session, request.range);
+        return dependencies.fileHistory.readCommit(request, session.rootPath);
+      },
+    ),
+    cancelFileHistory: (event: DesktopInvokeEvent, input: unknown) => handleRequest(
+      event,
+      dependencies,
+      async () => {
+        const request = parseRequest(cancelFileHistoryRequestSchema, input);
+        requireSession(dependencies, request);
+        return dependencies.fileHistory.cancel(request);
+      },
     ),
     readGroupingRules: (event: DesktopInvokeEvent, input: unknown) => handleRequest(
       event,

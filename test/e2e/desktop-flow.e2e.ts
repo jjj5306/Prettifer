@@ -719,6 +719,62 @@ test("switches the diff between side-by-side and inline without losing the place
   expect(fixture.git(["status", "--porcelain"])).toBe("");
 });
 
+test("reviews file history by keyboard and restores the selected-result position", async () => {
+  const fixture = await createSymbolE2eFixture();
+  const running = await launch([fixture.path]);
+  await setViewportSize(running.page, 1280, 900);
+  await openRepository(running.page, fixture.path, fixture.headRef);
+  await running.page.getByRole("button", { name: "Load Commit Range" }).click();
+  await running.page.getByRole("checkbox", {
+    name: "Include in selected result: feat(app): call UtVar from Caller",
+  }).check();
+  await running.page.getByRole("button", { name: "Build Selected Result" }).click();
+  await expect(running.page.getByRole("textbox", {
+    name: "Read-only diff: src/app/Caller.java · base and selected result",
+  })).toBeVisible();
+  await expect(running.page.getByText("Loading diff editor…")).toBeHidden();
+
+  const reviewed = running.page.locator(".monaco-diff-editor .modified");
+  await reviewed.locator(".view-lines").hover();
+  const topLine = reviewed.locator(".margin-view-overlays .line-numbers").first();
+  await expect.poll(async () => {
+    await running.page.mouse.wheel(0, 600);
+    return Number(await topLine.innerText());
+  }).toBeGreaterThan(10);
+  const originalTopLine = await topLine.innerText();
+
+  const fileHistory = running.page.getByRole("button", { name: "File History" });
+  await fileHistory.focus();
+  await fileHistory.press("Enter");
+  await expect(fileHistory).toHaveAttribute("aria-current", "page");
+  const historyCommits = running.page
+    .getByRole("list", { name: "File commits, oldest first" })
+    .getByRole("button");
+  await expect(historyCommits.first()).toBeFocused();
+  await running.page.keyboard.press("End");
+  await running.page.keyboard.press("Enter");
+  await expect(running.page.getByRole("heading", { name: "File History Change" })).toBeVisible();
+  await expect(running.page.getByRole("textbox", {
+    name: /Read-only file history diff: src\/app\/Caller\.java/u,
+  })).toBeVisible();
+  await expect(running.page.getByText("Loading diff editor…")).toBeHidden();
+
+  await running.page.keyboard.press("Escape");
+  await expect(running.page.getByRole("textbox", {
+    name: "Read-only diff: src/app/Caller.java · base and selected result",
+  })).toBeVisible();
+  await expect(topLine).toHaveText(originalTopLine);
+  await setViewportSize(running.page, 720, 720);
+  await running.page.emulateMedia({ forcedColors: "active" });
+  await expect.poll(() => running.page.evaluate(() => {
+    const historyPanel = document.getElementById("file-history");
+    return document.documentElement.scrollWidth <= document.documentElement.clientWidth
+      && historyPanel !== null
+      && historyPanel.scrollWidth <= historyPanel.clientWidth;
+  })).toBe(true);
+  expect(fixture.git(["status", "--porcelain"])).toBe("");
+});
+
 test("navigates from a reviewed file to a declaration outside the result and back", async () => {
   const fixture = await createSymbolE2eFixture();
   const running = await launch([fixture.path]);

@@ -78,10 +78,20 @@ export class DesktopCompositionController {
           return {
             status: "success",
             data: {
-              ...state.result,
+              baseCommit: state.result.baseCommit,
               selectedCommits: [...state.result.selectedCommits],
+              mainlineParents: { ...state.result.mainlineParents },
               files: state.result.files.map((file) => ({ ...file })),
               problemFiles: state.result.problemFiles.map((file) => ({ ...file })),
+              unifiedDiff: state.result.unifiedDiff,
+              ...(state.result.fileContributions === undefined
+                ? {}
+                : {
+                    fileContributions: state.result.fileContributions.map((contribution) => ({
+                      path: contribution.path,
+                      commits: [...contribution.commits],
+                    })),
+                  }),
             },
           };
         case "error":

@@ -93,6 +93,11 @@ function createDependencies() {
       } }),
       cancel: vi.fn().mockReturnValue({ status: "success", data: null }),
     },
+    fileHistory: {
+      list: vi.fn().mockResolvedValue({ status: "cancelled" }),
+      readCommit: vi.fn().mockResolvedValue({ status: "cancelled" }),
+      cancel: vi.fn().mockReturnValue({ status: "success", data: null }),
+    },
   };
 }
 
@@ -513,5 +518,77 @@ describe("desktop request handlers", () => {
       status: "error",
       diagnostic: { code: "BASE_TREE_LIST_FAILED", subject: "Repository tree" },
     });
+  });
+
+  it("validates and routes file history, commit reads, and cancellation", async () => {
+    const dependencies = createDependencies();
+    const handlers = createDesktopRequestHandlers(dependencies);
+    const historyRequest = {
+      repositorySessionId,
+      sessionRevision: 1,
+      range,
+      requestId,
+      path: "src/app.ts",
+      offset: 0,
+    };
+
+    await handlers.listFileHistory(trustedEvent, historyRequest);
+    await handlers.readFileCommit(trustedEvent, {
+      repositorySessionId,
+      sessionRevision: 1,
+      range,
+      requestId,
+      path: historyRequest.path,
+      commitId: "d".repeat(40),
+      selected: true,
+      mainlineParent: 2,
+    });
+    await handlers.cancelFileHistory(trustedEvent, {
+      repositorySessionId,
+      sessionRevision: 1,
+      requestId,
+    });
+
+    expect(dependencies.fileHistory.list).toHaveBeenCalledWith(
+      { ...historyRequest, mainlineParents: {} },
+      session.rootPath,
+    );
+    expect(dependencies.fileHistory.readCommit).toHaveBeenCalledWith(
+      expect.objectContaining({ commitId: "d".repeat(40), mainlineParent: 2 }),
+      session.rootPath,
+    );
+    expect(dependencies.fileHistory.cancel).toHaveBeenCalledWith({
+      repositorySessionId,
+      sessionRevision: 1,
+      requestId,
+    });
+  });
+
+  it("rejects invalid or expired file history identities before the controller", async () => {
+    const dependencies = createDependencies();
+    const handlers = createDesktopRequestHandlers(dependencies);
+
+    await expect(handlers.listFileHistory(trustedEvent, {
+      repositorySessionId,
+      sessionRevision: 1,
+      range,
+      requestId,
+      path: "C:\\outside.ts",
+      offset: 0,
+    })).resolves.toMatchObject({ status: "error", diagnostic: { code: "INVALID_REQUEST" } });
+    await expect(handlers.listFileHistory(trustedEvent, {
+      repositorySessionId,
+      sessionRevision: 1,
+      range: {
+        ...range,
+        headCommit: "e".repeat(40),
+        rangeRevision: `${baseCommit}:${"e".repeat(40)}:${commonCommit}`,
+      },
+      requestId,
+      path: "src/app.ts",
+      offset: 0,
+    })).resolves.toMatchObject({ status: "error", diagnostic: { code: "RANGE_EXPIRED" } });
+
+    expect(dependencies.fileHistory.list).not.toHaveBeenCalled();
   });
 });
