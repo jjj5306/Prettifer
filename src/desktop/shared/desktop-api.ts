@@ -105,6 +105,120 @@ export const cancelCompositionRequestSchema = sessionIdentitySchema.extend({
 }).strict();
 
 const compositeFilePathSchema = z.string().min(1);
+const repositoryRelativePathSchema = compositeFilePathSchema.refine((path) =>
+  !path.startsWith("/")
+  && !path.includes("\\")
+  && path.split("/").every((segment) => segment.length > 0 && segment !== "." && segment !== ".."),
+{ message: "The file path must be a normalized repository-relative path." });
+
+const fileChangeStatusSchema = z.enum(["added", "modified", "deleted", "renamed"]);
+
+export const fileHistoryRequestSchema = sessionIdentitySchema.extend({
+  range: repositoryRangeSchema,
+  requestId: z.uuid(),
+  path: repositoryRelativePathSchema,
+  offset: z.number().int().nonnegative().default(0),
+  mainlineParents: mainlineParentsSchema.default({}),
+}).strict();
+
+export const fileHistoryEntrySchema = z.object({
+  id: commitIdSchema,
+  shortId: z.string().regex(/^[0-9a-f]{7}$/u),
+  parents: z.array(commitIdSchema),
+  title: z.string(),
+  authorName: z.string(),
+  authoredAt: z.iso.datetime({ offset: true }),
+  status: fileChangeStatusSchema,
+  path: compositeFilePathSchema,
+  previousPath: compositeFilePathSchema.optional(),
+  similarity: z.number().int().min(0).max(100).optional(),
+}).strict().superRefine((entry, context) => {
+  if (entry.status === "renamed" && entry.previousPath === undefined) {
+    context.addIssue({
+      code: "custom",
+      message: "A renamed file history entry requires its previous path.",
+      path: ["previousPath"],
+    });
+  }
+});
+
+export const partialFileHistorySchema = z.object({
+  reason: z.literal("shallow"),
+  message: z.string().min(1),
+  nextAction: z.string().min(1),
+}).strict();
+
+export const fileHistoryPageSchema = z.object({
+  rangeRevision: z.string().min(1),
+  path: compositeFilePathSchema,
+  entries: z.array(fileHistoryEntrySchema),
+  nextOffset: z.number().int().nonnegative().nullable(),
+  partial: partialFileHistorySchema.nullable(),
+}).strict();
+
+export const fileCommitRequestSchema = sessionIdentitySchema.extend({
+  range: repositoryRangeSchema,
+  requestId: z.uuid(),
+  path: repositoryRelativePathSchema,
+  commitId: commitIdSchema,
+  selected: z.boolean().default(false),
+  mainlineParent: z.number().int().positive().optional(),
+}).strict();
+
+export const cancelFileHistoryRequestSchema = sessionIdentitySchema.extend({
+  requestId: z.uuid(),
+}).strict();
+
+const fileCommitChangeBase = {
+  commitId: commitIdSchema,
+  parentCommit: commitIdSchema.nullable(),
+  parentNumber: z.number().int().positive().nullable(),
+  path: compositeFilePathSchema,
+  beforeSize: z.number().int().nonnegative().nullable(),
+  afterSize: z.number().int().nonnegative().nullable(),
+} as const;
+
+export const fileCommitChangeSchema = z.union([
+  z.object({
+    ...fileCommitChangeBase,
+    status: z.literal("added"),
+    beforeContent: z.null(),
+    afterContent: z.string(),
+    binary: z.literal(false),
+  }).strict(),
+  z.object({
+    ...fileCommitChangeBase,
+    status: z.literal("modified"),
+    beforeContent: z.string(),
+    afterContent: z.string(),
+    binary: z.literal(false),
+  }).strict(),
+  z.object({
+    ...fileCommitChangeBase,
+    status: z.literal("deleted"),
+    beforeContent: z.string(),
+    afterContent: z.null(),
+    binary: z.literal(false),
+  }).strict(),
+  z.object({
+    ...fileCommitChangeBase,
+    status: z.literal("renamed"),
+    previousPath: compositeFilePathSchema,
+    similarity: z.number().int().min(0).max(100),
+    beforeContent: z.string(),
+    afterContent: z.string(),
+    binary: z.literal(false),
+  }).strict(),
+  z.object({
+    ...fileCommitChangeBase,
+    status: fileChangeStatusSchema,
+    previousPath: compositeFilePathSchema.optional(),
+    similarity: z.number().int().min(0).max(100).optional(),
+    beforeContent: z.null(),
+    afterContent: z.null(),
+    binary: z.literal(true),
+  }).strict(),
+]);
 
 /** A symbol lookup asks for one identifier at the range's comparison base. */
 export const symbolSearchRequestSchema = sessionIdentitySchema.extend({
@@ -236,6 +350,10 @@ export const compositeDiffResultSchema = z.object({
   mainlineParents: mainlineParentsSchema,
   files: z.array(compositeFileChangeSchema),
   problemFiles: z.array(compositeProblemFileSchema),
+  fileContributions: z.array(z.object({
+    path: compositeFilePathSchema,
+    commits: z.array(commitIdSchema),
+  }).strict()).optional(),
   unifiedDiff: z.string(),
 }).strict();
 
@@ -283,6 +401,12 @@ export type BaseFileRequest = z.infer<typeof baseFileRequestSchema>;
 export type BaseFileDto = z.infer<typeof baseFileSchema>;
 export type BaseTreeRequest = z.infer<typeof baseTreeRequestSchema>;
 export type BaseTreeDto = z.infer<typeof baseTreeSchema>;
+export type FileHistoryRequest = z.input<typeof fileHistoryRequestSchema>;
+export type FileHistoryEntryDto = z.infer<typeof fileHistoryEntrySchema>;
+export type FileHistoryPageDto = z.infer<typeof fileHistoryPageSchema>;
+export type FileCommitRequest = z.infer<typeof fileCommitRequestSchema>;
+export type FileCommitChangeDto = z.infer<typeof fileCommitChangeSchema>;
+export type CancelFileHistoryRequest = z.infer<typeof cancelFileHistoryRequestSchema>;
 export type GroupRuleDto = z.infer<typeof groupRuleSchema>;
 export type GroupingRulesRequest = z.infer<typeof groupingRulesRequestSchema>;
 export type SaveGroupingRulesRequest = z.infer<typeof saveGroupingRulesRequestSchema>;
@@ -302,6 +426,9 @@ export const DESKTOP_CHANNELS = Object.freeze({
   searchSymbol: "symbols:search",
   readBaseFile: "files:read-base",
   listBaseTree: "files:list-base-tree",
+  listFileHistory: "files:list-history",
+  readFileCommit: "files:read-history-commit",
+  cancelFileHistory: "files:cancel-history",
   readGroupingRules: "grouping:read-rules",
   saveGroupingRules: "grouping:save-rules",
 });
@@ -320,6 +447,12 @@ export interface DesktopApi {
   readBaseFile(request: BaseFileRequest): Promise<ApiResult<BaseFileDto>>;
   /** Lists the paths tracked at the range's comparison base. */
   listBaseTree(request: BaseTreeRequest): Promise<ApiResult<BaseTreeDto>>;
+  /** Lists commits that changed one file on the range's target branch. */
+  listFileHistory(request: FileHistoryRequest): Promise<ApiResult<FileHistoryPageDto>>;
+  /** Reads the selected file as changed by one history commit. */
+  readFileCommit(request: FileCommitRequest): Promise<ApiResult<FileCommitChangeDto>>;
+  /** Cancels an active file-history list or commit read. */
+  cancelFileHistory(request: CancelFileHistoryRequest): Promise<ApiResult<null>>;
   /** Reads the grouping rules kept for the session's repository. */
   readGroupingRules(request: GroupingRulesRequest): Promise<ApiResult<GroupingRulesDto>>;
   /** Replaces the grouping rules kept for the session's repository. */

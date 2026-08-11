@@ -105,7 +105,16 @@ export interface CompositeDiffResult {
   files: readonly CompositeFileChange[];
   /** Paths that needed a content choice. A non-empty list means a partial result. */
   problemFiles: readonly CompositeProblemFile[];
+  readonly fileContributions?: readonly Readonly<{
+    path: string;
+    commits: readonly string[];
+  }>[];
   unifiedDiff: string;
+}
+
+interface CommitPathChanges {
+  readonly commit: string;
+  readonly changes: readonly CompositeFilePathChange[];
 }
 
 export interface CompositeDiffRequest {
@@ -172,8 +181,13 @@ export class CompositeDiffService {
     return this.workspaces.withWorkspace(
       request.repositoryPath,
       baseCommit,
-      changedPaths,
-      (workspace) => this.composeInWorkspace(workspace, plan, request.signal),
+      changedPaths.paths,
+      (workspace) => this.composeInWorkspace(
+        workspace,
+        plan,
+        changedPaths.byCommit,
+        request.signal,
+      ),
       request.signal,
     );
   }
@@ -186,8 +200,8 @@ export class CompositeDiffService {
     repositoryPath: string,
     plan: SelectionPlan,
     signal: AbortSignal | undefined,
-  ): Promise<string[]> {
-    const changedPaths = await mapWithGitConcurrency(
+  ): Promise<{ paths: string[]; byCommit: readonly CommitPathChanges[] }> {
+    const byCommit = await mapWithGitConcurrency(
       plan.selectedCommits,
       async (commit) => {
         const mainlineParent = plan.mainlineParents[commit];
@@ -195,8 +209,8 @@ export class CompositeDiffService {
           [
             "diff-tree",
             "--no-commit-id",
-            "--name-only",
-            "--no-renames",
+            "--name-status",
+            ...RENAME_DETECTION,
             "-r",
             "-z",
             ...(mainlineParent === undefined
@@ -205,15 +219,21 @@ export class CompositeDiffService {
           ],
           gitRunOptions(repositoryPath, signal),
         );
-        return result.stdout.split("\0").filter((path) => path.length > 0);
+        return { commit, changes: parseNameStatus(result.stdout) };
       },
     );
-    return [...new Set(changedPaths.flat())].sort(comparePath);
+    const paths = byCommit.flatMap(({ changes }) => changes.flatMap((change) =>
+      change.status === "renamed"
+        ? [change.previousPath, change.path]
+        : [change.path],
+    ));
+    return { paths: [...new Set(paths)].sort(comparePath), byCommit };
   }
 
   private async composeInWorkspace(
     workspace: CompositionWorkspace,
     plan: SelectionPlan,
+    commitChanges: readonly CommitPathChanges[],
     signal: AbortSignal | undefined,
   ): Promise<CompositeDiffResult> {
     const problemFiles = new Map<string, CompositeProblemFile>();
@@ -303,14 +323,16 @@ export class CompositeDiffService {
       );
     }
 
+    const sortedProblems = [...problemFiles.values()].sort((left, right) =>
+      comparePath(left.path, right.path),
+    );
     return {
       baseCommit: workspace.baseCommit,
       selectedCommits: [...plan.selectedCommits],
       mainlineParents: plan.mainlineParents,
       files,
-      problemFiles: [...problemFiles.values()].sort((left, right) =>
-        comparePath(left.path, right.path),
-      ),
+      problemFiles: sortedProblems,
+      fileContributions: createFileContributions(files, sortedProblems, commitChanges),
       unifiedDiff: unifiedDiff.stdout,
     };
   }
@@ -586,6 +608,83 @@ function comparePath(left: string, right: string): number {
     return 1;
   }
   return 0;
+}
+
+/**
+ * Connects every path Git identified as a rename, then records selected commits
+ * that touched the resulting file lineage. A conflict on that lineage removes
+ * only that commit from the successful contribution list.
+ */
+function createFileContributions(
+  files: readonly CompositeFileChange[],
+  problems: readonly CompositeProblemFile[],
+  commits: readonly CommitPathChanges[],
+): readonly Readonly<{ path: string; commits: readonly string[] }>[] {
+  const adjacency = new Map<string, Set<string>>();
+  for (const { changes } of commits) {
+    for (const change of changes) {
+      if (change.status !== "renamed") {
+        continue;
+      }
+      connect(adjacency, change.previousPath, change.path);
+      connect(adjacency, change.path, change.previousPath);
+    }
+  }
+  const targets = [
+    ...files.map((file) => ({
+      path: file.path,
+      seeds: file.status === "renamed" ? [file.path, file.previousPath] : [file.path],
+    })),
+    ...problems
+      .filter((problem) => !files.some((file) => file.path === problem.path))
+      .map((problem) => ({ path: problem.path, seeds: [problem.path] })),
+  ];
+  return targets.map((target) => {
+    const lineage = connectedPaths(adjacency, target.seeds);
+    const problemCommits = new Set(
+      problems
+        .filter((problem) => lineage.has(problem.path))
+        .map((problem) => problem.commit),
+    );
+    return {
+      path: target.path,
+      commits: commits
+        .filter(({ commit, changes }) =>
+          !problemCommits.has(commit) && changes.some((change) =>
+            lineage.has(change.path) ||
+            (change.status === "renamed" && lineage.has(change.previousPath)),
+          ),
+        )
+        .map(({ commit }) => commit),
+    };
+  });
+}
+
+function connect(adjacency: Map<string, Set<string>>, from: string, to: string): void {
+  const related = adjacency.get(from) ?? new Set<string>();
+  related.add(to);
+  adjacency.set(from, related);
+}
+
+function connectedPaths(
+  adjacency: ReadonlyMap<string, ReadonlySet<string>>,
+  seeds: readonly string[],
+): ReadonlySet<string> {
+  const found = new Set(seeds);
+  const pending = [...seeds];
+  while (pending.length > 0) {
+    const path = pending.pop();
+    if (path === undefined) {
+      continue;
+    }
+    for (const related of adjacency.get(path) ?? []) {
+      if (!found.has(related)) {
+        found.add(related);
+        pending.push(related);
+      }
+    }
+  }
+  return found;
 }
 
 

@@ -7,10 +7,12 @@ import { CompositeDiffCoordinator } from "../../composition/composite-diff-coord
 import { CompositeDiffService } from "../../composition/composite-diff-service.js";
 import { GitCommandRunner } from "../../git/git-command-runner.js";
 import { RepositoryHistoryService } from "../../history/repository-history-service.js";
+import { FileHistoryService } from "../../history/file-history-service.js";
 import { BaseTreeLister } from "../../base-tree/base-tree-lister.js";
 import { BaseFileReader } from "../../symbols/base-file-reader.js";
 import { SymbolSearchService } from "../../symbols/symbol-search.js";
 import { DesktopCompositionController } from "./desktop-composition-controller.js";
+import { DesktopFileHistoryController } from "./desktop-file-history-controller.js";
 import { createDesktopRequestHandlers } from "./desktop-request-handlers.js";
 import {
   createGroupingRuleStore,
@@ -117,11 +119,19 @@ export async function startDesktopApplication(
     () => seams.beforeComposition?.() ?? Promise.resolve(),
     lifetime.signal,
   );
+  const fileHistory = new DesktopFileHistoryController(
+    history,
+    new FileHistoryService(git),
+    lifetime.signal,
+  );
   const sessions = new RepositorySessionManager(
     history,
     undefined,
     undefined,
-    () => { composition.dispose(); },
+    () => {
+      composition.dispose();
+      fileHistory.dispose();
+    },
   );
   const repositoryController = new RepositorySessionController(
     sessions,
@@ -137,6 +147,7 @@ export async function startDesktopApplication(
     repositoryController,
     history,
     composition,
+    fileHistory,
     symbols: new SymbolSearchService(git),
     baseFiles: new BaseFileReader(git),
     baseTree: new BaseTreeLister(git),
@@ -155,6 +166,7 @@ export async function startDesktopApplication(
     released = true;
     lifetime.abort();
     composition.dispose();
+    fileHistory.dispose();
     sessions.clear();
     removeDesktopRequestHandlers(host.ipc);
     current = undefined;

@@ -1,11 +1,21 @@
-export type WorkbenchRegion = "repository" | "history" | "files" | "rules" | "diff";
+export type WorkbenchRegion =
+  | "repository"
+  | "history"
+  | "files"
+  | "fileHistory"
+  | "rules"
+  | "diff";
 
 /** The panel a rail item points at. Two items can share one panel. */
 export type WorkbenchPanel = "repository" | "history" | "files" | "diff";
 
 /** Items below the history point at a selected result, which may not exist. */
 export function regionNeedsResult(region: WorkbenchRegion): boolean {
-  return region === "files" || region === "rules" || region === "diff";
+  return region === "files" || region === "fileHistory" || region === "rules" || region === "diff";
+}
+
+export function regionNeedsFile(region: WorkbenchRegion): boolean {
+  return region === "fileHistory";
 }
 
 /**
@@ -16,8 +26,12 @@ export function regionNeedsResult(region: WorkbenchRegion): boolean {
 export function currentRegion(
   activeRegion: WorkbenchRegion,
   resultAvailable: boolean,
+  fileSelected: boolean = resultAvailable,
 ): WorkbenchRegion {
-  return !resultAvailable && regionNeedsResult(activeRegion) ? "history" : activeRegion;
+  return (!resultAvailable && regionNeedsResult(activeRegion)) ||
+    (!fileSelected && regionNeedsFile(activeRegion))
+    ? "history"
+    : activeRegion;
 }
 
 /**
@@ -27,7 +41,8 @@ export function currentRegion(
 export function currentPanel(
   activeRegion: WorkbenchRegion,
   resultAvailable: boolean,
+  fileSelected: boolean = resultAvailable,
 ): WorkbenchPanel {
-  const region = currentRegion(activeRegion, resultAvailable);
-  return region === "rules" ? "files" : region;
+  const region = currentRegion(activeRegion, resultAvailable, fileSelected);
+  return region === "rules" || region === "fileHistory" ? "files" : region;
 }

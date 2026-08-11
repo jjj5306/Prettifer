@@ -6,6 +6,10 @@ import {
   compositeFileChangeSchema,
   compositionRequestSchema,
   diagnosticSchema,
+  fileCommitChangeSchema,
+  fileCommitRequestSchema,
+  fileHistoryPageSchema,
+  fileHistoryRequestSchema,
   rangeRequestSchema,
   repositorySessionSchema,
 } from "../../../src/desktop/shared/index.js";
@@ -118,6 +122,79 @@ describe("desktop shared contracts", () => {
       code: "INVALID_REPOSITORY",
       message: "The Git repository could not be opened.",
     })).toThrow();
+  });
+
+  it("validates file history paging, rename boundaries and partial state", () => {
+    const request = {
+      repositorySessionId: session.repositorySessionId,
+      sessionRevision: 1,
+      range,
+      requestId: "01909ee1-2ab8-71f4-80ab-184a9459f4af",
+      path: "src/current.ts",
+    };
+    expect(fileHistoryRequestSchema.parse(request)).toMatchObject({ offset: 0 });
+    expect(fileHistoryPageSchema.parse({
+      rangeRevision: range.rangeRevision,
+      path: request.path,
+      entries: [{
+        id: "d".repeat(40),
+        shortId: "d".repeat(7),
+        parents: ["c".repeat(40)],
+        title: "rename file",
+        authorName: "Author",
+        authoredAt: "2025-01-01T00:00:00Z",
+        status: "renamed",
+        previousPath: "src/old.ts",
+        path: request.path,
+        similarity: 87,
+      }],
+      nextOffset: null,
+      partial: {
+        reason: "shallow",
+        message: "Only known history is shown.",
+        nextAction: "Fetch more history.",
+      },
+    })).toBeDefined();
+    expect(() => fileHistoryPageSchema.parse({
+      rangeRevision: range.rangeRevision,
+      path: request.path,
+      entries: [{
+        id: "d".repeat(40),
+        shortId: "d".repeat(7),
+        parents: [],
+        title: "invalid rename",
+        authorName: "Author",
+        authoredAt: "2025-01-01T00:00:00Z",
+        status: "renamed",
+        path: request.path,
+      }],
+      nextOffset: null,
+      partial: null,
+    })).toThrow();
+  });
+
+  it("validates file commit requests and binary metadata", () => {
+    const request = {
+      repositorySessionId: session.repositorySessionId,
+      sessionRevision: 1,
+      range,
+      requestId: "01909ee1-2ab8-71f4-80ab-184a9459f4af",
+      path: "assets/data.bin",
+      commitId: "d".repeat(40),
+    };
+    expect(fileCommitRequestSchema.parse(request)).toMatchObject({ selected: false });
+    expect(fileCommitChangeSchema.parse({
+      commitId: request.commitId,
+      parentCommit: "c".repeat(40),
+      parentNumber: 1,
+      path: request.path,
+      status: "modified",
+      binary: true,
+      beforeContent: null,
+      afterContent: null,
+      beforeSize: 5,
+      afterSize: 6,
+    })).toBeDefined();
   });
 
   it.each([

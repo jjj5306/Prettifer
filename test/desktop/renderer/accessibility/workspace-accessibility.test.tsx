@@ -76,6 +76,8 @@ function createController(withResult = false): AppController {
         ? { status: "ready", requestId: "composition-1", result }
         : { status: "idle" },
       selectedFilePath: withResult ? "src/app.ts" : null,
+      fileHistory: { status: "idle" },
+      fileCommit: { status: "idle" },
       symbolLookup: { status: "idle" },
       groupingRules: {
         status: "ready",
@@ -98,6 +100,11 @@ function createController(withResult = false): AppController {
     composeSelection: vi.fn(),
     cancelComposition: vi.fn(),
     selectFile: vi.fn(),
+    loadFileHistory: vi.fn().mockResolvedValue(undefined),
+    loadMoreFileHistory: vi.fn().mockResolvedValue(undefined),
+    openFileCommit: vi.fn().mockResolvedValue(undefined),
+    closeFileCommit: vi.fn(),
+    focusFileHistoryCommit: vi.fn(),
     lookUpSymbol: vi.fn().mockResolvedValue(undefined),
     goToHit: vi.fn(),
     dismissSymbolLookup: vi.fn(),
@@ -191,6 +198,7 @@ describe("desktop workspace accessibility", () => {
       screen.getByRole("button", { name: "Repository" }),
       screen.getByRole("button", { name: "Commit History" }),
       screen.getByRole("button", { name: "Changed Files" }),
+      screen.getByRole("button", { name: "File History" }),
       screen.getByRole("button", { name: "Group Rules" }),
       screen.getByRole("button", { name: "Diff Review" }),
       screen.getByRole("button", { name: "Change Repository" }),

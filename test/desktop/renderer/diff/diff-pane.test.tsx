@@ -19,6 +19,135 @@ const file = {
 };
 
 describe("DiffPane", () => {
+  it("restores the selected-result editor state after closing a history change", async () => {
+    const viewState = { modified: { scrollTop: 320, lineNumber: 18, column: 4 } };
+    const selectedAdapter = {
+      show: vi.fn(),
+      saveViewState: vi.fn().mockReturnValue(viewState),
+      dispose: vi.fn(),
+    };
+    const historyAdapter = { show: vi.fn(), dispose: vi.fn() };
+    const restoredAdapter = {
+      show: vi.fn(),
+      restoreViewState: vi.fn(),
+      dispose: vi.fn(),
+    };
+    const loadAdapter = vi.fn()
+      .mockResolvedValueOnce(selectedAdapter)
+      .mockResolvedValueOnce(historyAdapter)
+      .mockResolvedValueOnce(restoredAdapter);
+    const historyState = {
+      status: "ready" as const,
+      requestId: "history-change-1",
+      rangeRevision: "range-1",
+      change: {
+        commitId: "d".repeat(40),
+        parentCommit: "c".repeat(40),
+        parentNumber: 1,
+        path: file.path,
+        status: "modified" as const,
+        binary: false as const,
+        beforeContent: "history before",
+        afterContent: "history after",
+        beforeSize: 14,
+        afterSize: 13,
+      },
+    };
+    const { rerender } = render(
+      <DiffPane isCurrentRegion={false} identity={identity} file={file} loadAdapter={loadAdapter} />,
+    );
+    await waitFor(() => { expect(selectedAdapter.show).toHaveBeenCalled(); });
+
+    rerender(
+      <DiffPane
+        isCurrentRegion={false}
+        identity={identity}
+        file={file}
+        fileCommit={historyState}
+        loadAdapter={loadAdapter}
+      />,
+    );
+    await waitFor(() => { expect(historyAdapter.show).toHaveBeenCalled(); });
+    rerender(
+      <DiffPane isCurrentRegion={false} identity={identity} file={file} loadAdapter={loadAdapter} />,
+    );
+    await waitFor(() => { expect(restoredAdapter.show).toHaveBeenCalled(); });
+
+    expect(selectedAdapter.saveViewState).toHaveBeenCalledOnce();
+    expect(restoredAdapter.restoreViewState).toHaveBeenCalledWith(viewState);
+  });
+
+  it("shows a file history commit in the same diff area and returns to the result", async () => {
+    const user = userEvent.setup();
+    const adapter = { show: vi.fn(), dispose: vi.fn() };
+    const onCloseFileCommit = vi.fn();
+    render(
+      <DiffPane
+        isCurrentRegion={false}
+        identity={identity}
+        file={file}
+        fileCommit={{
+          status: "ready",
+          requestId: "history-change-1",
+          rangeRevision: "range-1",
+          change: {
+            commitId: "d".repeat(40),
+            parentCommit: "c".repeat(40),
+            parentNumber: 1,
+            path: "src/app.ts",
+            status: "modified",
+            binary: false,
+            beforeContent: "history before",
+            afterContent: "history after",
+            beforeSize: 14,
+            afterSize: 13,
+          },
+        }}
+        onCloseFileCommit={onCloseFileCommit}
+        loadAdapter={vi.fn().mockResolvedValue(adapter)}
+      />,
+    );
+
+    await waitFor(() => { expect(adapter.show).toHaveBeenCalled(); });
+    expect(screen.getByRole("heading", { name: "File History Change" })).toBeVisible();
+    expect(screen.getByRole("textbox")).toHaveAccessibleName(/commit ddddddd compared with parent 1/u);
+    await user.click(screen.getByRole("button", { name: "Return to Selected Result" }));
+    expect(onCloseFileCommit).toHaveBeenCalledOnce();
+  });
+
+  it("shows binary history metadata without loading contents", () => {
+    const loadAdapter = vi.fn();
+    render(
+      <DiffPane
+        isCurrentRegion={false}
+        identity={identity}
+        file={file}
+        fileCommit={{
+          status: "ready",
+          requestId: "history-change-1",
+          rangeRevision: "range-1",
+          change: {
+            commitId: "d".repeat(40),
+            parentCommit: "c".repeat(40),
+            parentNumber: 1,
+            path: "assets/data.bin",
+            status: "modified",
+            binary: true,
+            beforeContent: null,
+            afterContent: null,
+            beforeSize: 5,
+            afterSize: 6,
+          },
+        }}
+        loadAdapter={loadAdapter}
+      />,
+    );
+
+    expect(loadAdapter).not.toHaveBeenCalled();
+    expect(screen.getByText("Binary content comparison is not available")).toBeVisible();
+    expect(screen.getByText("Blob sizes: 5 bytes → 6 bytes")).toBeVisible();
+  });
+
   it("loads Monaco only after a result file is selected", async () => {
     const adapter = { show: vi.fn(), dispose: vi.fn() };
     const loadAdapter = vi.fn().mockResolvedValue(adapter);

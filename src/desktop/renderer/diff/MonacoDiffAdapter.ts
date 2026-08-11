@@ -123,6 +123,9 @@ interface CodeEditor extends Disposable {
   onMouseDown(listener: (event: EditorMouseEvent) => void): Disposable;
   onMouseMove(listener: (event: EditorMouseEvent) => void): Disposable;
   onMouseLeave(listener: () => void): Disposable;
+  getScrollTop(): number;
+  getScrollLeft(): number;
+  setScrollPosition(position: { readonly scrollTop: number; readonly scrollLeft: number }): void;
 }
 
 interface MonacoUri {
@@ -145,6 +148,14 @@ export interface MonacoApi {
 export interface DiffIdentity {
   readonly repositorySessionId: string;
   readonly requestId: string;
+}
+
+interface MonacoDiffViewState {
+  readonly reviewed: Readonly<{
+    position: EditorPosition | null;
+    scrollTop: number;
+    scrollLeft: number;
+  }> | null;
 }
 
 const baseEditorOptions = {
@@ -262,6 +273,34 @@ export class MonacoDiffAdapter {
    */
   setView(view: DiffView): void {
     this.comparisonEditor?.updateOptions({ renderSideBySide: view !== "inline" });
+  }
+
+  /** Captures cursor, selection, folding, and scroll state before a history review replaces the editor. */
+  saveViewState(): object | null {
+    const state: MonacoDiffViewState = {
+      reviewed: this.reviewEditor === undefined
+        ? null
+        : {
+            position: this.reviewEditor.getPosition(),
+            scrollTop: this.reviewEditor.getScrollTop(),
+            scrollLeft: this.reviewEditor.getScrollLeft(),
+          },
+    };
+    return state.reviewed === null ? null : state;
+  }
+
+  /** Restores the exact reading position when the selected result is shown again. */
+  restoreViewState(state: object): void {
+    const snapshot = state as Partial<MonacoDiffViewState>;
+    if (snapshot.reviewed !== null && snapshot.reviewed !== undefined && this.reviewEditor !== undefined) {
+      this.reviewEditor.setScrollPosition({
+        scrollTop: snapshot.reviewed.scrollTop,
+        scrollLeft: snapshot.reviewed.scrollLeft,
+      });
+      if (snapshot.reviewed.position !== null) {
+        this.reviewEditor.setPosition(snapshot.reviewed.position);
+      }
+    }
   }
 
   /**

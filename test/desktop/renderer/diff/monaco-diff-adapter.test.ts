@@ -35,6 +35,11 @@ interface FakeEditor {
   setPosition: Mock<(position: { lineNumber: number; column: number }) => void>;
   getModel: () => FakeModel | null;
   getPosition: () => { lineNumber: number; column: number } | null;
+  saveViewState: Mock<() => object | null>;
+  restoreViewState: Mock<(state: object) => void>;
+  getScrollTop: Mock<() => number>;
+  getScrollLeft: Mock<() => number>;
+  setScrollPosition: Mock<(position: { scrollTop: number; scrollLeft: number }) => void>;
   onKeyDown: (listener: Listener<never>) => { dispose: Mock<() => void> };
   onKeyUp: (listener: Listener<never>) => { dispose: Mock<() => void> };
   onMouseDown: (listener: Listener<never>) => { dispose: Mock<() => void> };
@@ -82,6 +87,11 @@ function createMonaco() {
       }),
       getModel: () => editor.model,
       getPosition: () => editor.position,
+      saveViewState: vi.fn(() => ({ position: editor.position })),
+      restoreViewState: vi.fn(() => undefined),
+      getScrollTop: vi.fn(() => 0),
+      getScrollLeft: vi.fn(() => 0),
+      setScrollPosition: vi.fn(() => undefined),
       onKeyDown: (listener) => {
         editor.keyListeners.push(listener);
         return { dispose: vi.fn(() => undefined) };
@@ -832,6 +842,32 @@ describe("MonacoDiffAdapter", () => {
     // One editor throughout: rebuilding would lose the scroll position.
     expect(fixture.editors).toHaveLength(1);
     expect(editor.dispose).not.toHaveBeenCalled();
+  });
+
+  it("snapshots and restores the complete diff editor view state", () => {
+    const { fixture, adapter } = reviewing();
+    const editor = fixture.editors[0]!;
+    const reviewedState = {
+      scrollTop: 420,
+      scrollLeft: 12,
+      position: { lineNumber: 27, column: 8 },
+    };
+    editor.modified.getScrollTop.mockReturnValue(reviewedState.scrollTop);
+    editor.modified.getScrollLeft.mockReturnValue(reviewedState.scrollLeft);
+    editor.modified.position = reviewedState.position;
+
+    const state = adapter.saveViewState();
+    expect(state).toEqual({ reviewed: reviewedState });
+    if (state === null) {
+      throw new Error("The editor did not return a view state.");
+    }
+    adapter.restoreViewState(state);
+
+    expect(editor.modified.setScrollPosition).toHaveBeenCalledWith({
+      scrollTop: reviewedState.scrollTop,
+      scrollLeft: reviewedState.scrollLeft,
+    });
+    expect(editor.modified.setPosition).toHaveBeenCalledWith(reviewedState.position);
   });
 
   it("ignores a layout change where there is nothing to compare", () => {

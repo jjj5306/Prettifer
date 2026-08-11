@@ -29,6 +29,8 @@ const baseState: AppState = {
   inspectedCommitId: null,
   composition: { status: "idle" },
   selectedFilePath: null,
+  fileHistory: { status: "idle" },
+  fileCommit: { status: "idle" },
   symbolLookup: { status: "idle" },
   groupingRules: { status: "idle" },
   baseTree: { status: "idle" },

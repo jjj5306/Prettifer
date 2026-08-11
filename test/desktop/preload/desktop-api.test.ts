@@ -17,6 +17,9 @@ describe("preload desktop API", () => {
       "cancelComposition",
       "readBaseFile",
       "listBaseTree",
+      "listFileHistory",
+      "readFileCommit",
+      "cancelFileHistory",
       "readGroupingRules",
       "saveGroupingRules",
     ]);

@@ -2,6 +2,9 @@ import type {
   BaseTreeDto,
   CompositeDiffResultDto,
   Diagnostic,
+  FileCommitChangeDto,
+  FileHistoryEntryDto,
+  FileHistoryPageDto,
   GroupRuleDto,
   RangeResult,
   RepositoryCommitDto,
@@ -99,6 +102,8 @@ export interface AppState {
   readonly inspectedCommitId: string | null;
   readonly composition: CompositionState;
   readonly selectedFilePath: string | null;
+  readonly fileHistory: FileHistoryState;
+  readonly fileCommit: FileCommitState;
   readonly symbolLookup: SymbolLookupState;
   readonly groupingRules: GroupingRulesState;
   readonly baseTree: BaseTreeState;
@@ -108,6 +113,55 @@ export interface AppState {
   /** Positions to return to, newest last. */
   readonly navigationHistory: readonly ReviewPosition[];
 }
+
+export type FileHistoryState =
+  | Readonly<{ status: "idle" }>
+  | Readonly<{
+      status: "loading";
+      requestId: string;
+      rangeRevision: string;
+      path: string;
+    }>
+  | Readonly<{
+      status: "ready";
+      rangeRevision: string;
+      path: string;
+      entries: readonly FileHistoryEntryDto[];
+      nextOffset: number | null;
+      partial: FileHistoryPageDto["partial"];
+      pagination: PaginationState;
+      focusedCommitId: string | null;
+    }>
+  | Readonly<{
+      status: "error";
+      rangeRevision: string;
+      path: string;
+      diagnostic: Diagnostic;
+    }>;
+
+export type FileCommitState =
+  | Readonly<{ status: "idle" }>
+  | Readonly<{
+      status: "loading";
+      requestId: string;
+      rangeRevision: string;
+      path: string;
+      commitId: string;
+    }>
+  | Readonly<{
+      status: "ready";
+      requestId: string;
+      rangeRevision: string;
+      change: FileCommitChangeDto;
+    }>
+  | Readonly<{
+      status: "error";
+      requestId: string;
+      rangeRevision: string;
+      path: string;
+      commitId: string;
+      diagnostic: Diagnostic;
+    }>;
 
 /**
  * The grouping rules of the open repository, as the settings file holds them.
@@ -187,6 +241,68 @@ export type ExternalFileState =
   | Readonly<{ status: "error"; path: string; diagnostic: Diagnostic }>;
 
 export type AppAction =
+  | Readonly<{
+      type: "fileHistory/loading";
+      requestId: string;
+      rangeRevision: string;
+      path: string;
+    }>
+  | Readonly<{
+      type: "fileHistory/loaded";
+      requestId: string;
+      rangeRevision: string;
+      page: FileHistoryPageDto;
+    }>
+  | Readonly<{
+      type: "fileHistory/failed";
+      requestId: string;
+      rangeRevision: string;
+      path: string;
+      diagnostic: Diagnostic;
+    }>
+  | Readonly<{ type: "fileHistory/focused"; commitId: string }>
+  | Readonly<{
+      type: "fileHistory/page-loading";
+      requestId: string;
+      rangeRevision: string;
+      path: string;
+    }>
+  | Readonly<{
+      type: "fileHistory/page-loaded";
+      requestId: string;
+      rangeRevision: string;
+      path: string;
+      page: FileHistoryPageDto;
+    }>
+  | Readonly<{
+      type: "fileHistory/page-failed";
+      requestId: string;
+      rangeRevision: string;
+      path: string;
+      diagnostic: Diagnostic;
+    }>
+  | Readonly<{
+      type: "fileCommit/loading";
+      requestId: string;
+      rangeRevision: string;
+      path: string;
+      commitId: string;
+    }>
+  | Readonly<{
+      type: "fileCommit/loaded";
+      requestId: string;
+      rangeRevision: string;
+      change: FileCommitChangeDto;
+    }>
+  | Readonly<{
+      type: "fileCommit/failed";
+      requestId: string;
+      rangeRevision: string;
+      path: string;
+      commitId: string;
+      diagnostic: Diagnostic;
+    }>
+  | Readonly<{ type: "fileCommit/closed" }>
   | Readonly<{ type: "symbol/looking"; symbol: string; mode: SymbolLookupMode }>
   | Readonly<{
       type: "symbol/found";
@@ -328,6 +444,8 @@ export const initialAppState: AppState = {
   inspectedCommitId: null,
   composition: { status: "idle" },
   selectedFilePath: null,
+  fileHistory: { status: "idle" },
+  fileCommit: { status: "idle" },
   symbolLookup: { status: "idle" },
   groupingRules: { status: "idle" },
   baseTree: { status: "idle" },
@@ -347,8 +465,134 @@ const clearedSymbolNavigation = {
   "symbolLookup" | "externalFile" | "reveal" | "navigationHistory"
 >;
 
+const clearedFileReview = {
+  fileHistory: { status: "idle" },
+  fileCommit: { status: "idle" },
+} as const satisfies Pick<AppState, "fileHistory" | "fileCommit">;
+
 export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
+    case "fileHistory/loading":
+      return {
+        ...state,
+        fileHistory: {
+          status: "loading",
+          requestId: action.requestId,
+          rangeRevision: action.rangeRevision,
+          path: action.path,
+        },
+      };
+    case "fileHistory/loaded":
+      return matchesFileHistoryRequest(state, action)
+        ? {
+            ...state,
+            fileHistory: {
+              status: "ready",
+              rangeRevision: action.rangeRevision,
+              path: action.page.path,
+              entries: action.page.entries,
+              nextOffset: action.page.nextOffset,
+              partial: action.page.partial,
+              pagination: { status: "idle" },
+              focusedCommitId: action.page.entries.at(-1)?.id ?? null,
+            },
+          }
+        : state;
+    case "fileHistory/failed":
+      return matchesFileHistoryRequest(state, action)
+        ? {
+            ...state,
+            fileHistory: {
+              status: "error",
+              rangeRevision: action.rangeRevision,
+              path: action.path,
+              diagnostic: action.diagnostic,
+            },
+          }
+        : state;
+    case "fileHistory/focused":
+      return state.fileHistory.status === "ready" &&
+        state.fileHistory.entries.some((entry) => entry.id === action.commitId)
+        ? { ...state, fileHistory: { ...state.fileHistory, focusedCommitId: action.commitId } }
+        : state;
+    case "fileHistory/page-loading":
+      return state.fileHistory.status === "ready" &&
+        state.fileHistory.path === action.path &&
+        state.fileHistory.rangeRevision === action.rangeRevision &&
+        state.fileHistory.pagination.status !== "loading"
+        ? {
+            ...state,
+            fileHistory: {
+              ...state.fileHistory,
+              pagination: { status: "loading", requestId: action.requestId },
+            },
+          }
+        : state;
+    case "fileHistory/page-loaded":
+      return matchesFileHistoryPageRequest(state, action)
+        ? {
+            ...state,
+            fileHistory: {
+              ...state.fileHistory,
+              entries: appendUniqueFileHistory(
+                state.fileHistory.entries,
+                action.page.entries,
+              ),
+              nextOffset: action.page.nextOffset,
+              partial: action.page.partial,
+              pagination: { status: "idle" },
+            },
+          }
+        : state;
+    case "fileHistory/page-failed":
+      return matchesFileHistoryPageRequest(state, action)
+        ? {
+            ...state,
+            fileHistory: {
+              ...state.fileHistory,
+              pagination: { status: "error", diagnostic: action.diagnostic },
+            },
+          }
+        : state;
+    case "fileCommit/loading":
+      return {
+        ...state,
+        fileCommit: {
+          status: "loading",
+          requestId: action.requestId,
+          rangeRevision: action.rangeRevision,
+          path: action.path,
+          commitId: action.commitId,
+        },
+      };
+    case "fileCommit/loaded":
+      return matchesFileCommitRequest(state, action)
+        ? {
+            ...state,
+            fileCommit: {
+              status: "ready",
+              requestId: action.requestId,
+              rangeRevision: action.rangeRevision,
+              change: action.change,
+            },
+          }
+        : state;
+    case "fileCommit/failed":
+      return matchesFileCommitRequest(state, action)
+        ? {
+            ...state,
+            fileCommit: {
+              status: "error",
+              requestId: action.requestId,
+              rangeRevision: action.rangeRevision,
+              path: action.path,
+              commitId: action.commitId,
+              diagnostic: action.diagnostic,
+            },
+          }
+        : state;
+    case "fileCommit/closed":
+      return { ...state, fileCommit: { status: "idle" } };
     case "baseTree/loading":
       return {
         ...state,
@@ -460,6 +704,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         navigationHistory: from === null
           ? state.navigationHistory
           : [...state.navigationHistory, from],
+        ...clearedFileReview,
       };
     }
     case "symbol/back": {
@@ -474,6 +719,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
             externalFile: { status: "idle" },
             reveal: previous,
             navigationHistory: state.navigationHistory.slice(0, -1),
+            ...clearedFileReview,
           };
     }
     case "external/opening": {
@@ -486,6 +732,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         navigationHistory: from === null
           ? state.navigationHistory
           : [...state.navigationHistory, from],
+        ...clearedFileReview,
       };
     }
     case "external/opened":
@@ -552,6 +799,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
             selectedFilePath: null,
             // The path list belongs to a comparison base, so a new range drops it.
             baseTree: { status: "idle" },
+            ...clearedFileReview,
             ...clearedSymbolNavigation,
           }
         : state;
@@ -640,6 +888,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
               rangeRevision: action.rangeRevision,
             },
             selectedFilePath: null,
+            ...clearedFileReview,
             ...clearedSymbolNavigation,
           }
         : state;
@@ -653,6 +902,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
               result: action.result,
             },
             selectedFilePath: action.result.files[0]?.path ?? null,
+            ...clearedFileReview,
             ...clearedSymbolNavigation,
           }
         : state;
@@ -668,6 +918,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
               diagnostic: action.diagnostic,
             },
             selectedFilePath: null,
+            ...clearedFileReview,
             ...clearedSymbolNavigation,
           }
         : state;
@@ -677,6 +928,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
             ...state,
             composition: { status: "cancelled", requestId: action.requestId },
             selectedFilePath: null,
+            ...clearedFileReview,
             ...clearedSymbolNavigation,
           }
         : state;
@@ -684,9 +936,59 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       // Picking a file by hand starts a fresh review position, so the symbol
       // panel and the way back to the previous position no longer apply.
       return resultHoldsPath(state, action.path)
-        ? { ...state, selectedFilePath: action.path, ...clearedSymbolNavigation }
+        ? {
+            ...state,
+            selectedFilePath: action.path,
+            ...clearedFileReview,
+            ...clearedSymbolNavigation,
+          }
         : state;
   }
+}
+
+function matchesFileHistoryRequest(
+  state: AppState,
+  action: { readonly requestId: string; readonly rangeRevision: string },
+): state is AppState & { fileHistory: Extract<FileHistoryState, { status: "loading" }> } {
+  return state.fileHistory.status === "loading" &&
+    state.fileHistory.requestId === action.requestId &&
+    state.fileHistory.rangeRevision === action.rangeRevision &&
+    state.range.status === "ready" &&
+    state.range.range.rangeRevision === action.rangeRevision;
+}
+
+function matchesFileHistoryPageRequest(
+  state: AppState,
+  action: {
+    readonly requestId: string;
+    readonly rangeRevision: string;
+    readonly path: string;
+  },
+): state is AppState & { fileHistory: Extract<FileHistoryState, { status: "ready" }> } {
+  return state.fileHistory.status === "ready" &&
+    state.fileHistory.path === action.path &&
+    state.fileHistory.rangeRevision === action.rangeRevision &&
+    state.fileHistory.pagination.status === "loading" &&
+    state.fileHistory.pagination.requestId === action.requestId;
+}
+
+function matchesFileCommitRequest(
+  state: AppState,
+  action: { readonly requestId: string; readonly rangeRevision: string },
+): state is AppState & { fileCommit: Extract<FileCommitState, { status: "loading" }> } {
+  return state.fileCommit.status === "loading" &&
+    state.fileCommit.requestId === action.requestId &&
+    state.fileCommit.rangeRevision === action.rangeRevision &&
+    state.range.status === "ready" &&
+    state.range.range.rangeRevision === action.rangeRevision;
+}
+
+function appendUniqueFileHistory(
+  current: readonly FileHistoryEntryDto[],
+  additional: readonly FileHistoryEntryDto[],
+): readonly FileHistoryEntryDto[] {
+  const known = new Set(current.map((entry) => entry.id));
+  return [...current, ...additional.filter((entry) => !known.has(entry.id))];
 }
 
 /**
@@ -749,6 +1051,7 @@ function clearSelection(state: AppState): AppState {
     mergeParents: {},
     composition: { status: "idle" },
     selectedFilePath: null,
+    ...clearedFileReview,
     ...clearedSymbolNavigation,
   };
 }
@@ -793,6 +1096,7 @@ function resetForRepository(state: AppState, session: RepositorySession): AppSta
     // Rules belong to one repository, so the next one starts from its own file.
     groupingRules: { status: "idle" },
     baseTree: { status: "idle" },
+    ...clearedFileReview,
     ...clearedSymbolNavigation,
   };
 }
@@ -856,6 +1160,7 @@ function toggleCommit(state: AppState, commitId: string): AppState {
       : state.mergeParents,
     composition: { status: "idle" },
     selectedFilePath: null,
+    ...clearedFileReview,
   };
 }
 
@@ -879,6 +1184,7 @@ function chooseMainlineParent(
     mergeParents: { ...state.mergeParents, [commitId]: mainlineParent },
     composition: { status: "idle" },
     selectedFilePath: null,
+    ...clearedFileReview,
   };
 }
 
@@ -951,6 +1257,7 @@ function markRangeStale(state: AppState, diagnostic: Diagnostic): AppState {
     inspectedCommitId: null,
     composition: { status: "idle" },
     selectedFilePath: null,
+    ...clearedFileReview,
   };
 }
 
