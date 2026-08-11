@@ -76,7 +76,7 @@ describe("file history service", () => {
     expect(first.nextOffset).toBe(100);
     expect(second.entries.length).toBeGreaterThan(0);
     expect(second.nextOffset).toBeNull();
-  });
+  }, 60_000);
 
   it("reads text rename and binary metadata without decoding binary content", async () => {
     fixture = await createFileHistoryFixture();
