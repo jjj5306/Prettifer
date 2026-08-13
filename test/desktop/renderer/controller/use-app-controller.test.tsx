@@ -984,6 +984,31 @@ describe("useAppController base tree", () => {
     expect(listBaseTree).toHaveBeenCalledOnce();
   });
 
+  it("loads history for the selected changed file", async () => {
+    const listFileHistory = vi.fn().mockResolvedValue({
+      status: "success",
+      data: {
+        rangeRevision: range.rangeRevision,
+        path: "src/app.ts",
+        entries: [],
+        nextOffset: null,
+        partial: null,
+      },
+    });
+    const { controller } = await reviewing({ listFileHistory });
+    await act(() => controller.current.loadFileHistory());
+
+    expect(listFileHistory).toHaveBeenCalledWith(expect.objectContaining({
+      path: "src/app.ts",
+      range,
+      offset: 0,
+    }));
+    expect(controller.current.state.fileHistory).toMatchObject({
+      status: "ready",
+      path: "src/app.ts",
+    });
+  });
+
   it("keeps the path list when the result is calculated again", async () => {
     const listBaseTree = vi.fn().mockResolvedValue({
       status: "success",

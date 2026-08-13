@@ -55,6 +55,7 @@ interface DiffPaneProps {
   readonly reveal?: ReviewPosition | null;
   readonly fileCommit?: FileCommitState;
   readonly onCloseFileCommit?: () => void;
+  readonly closeFileCommitLabel?: string;
   readonly onSymbol?: SymbolRequestHandler;
   readonly loadAdapter?: () => Promise<DiffAdapter>;
 }
@@ -82,6 +83,7 @@ export const DiffPane = ({
   reveal = null,
   fileCommit = { status: "idle" },
   onCloseFileCommit,
+  closeFileCommitLabel = "Return to Selected Result",
   onSymbol,
   loadAdapter = loadMonacoAdapter,
 }: DiffPaneProps) => {
@@ -241,7 +243,7 @@ export const DiffPane = ({
           <strong>This file change could not be opened</strong>
           <p>{fileCommit.diagnostic.message}</p>
           <p>{fileCommit.diagnostic.nextAction}</p>
-          <button type="button" onClick={onCloseFileCommit}>Return to Selected Result</button>
+          <button type="button" onClick={onCloseFileCommit}>{closeFileCommitLabel}</button>
         </div>
       </ReviewPanel>
     );
@@ -256,7 +258,7 @@ export const DiffPane = ({
           <p>{historyChangeSummary(change)}</p>
           <p>Compared with {parentLabel(change)}.</p>
           <p>Blob sizes: {sizeLabel(change.beforeSize)} → {sizeLabel(change.afterSize)}</p>
-          <button type="button" onClick={onCloseFileCommit}>Return to Selected Result</button>
+          <button type="button" onClick={onCloseFileCommit}>{closeFileCommitLabel}</button>
         </div>
       </ReviewPanel>
     );
@@ -290,7 +292,7 @@ export const DiffPane = ({
           <h2 id="diff-heading">{shown.heading}</h2>
           <ReviewedPath path={shown.path} />
           {target.kind === "history" ? (
-            <button type="button" onClick={onCloseFileCommit}>Return to Selected Result</button>
+            <button type="button" onClick={onCloseFileCommit}>{closeFileCommitLabel}</button>
           ) : null}
           {shown.rename === undefined ? null : <RenameNote rename={shown.rename} />}
           {comparable ? (

@@ -9,12 +9,12 @@ import styles from "./FileHistoryPane.module.css";
 interface FileHistoryPaneProps {
   readonly isCurrentRegion: boolean;
   readonly history: FileHistoryState;
-  readonly selectedCommits: readonly string[];
-  readonly result: CompositeDiffResultDto;
+  readonly selectedCommits?: readonly string[];
+  readonly result?: CompositeDiffResultDto;
   readonly onFocusCommit: (commitId: string) => void;
   readonly onOpenCommit: (commitId: string, path: string) => void;
   readonly onLoadMore: () => void;
-  readonly onReturnToComposite: () => void;
+  readonly onReturnToResult: () => void;
 }
 
 type CompositeProblem = CompositeDiffResultDto["problemFiles"][number];
@@ -24,12 +24,12 @@ const historyScrollPositions = new Map<string, number>();
 export const FileHistoryPane = ({
   isCurrentRegion,
   history,
-  selectedCommits,
+  selectedCommits = [],
   result,
   onFocusCommit,
   onOpenCommit,
   onLoadMore,
-  onReturnToComposite,
+  onReturnToResult,
 }: FileHistoryPaneProps) => {
   const buttons = useRef(new Map<string, HTMLButtonElement>());
   const listRef = useRef<HTMLOListElement>(null);
@@ -38,10 +38,10 @@ export const FileHistoryPane = ({
     ? `${history.rangeRevision}:${history.path}`
     : null;
   const selected = useMemo(() => new Set(selectedCommits), [selectedCommits]);
-  const contributions = history.status === "ready"
+  const contributions = history.status === "ready" && result !== undefined
     ? new Set(result.fileContributions?.find((item) => item.path === history.path)?.commits ?? [])
     : new Set<string>();
-  const problems = history.status === "ready"
+  const problems = history.status === "ready" && result !== undefined
     ? new Map<string, CompositeProblem>(
         result.problemFiles
           .filter((problem) => problem.path === history.path)
@@ -94,12 +94,15 @@ export const FileHistoryPane = ({
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault();
-          onReturnToComposite();
+          onReturnToResult();
         }
       }}
     >
       <header className={styles.heading}>
-        <h2 id="file-history-heading">File History</h2>
+        <div className={styles.headingRow}>
+          <h2 id="file-history-heading">File History</h2>
+          <button type="button" onClick={onReturnToResult}>Return to Selected Result</button>
+        </div>
         <p title={history.status === "idle" ? undefined : history.path}>
           {history.status === "idle" ? "Select a file to inspect its history." : history.path}
         </p>

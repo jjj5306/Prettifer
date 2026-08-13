@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   currentPanel,
   currentRegion,
+  regionNeedsFile,
   regionNeedsResult,
 } from "../../../../src/desktop/renderer/navigation/workbench-region.js";
 
@@ -20,6 +21,14 @@ describe("regionNeedsResult", () => {
   });
 });
 
+describe("regionNeedsFile", () => {
+  it("requires a selected changed file only for File History", () => {
+    expect(regionNeedsFile("fileHistory")).toBe(true);
+    expect(regionNeedsFile("repository")).toBe(false);
+    expect(regionNeedsFile("rules")).toBe(false);
+  });
+});
+
 describe("currentRegion", () => {
   it("keeps the active region while a result exists", () => {
     expect(currentRegion("diff", true)).toBe("diff");
@@ -31,7 +40,7 @@ describe("currentRegion", () => {
     expect(currentRegion("files", false)).toBe("history");
     expect(currentRegion("rules", false)).toBe("history");
     expect(currentRegion("diff", false)).toBe("history");
-    expect(currentRegion("fileHistory", true, false)).toBe("history");
+    expect(currentRegion("fileHistory", false, false)).toBe("history");
   });
 
   it("leaves a region that does not need a result alone", () => {
@@ -42,7 +51,7 @@ describe("currentRegion", () => {
 describe("currentPanel", () => {
   it("sends the group rules region to the changed file panel", () => {
     expect(currentPanel("rules", true)).toBe("files");
-    expect(currentPanel("fileHistory", true, true)).toBe("files");
+    expect(currentPanel("fileHistory", true, true)).toBe("fileHistory");
   });
 
   it("marks the panel of every other region directly", () => {

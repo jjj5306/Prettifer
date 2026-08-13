@@ -40,18 +40,25 @@ interface DesktopWorkspaceProps {
   readonly controller: AppController;
 }
 
+type FileHistoryStage = "history" | "change";
+
 export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
   const selectedFile = selectSelectedFile(controller.state);
   const repositorySession = selectRepositorySession(controller.state.repository);
   const [activeRegion, setActiveRegion] = useState<WorkbenchRegion>("repository");
+  const [fileHistoryStage, setFileHistoryStage] = useState<FileHistoryStage>("history");
   const resultAvailable = controller.state.composition.status === "ready";
+  const fileSelected = controller.state.selectedFilePath !== null;
   /*
    * The panel the rail points at, marked so a mouse user sees where the rail
    * took them. The rail decides the same thing for its own current item, so both
    * read it from one place and cannot disagree.
    */
-  const fileSelected = controller.state.selectedFilePath !== null;
-  const markedPanel = currentPanel(activeRegion, resultAvailable, fileSelected);
+  const markedPanel = currentPanel(
+    activeRegion,
+    resultAvailable,
+    fileSelected,
+  );
   const changedFileView = useChangedFileView(
     controller.state.selectedFilePath,
     controller.state.groupingRules,
@@ -73,6 +80,8 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
       changedFileView.openRuleEditor();
     }
     if (region === "fileHistory") {
+      controller.closeFileCommit();
+      setFileHistoryStage("history");
       void controller.loadFileHistory();
     }
     setActiveRegion(region);
@@ -127,91 +136,122 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
               onClearSelection={controller.clearCommitSelection}
             />
             <div className={styles.reviewArea}>
-              {controller.state.range.status === "ready" ? (
-                <CompositeResultHeader
-                  composition={controller.state.composition}
-                  range={controller.state.range.range}
-                  selectedCount={controller.state.selectedCommitIds.length}
-                  pendingMainlineParents={selectPendingMainlineParents(controller.state)}
-                  onCompose={controller.composeSelection}
-                  onCancel={controller.cancelComposition}
-                  onSelectFile={controller.selectFile}
-                />
-              ) : (
-                <section className={styles.placeholder} aria-labelledby="result-placeholder-heading">
-                  <h2 id="result-placeholder-heading">Selected Result</h2>
-                  <p>Load a comparison range to build a selected result.</p>
-                </section>
-              )}
-              {controller.state.composition.status === "ready" ? (
-                <div
-                  ref={resultGridRef}
-                  className={styles.resultGrid}
-                  style={changedFilesColumn(changedFilesWidth.width)}
-                >
-                  {activeRegion === "fileHistory" ? (
+              {activeRegion === "fileHistory" && resultAvailable && fileSelected ? (
+                <div className={styles.fileHistoryStage}>
+                  {fileHistoryStage === "history" ? (
                     <FileHistoryPane
-                      isCurrentRegion={markedPanel === "files"}
+                      isCurrentRegion={markedPanel === "fileHistory"}
                       history={controller.state.fileHistory}
                       selectedCommits={controller.state.selectedCommitIds}
                       result={controller.state.composition.result}
                       onFocusCommit={controller.focusFileHistoryCommit}
                       onOpenCommit={(commitId, path) => {
+                        setFileHistoryStage("change");
                         void controller.openFileCommit(commitId, path);
                       }}
                       onLoadMore={() => { void controller.loadMoreFileHistory(); }}
-                      onReturnToComposite={controller.closeFileCommit}
-                    />
-                  ) : (
-                    <ChangedFilePane
-                      isCurrentRegion={markedPanel === "files"}
-                      result={controller.state.composition.result}
-                      selectedFilePath={controller.state.selectedFilePath}
-                      repositoryPath={repositorySession?.rootPath ?? ""}
-                      groupingRules={controller.state.groupingRules}
-                      baseTree={controller.state.baseTree}
-                      control={changedFileView}
-                      onSelectFile={controller.selectFile}
-                      onChangeRules={(rules) => {
-                        void controller.saveGroupingRules(rules);
+                      onReturnToResult={() => {
+                        controller.closeFileCommit();
+                        setFileHistoryStage("history");
+                        setActiveRegion("files");
                       }}
                     />
-                  )}
-                  <PaneSplitter
-                    label="Resize Changed Files"
-                    controls="changed-files"
-                    pane={changedFilesWidth}
-                  />
-                  <div className={styles.reviewColumn}>
+                  ) : (
                     <DiffErrorBoundary onRecover={() => undefined}>
                       <DiffPane
-                        isCurrentRegion={markedPanel === "diff"}
+                        isCurrentRegion={markedPanel === "fileHistory"}
                         identity={{
                           repositorySessionId: repositorySession?.repositorySessionId
                             ?? "expired-session",
-                          requestId: controller.state.composition.requestId,
+                          requestId: controller.state.fileCommit.status === "idle"
+                            ? "file-history"
+                            : controller.state.fileCommit.requestId,
                         }}
-                        file={selectedFile}
-                        problem={selectSelectedProblemFile(controller.state)}
-                        externalFile={controller.state.externalFile}
-                        reveal={controller.state.reveal}
+                        file={null}
                         fileCommit={controller.state.fileCommit}
-                        onCloseFileCommit={controller.closeFileCommit}
-                        onSymbol={(symbol, mode, usage) => {
-                          void controller.lookUpSymbol(symbol, mode, usage);
+                        onCloseFileCommit={() => {
+                          controller.closeFileCommit();
+                          setFileHistoryStage("history");
                         }}
+                        closeFileCommitLabel="Back to File History"
                       />
                     </DiffErrorBoundary>
-                    <SymbolPanel
-                      lookup={controller.state.symbolLookup}
-                      canGoBack={controller.state.navigationHistory.length > 0}
-                      onGoToHit={controller.goToHit}
-                      onDismiss={controller.dismissSymbolLookup}
-                      onGoBack={controller.goBack}
-                    />
-                  </div>
+                  )}
                 </div>
-              ) : null}
+              ) : (
+                <>
+                  {controller.state.range.status === "ready" ? (
+                    <CompositeResultHeader
+                      composition={controller.state.composition}
+                      range={controller.state.range.range}
+                      selectedCount={controller.state.selectedCommitIds.length}
+                      pendingMainlineParents={selectPendingMainlineParents(controller.state)}
+                      onCompose={controller.composeSelection}
+                      onCancel={controller.cancelComposition}
+                      onSelectFile={controller.selectFile}
+                    />
+                  ) : (
+                    <section className={styles.placeholder} aria-labelledby="result-placeholder-heading">
+                      <h2 id="result-placeholder-heading">Selected Result</h2>
+                      <p>Load a comparison range to build a selected result.</p>
+                    </section>
+                  )}
+                  {controller.state.composition.status === "ready" ? (
+                    <div
+                      ref={resultGridRef}
+                      className={styles.resultGrid}
+                      style={changedFilesColumn(changedFilesWidth.width)}
+                    >
+                      <ChangedFilePane
+                        isCurrentRegion={markedPanel === "files"}
+                        result={controller.state.composition.result}
+                        selectedFilePath={controller.state.selectedFilePath}
+                        repositoryPath={repositorySession?.rootPath ?? ""}
+                        groupingRules={controller.state.groupingRules}
+                        baseTree={controller.state.baseTree}
+                        control={changedFileView}
+                        onSelectFile={controller.selectFile}
+                        onChangeRules={(rules) => {
+                          void controller.saveGroupingRules(rules);
+                        }}
+                      />
+                      <PaneSplitter
+                        label="Resize Changed Files"
+                        controls="changed-files"
+                        pane={changedFilesWidth}
+                      />
+                      <div className={styles.reviewColumn}>
+                        <DiffErrorBoundary onRecover={() => undefined}>
+                          <DiffPane
+                            isCurrentRegion={markedPanel === "diff"}
+                            identity={{
+                              repositorySessionId: repositorySession?.repositorySessionId
+                                ?? "expired-session",
+                              requestId: controller.state.composition.requestId,
+                            }}
+                            file={selectedFile}
+                            problem={selectSelectedProblemFile(controller.state)}
+                            externalFile={controller.state.externalFile}
+                            reveal={controller.state.reveal}
+                            fileCommit={controller.state.fileCommit}
+                            onCloseFileCommit={controller.closeFileCommit}
+                            onSymbol={(symbol, mode, usage) => {
+                              void controller.lookUpSymbol(symbol, mode, usage);
+                            }}
+                          />
+                        </DiffErrorBoundary>
+                        <SymbolPanel
+                          lookup={controller.state.symbolLookup}
+                          canGoBack={controller.state.navigationHistory.length > 0}
+                          onGoToHit={controller.goToHit}
+                          onDismiss={controller.dismissSymbolLookup}
+                          onGoBack={controller.goBack}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              )}
             </div>
           </div>
         </div>

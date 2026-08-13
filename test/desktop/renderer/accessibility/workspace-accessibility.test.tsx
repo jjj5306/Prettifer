@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { StrictMode } from "react";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -23,7 +23,7 @@ const baseCommit = "b".repeat(40);
 const headCommit = firstCommit.id;
 const commonCommit = "c".repeat(40);
 
-function createController(withResult = false): AppController {
+function createController(withResult = false, withSelectedFile = withResult): AppController {
   const result = {
     baseCommit: commonCommit,
     selectedCommits: [firstCommit.id],
@@ -75,7 +75,7 @@ function createController(withResult = false): AppController {
       composition: withResult
         ? { status: "ready", requestId: "composition-1", result }
         : { status: "idle" },
-      selectedFilePath: withResult ? "src/app.ts" : null,
+      selectedFilePath: withSelectedFile ? "src/app.ts" : null,
       fileHistory: { status: "idle" },
       fileCommit: { status: "idle" },
       symbolLookup: { status: "idle" },
@@ -122,7 +122,9 @@ describe("desktop workspace accessibility", () => {
     await user.tab();
     expect(screen.getByRole("button", { name: "Repository" })).toHaveFocus();
     await user.tab();
-    expect(screen.getByRole("button", { name: "Commit History" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "File History" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Group Rules" })).toHaveFocus();
     await user.tab();
     expect(screen.getByRole("button", { name: "Change Repository" })).toHaveFocus();
     await user.tab();
@@ -148,46 +150,50 @@ describe("desktop workspace accessibility", () => {
     ).toBeVisible();
   });
 
-  it("provides an activity rail for each available review region", async () => {
+  it("provides only the workbench entries that open a distinct view", async () => {
     const user = userEvent.setup();
-    render(<StrictMode><DesktopWorkspace controller={createController()} /></StrictMode>);
+    render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
 
     const rail = screen.getByRole("navigation", { name: "Workbench" });
     expect(within(rail).getByRole("button", { name: "Repository" })).toBeEnabled();
-    expect(within(rail).getByRole("button", { name: "Commit History" })).toBeEnabled();
-    expect(within(rail).getByRole("button", { name: "Changed Files" })).toBeDisabled();
-    expect(within(rail).getByRole("button", { name: "Diff Review" })).toBeDisabled();
+    expect(within(rail).getByRole("button", { name: "File History" })).toBeEnabled();
+    expect(within(rail).getByRole("button", { name: "Group Rules" })).toBeEnabled();
+    expect(within(rail).queryByRole("button", { name: "Commit History" })).toBeNull();
+    expect(within(rail).queryByRole("button", { name: "Changed Files" })).toBeNull();
+    expect(within(rail).queryByRole("button", { name: "Diff Review" })).toBeNull();
 
     const repository = within(rail).getByRole("button", { name: "Repository" });
-    const timeline = within(rail).getByRole("button", { name: "Commit History" });
+    const fileHistory = within(rail).getByRole("button", { name: "File History" });
     expect(repository).toHaveAttribute("aria-current", "page");
 
-    await user.click(timeline);
-    expect(screen.getByRole("region", { name: "Commit History" })).toHaveFocus();
-    expect(timeline).toHaveAttribute("aria-current", "page");
+    await user.click(fileHistory);
+    await waitFor(() => {
+      expect(screen.getByRole("region", { name: "File History" })).toHaveFocus();
+    });
+    expect(fileHistory).toHaveAttribute("aria-current", "page");
     expect(repository).not.toHaveAttribute("aria-current");
   });
 
-  it("does not mark a disabled review region as current while rebuilding", async () => {
+  it("disables File History when the selected result disappears", async () => {
     const user = userEvent.setup();
     const ready = createController(true);
     const { rerender } = render(
       <StrictMode><DesktopWorkspace controller={ready} /></StrictMode>,
     );
-    const files = screen.getByRole("button", { name: "Changed Files" });
+    const fileHistory = screen.getByRole("button", { name: "File History" });
 
-    await user.click(files);
-    expect(files).toHaveAttribute("aria-current", "page");
+    await user.click(fileHistory);
+    expect(fileHistory).toHaveAttribute("aria-current", "page");
 
     rerender(
       <StrictMode><DesktopWorkspace controller={createController()} /></StrictMode>,
     );
 
-    expect(screen.getByRole("button", { name: "Changed Files" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Changed Files" }))
+    expect(screen.getByRole("button", { name: "File History" }))
+      .toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("button", { name: "File History" }))
       .not.toHaveAttribute("aria-current");
-    expect(screen.getByRole("button", { name: "Commit History" }))
-      .toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("region", { name: "Commit History" })).toBeVisible();
   });
 
   it("continues keyboard order through calculation, files and accessible diff", async () => {
@@ -196,11 +202,8 @@ describe("desktop workspace accessibility", () => {
 
     const expected = [
       screen.getByRole("button", { name: "Repository" }),
-      screen.getByRole("button", { name: "Commit History" }),
-      screen.getByRole("button", { name: "Changed Files" }),
       screen.getByRole("button", { name: "File History" }),
       screen.getByRole("button", { name: "Group Rules" }),
-      screen.getByRole("button", { name: "Diff Review" }),
       screen.getByRole("button", { name: "Change Repository" }),
       screen.getByRole("combobox", { name: "Base branch" }),
       screen.getByRole("combobox", { name: "Working branch" }),
@@ -321,23 +324,24 @@ describe("desktop workspace accessibility", () => {
     })).toBeVisible();
   });
 
-  it("disables the group rule entry until a result exists", () => {
+  it("marks the group rule entry unavailable until a result exists", () => {
     render(<StrictMode><DesktopWorkspace controller={createController()} /></StrictMode>);
 
-    expect(screen.getByRole("button", { name: "Group Rules" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Group Rules" }))
+      .toHaveAttribute("aria-disabled", "true");
   });
   const currentRegionMarker = surface.currentRegion ?? "";
 
-  it("marks the region the rail points at when clicked with a mouse", async () => {
+  it("marks file history when opened from the rail with a mouse", async () => {
     const user = userEvent.setup();
     render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
     const history = screen.getByRole("region", { name: "Commit History" });
 
-    // The repository is current at startup, so the history is not marked yet.
     expect(history).not.toHaveClass(currentRegionMarker);
-    await user.click(screen.getByRole("button", { name: "Commit History" }));
+    await user.click(screen.getByRole("button", { name: "File History" }));
 
-    expect(history).toHaveClass(currentRegionMarker);
+    expect(screen.getByRole("region", { name: "File History" }))
+      .toHaveClass(currentRegionMarker);
     expect(screen.getByRole("region", { name: "Repository and comparison range" }))
       .not.toHaveClass(currentRegionMarker);
   });
@@ -346,22 +350,40 @@ describe("desktop workspace accessibility", () => {
     const user = userEvent.setup();
     render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
 
-    screen.getByRole("button", { name: "Commit History" }).focus();
+    screen.getByRole("button", { name: "File History" }).focus();
     await user.keyboard("{Enter}");
 
-    expect(screen.getByRole("region", { name: "Commit History" }))
+    expect(screen.getByRole("region", { name: "File History" }))
       .toHaveClass(currentRegionMarker);
   });
 
   it("keeps the marker after focus moves into another region", async () => {
     const user = userEvent.setup();
     render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
-    await user.click(screen.getByRole("button", { name: "Commit History" }));
+    await user.click(screen.getByRole("button", { name: "File History" }));
 
-    await user.click(screen.getByRole("button", { name: "Change Repository" }));
+    await user.click(screen.getByRole("combobox", { name: "Base branch" }));
 
-    expect(screen.getByRole("region", { name: "Commit History" }))
+    expect(screen.getByRole("region", { name: "File History" }))
       .toHaveClass(currentRegionMarker);
+  });
+
+  it("loads the selected changed file history without replacing the base tree", async () => {
+    const user = userEvent.setup();
+    const controller = createController(true);
+    render(<StrictMode><DesktopWorkspace controller={controller} /></StrictMode>);
+
+    await user.click(screen.getByRole("button", { name: "File History" }));
+
+    expect(controller.loadFileHistory).toHaveBeenCalledOnce();
+    expect(controller.loadBaseTree).not.toHaveBeenCalled();
+  });
+
+  it("keeps File History disabled until a changed file is selected", () => {
+    render(<StrictMode><DesktopWorkspace controller={createController(true, false)} /></StrictMode>);
+
+    expect(screen.getByRole("button", { name: "File History" }))
+      .toHaveAttribute("aria-disabled", "true");
   });
 
   it("marks the changed file region for the group rule entry", async () => {
@@ -374,19 +396,19 @@ describe("desktop workspace accessibility", () => {
       .toHaveClass(currentRegionMarker);
   });
 
-  it("moves the marker with the rail when the result goes away", async () => {
+  it("returns the marker to commit history when the selected result goes away", async () => {
     const user = userEvent.setup();
     const { rerender } = render(
       <StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>,
     );
-    await user.click(screen.getByRole("button", { name: "Changed Files" }));
-    expect(screen.getByRole("region", { name: "Changed Files" }))
+    await user.click(screen.getByRole("button", { name: "File History" }));
+    expect(screen.getByRole("region", { name: "File History" }))
       .toHaveClass(currentRegionMarker);
 
     rerender(<StrictMode><DesktopWorkspace controller={createController()} /></StrictMode>);
 
-    expect(screen.getByRole("button", { name: "Commit History" }))
-      .toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "File History" }))
+      .not.toHaveAttribute("aria-current");
     expect(screen.getByRole("region", { name: "Commit History" }))
       .toHaveClass(currentRegionMarker);
   });
@@ -395,10 +417,10 @@ describe("desktop workspace accessibility", () => {
     const user = userEvent.setup();
     render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
 
-    await user.click(screen.getByRole("button", { name: "Commit History" }));
+    await user.click(screen.getByRole("button", { name: "File History" }));
 
     // The rail already says where the user is; the region must not repeat it.
-    const history = screen.getByRole("region", { name: "Commit History" });
+    const history = screen.getByRole("region", { name: "File History" });
     expect(history).not.toHaveAttribute("aria-current");
     expect(history).not.toHaveAttribute("aria-selected");
   });

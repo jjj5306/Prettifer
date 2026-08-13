@@ -7,9 +7,9 @@ export type WorkbenchRegion =
   | "diff";
 
 /** The panel a rail item points at. Two items can share one panel. */
-export type WorkbenchPanel = "repository" | "history" | "files" | "diff";
+export type WorkbenchPanel = "repository" | "history" | "files" | "fileHistory" | "diff";
 
-/** Items below the history point at a selected result, which may not exist. */
+/** Review regions that point at a selected result, which may not exist. */
 export function regionNeedsResult(region: WorkbenchRegion): boolean {
   return region === "files" || region === "fileHistory" || region === "rules" || region === "diff";
 }
@@ -20,8 +20,8 @@ export function regionNeedsFile(region: WorkbenchRegion): boolean {
 
 /**
  * The region that is current right now. A result-only region falls back to the
- * history while no result exists, so the rail never marks an item the user
- * cannot use.
+ * history panel while no result exists. When that fallback has no rail entry,
+ * the workbench keeps its panel marker without marking an unavailable button.
  */
 export function currentRegion(
   activeRegion: WorkbenchRegion,
@@ -44,5 +44,5 @@ export function currentPanel(
   fileSelected: boolean = resultAvailable,
 ): WorkbenchPanel {
   const region = currentRegion(activeRegion, resultAvailable, fileSelected);
-  return region === "rules" || region === "fileHistory" ? "files" : region;
+  return region === "rules" ? "files" : region;
 }
