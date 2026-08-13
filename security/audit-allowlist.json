@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "advisory": "GHSA-jmr9-qjv8-65gv",
+    "package": "extract-zip",
+    "severity": "high",
+    "title": "extract-zip unvalidated symlink path traversal",
+    "reason": "No patched extract-zip release or stable Electron Forge upgrade path is available as of 2026-08-13.",
+    "notExploitableHere": "The dependency is reached through Electron Packager during trusted application builds and is not exposed to user-supplied archives at runtime.",
+    "resolvesWhen": "Remove this entry when stable Electron Forge uses a patched archive extraction dependency.",
+    "reviewBy": "2026-09-30"
+  }
+]
