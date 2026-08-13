@@ -984,6 +984,56 @@ describe("useAppController base tree", () => {
     expect(listBaseTree).toHaveBeenCalledOnce();
   });
 
+  it("reads the target branch tree separately for File History", async () => {
+    const listBaseTree = vi.fn().mockResolvedValue({
+      status: "success",
+      data: { paths: ["src/new-on-head.ts"], truncated: false },
+    });
+    const { controller } = await reviewing({ listBaseTree });
+
+    await act(() => controller.current.loadBaseTree("head"));
+
+    expect(listBaseTree).toHaveBeenCalledWith({
+      repositorySessionId: session.repositorySessionId,
+      sessionRevision: session.sessionRevision,
+      range,
+      revision: "head",
+    });
+    expect(controller.current.state.baseTree).toMatchObject({
+      status: "ready",
+      revision: "head",
+      paths: ["src/new-on-head.ts"],
+    });
+  });
+
+  it("loads history for an explicit repository file without selecting a result file", async () => {
+    const listFileHistory = vi.fn().mockResolvedValue({
+      status: "success",
+      data: {
+        rangeRevision: range.rangeRevision,
+        path: "src/config.ts",
+        entries: [],
+        nextOffset: null,
+        partial: null,
+      },
+    });
+    const { controller } = await reviewing({ listFileHistory });
+    const selectedBefore = controller.current.state.selectedFilePath;
+
+    await act(() => controller.current.loadFileHistory("src/config.ts"));
+
+    expect(listFileHistory).toHaveBeenCalledWith(expect.objectContaining({
+      path: "src/config.ts",
+      range,
+      offset: 0,
+    }));
+    expect(controller.current.state.fileHistory).toMatchObject({
+      status: "ready",
+      path: "src/config.ts",
+    });
+    expect(controller.current.state.selectedFilePath).toBe(selectedBefore);
+  });
+
   it("keeps the path list when the result is calculated again", async () => {
     const listBaseTree = vi.fn().mockResolvedValue({
       status: "success",

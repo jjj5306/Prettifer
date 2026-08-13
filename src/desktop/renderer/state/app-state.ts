@@ -186,15 +186,26 @@ export type GroupingRulesState =
  */
 export type BaseTreeState =
   | Readonly<{ status: "idle" }>
-  | Readonly<{ status: "loading"; requestId: string; rangeRevision: string }>
+  | Readonly<{
+      status: "loading";
+      requestId: string;
+      rangeRevision: string;
+      revision?: "base" | "head";
+    }>
   | Readonly<{
       status: "ready";
       rangeRevision: string;
+      revision?: "base" | "head";
       paths: readonly string[];
       /** True when the limit cut the list, so the screen can say so. */
       truncated: boolean;
     }>
-  | Readonly<{ status: "error"; rangeRevision: string; diagnostic: Diagnostic }>;
+  | Readonly<{
+      status: "error";
+      rangeRevision: string;
+      revision?: "base" | "head";
+      diagnostic: Diagnostic;
+    }>;
 
 export interface ReviewPosition {
   readonly path: string;
@@ -329,17 +340,24 @@ export type AppAction =
     }>
   | Readonly<{ type: "external/opened"; path: string; contents: string }>
   | Readonly<{ type: "external/failed"; path: string; diagnostic: Diagnostic }>
-  | Readonly<{ type: "baseTree/loading"; requestId: string; rangeRevision: string }>
+  | Readonly<{
+      type: "baseTree/loading";
+      requestId: string;
+      rangeRevision: string;
+      revision: "base" | "head";
+    }>
   | Readonly<{
       type: "baseTree/loaded";
       requestId: string;
       rangeRevision: string;
+      revision: "base" | "head";
       tree: BaseTreeDto;
     }>
   | Readonly<{
       type: "baseTree/failed";
       requestId: string;
       rangeRevision: string;
+      revision: "base" | "head";
       diagnostic: Diagnostic;
     }>
   | Readonly<{ type: "rules/loading"; requestId: string }>
@@ -600,6 +618,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
           status: "loading",
           requestId: action.requestId,
           rangeRevision: action.rangeRevision,
+          ...(action.revision === "base" ? {} : { revision: action.revision }),
         },
       };
     case "baseTree/loaded":
@@ -609,6 +628,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
             baseTree: {
               status: "ready",
               rangeRevision: action.rangeRevision,
+              ...(action.revision === "base" ? {} : { revision: action.revision }),
               paths: action.tree.paths,
               truncated: action.tree.truncated,
             },
@@ -621,6 +641,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
             baseTree: {
               status: "error",
               rangeRevision: action.rangeRevision,
+              ...(action.revision === "base" ? {} : { revision: action.revision }),
               diagnostic: action.diagnostic,
             },
           }

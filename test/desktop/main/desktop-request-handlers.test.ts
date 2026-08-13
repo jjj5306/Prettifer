@@ -486,6 +486,24 @@ describe("desktop request handlers", () => {
     );
   });
 
+  it("lists the comparison target paths for file history browsing", async () => {
+    const dependencies = createDependencies();
+    const handlers = createDesktopRequestHandlers(dependencies);
+
+    await handlers.listBaseTree(trustedEvent, {
+      repositorySessionId,
+      sessionRevision: 1,
+      range,
+      revision: "head",
+    });
+
+    expect(dependencies.baseTree.list).toHaveBeenCalledWith(
+      session.rootPath,
+      range.headCommit,
+      undefined,
+    );
+  });
+
   it("refuses to list a range that no longer matches the session", async () => {
     const dependencies = createDependencies();
     const handlers = createDesktopRequestHandlers(dependencies);

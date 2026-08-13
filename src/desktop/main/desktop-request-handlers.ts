@@ -325,8 +325,8 @@ async function readBaseFile(
 }
 
 /**
- * Lists the paths tracked at the comparison base, so the review can place a
- * change inside the project structure. Asked for once per range.
+ * Lists the paths tracked at either side of the comparison. The review uses
+ * the base tree, while file-history browsing uses the target tree.
  */
 async function listBaseTree(
   dependencies: DesktopRequestDependencies,
@@ -336,7 +336,7 @@ async function listBaseTree(
   assertRangeBelongsToSession(session, request.range);
   const listing = await dependencies.baseTree.list(
     session.rootPath,
-    request.range.baseCommit,
+    request.revision === "head" ? request.range.headCommit : request.range.baseCommit,
     dependencies.signal,
   );
   return {

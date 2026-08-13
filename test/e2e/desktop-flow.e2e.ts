@@ -109,11 +109,6 @@ test("opens a repository, selects non-contiguous commits and reviews file diff",
     name: /Currently viewing file: docs\/auth\.md/u,
   });
   await expect(selectedFile).toHaveAttribute("aria-pressed", "true");
-  await expect(running.page.getByRole("button", { name: "Changed Files" })).toBeEnabled();
-  await running.page.getByRole("button", { name: "Changed Files" }).click();
-  await expect(running.page.getByRole("region", { name: "Changed Files" })).toBeFocused();
-  await expect(running.page.getByRole("button", { name: "Changed Files" }))
-    .toHaveAttribute("aria-current", "page");
   const layout = await running.page.evaluate(() => {
     const rail = document.querySelector<HTMLElement>('nav[aria-label="Workbench"]');
     const appBar = document.querySelector<HTMLElement>("header");
@@ -719,53 +714,66 @@ test("switches the diff between side-by-side and inline without losing the place
   expect(fixture.git(["status", "--porcelain"])).toBe("");
 });
 
-test("reviews file history by keyboard and restores the selected-result position", async () => {
-  const fixture = await createSymbolE2eFixture();
+test("browses all files, file commits and a commit change without building a result", async () => {
+  const fixture = await createFixture();
   const running = await launch([fixture.path]);
   await setViewportSize(running.page, 1280, 900);
-  await openRepository(running.page, fixture.path, fixture.headRef);
+  await openRepository(running.page, fixture.path);
   await running.page.getByRole("button", { name: "Load Commit Range" }).click();
-  await running.page.getByRole("checkbox", {
-    name: "Include in selected result: feat(app): call UtVar from Caller",
-  }).check();
-  await running.page.getByRole("button", { name: "Build Selected Result" }).click();
-  await expect(running.page.getByRole("textbox", {
-    name: "Read-only diff: src/app/Caller.java · base and selected result",
-  })).toBeVisible();
-  await expect(running.page.getByText("Loading diff editor…")).toBeHidden();
-
-  const reviewed = running.page.locator(".monaco-diff-editor .modified");
-  await reviewed.locator(".view-lines").hover();
-  const topLine = reviewed.locator(".margin-view-overlays .line-numbers").first();
-  await expect.poll(async () => {
-    await running.page.mouse.wheel(0, 600);
-    return Number(await topLine.innerText());
-  }).toBeGreaterThan(10);
-  const originalTopLine = await topLine.innerText();
 
   const fileHistory = running.page.getByRole("button", { name: "File History" });
+  await expect(fileHistory).not.toHaveAttribute("aria-disabled");
   await fileHistory.focus();
   await fileHistory.press("Enter");
   await expect(fileHistory).toHaveAttribute("aria-current", "page");
+  await expect(running.page.getByRole("heading", { name: "Choose a File" })).toBeVisible();
+  await running.page.getByRole("button", { name: "src" }).click();
+  await running.page.getByRole("button", { name: "src/auth" }).click();
+  await running.page.getByRole("button", {
+    name: "View history: src/auth/credentials.ts",
+  }).click();
+
   const historyCommits = running.page
     .getByRole("list", { name: "File commits, oldest first" })
     .getByRole("button");
+  await expect(historyCommits).toHaveCount(1);
   await expect(historyCommits.first()).toBeFocused();
-  await running.page.keyboard.press("End");
-  await running.page.keyboard.press("Enter");
+  await setViewportSize(running.page, 720, 720);
+  await running.page.emulateMedia({ forcedColors: "active" });
+  const shortHistoryLayout = await historyCommits.first().evaluate((commit) => {
+    const list = commit.closest("ol");
+    if (list === null) {
+      throw new Error("File history list is missing");
+    }
+    const commitBox = commit.getBoundingClientRect();
+    const listBox = list.getBoundingClientRect();
+    return {
+      topOffset: Math.abs(commitBox.top - listBox.top),
+      commitHeight: commitBox.height,
+      listHeight: listBox.height,
+      pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    };
+  });
+  expect(shortHistoryLayout.topOffset).toBeLessThanOrEqual(2);
+  expect(shortHistoryLayout.commitHeight).toBeLessThan(160);
+  expect(shortHistoryLayout.listHeight).toBeLessThan(192);
+  expect(shortHistoryLayout.pageOverflow).toBeLessThanOrEqual(0);
+  await setViewportSize(running.page, 1280, 900);
+  await historyCommits.last().click();
   await expect(running.page.getByRole("heading", { name: "File History Change" })).toBeVisible();
   await expect(running.page.getByRole("textbox", {
-    name: /Read-only file history diff: src\/app\/Caller\.java/u,
+    name: /Read-only file history diff: src\/auth\/credentials\.ts/u,
   })).toBeVisible();
   await expect(running.page.getByText("Loading diff editor…")).toBeHidden();
 
-  await running.page.keyboard.press("Escape");
-  await expect(running.page.getByRole("textbox", {
-    name: "Read-only diff: src/app/Caller.java · base and selected result",
-  })).toBeVisible();
-  await expect(topLine).toHaveText(originalTopLine);
+  await running.page.getByRole("button", { name: "Back to File History" }).click();
+  await expect(running.page.getByRole("list", { name: "File commits, oldest first" }))
+    .toBeVisible();
+  await running.page.getByRole("button", { name: "Back to All Files" }).click();
+  await expect(running.page.getByRole("heading", { name: "Choose a File" })).toBeVisible();
+  await expect(running.page.getByText(/Result ready/u)).toHaveCount(0);
+
   await setViewportSize(running.page, 720, 720);
-  await running.page.emulateMedia({ forcedColors: "active" });
   await expect.poll(() => running.page.evaluate(() => {
     const historyPanel = document.getElementById("file-history");
     return document.documentElement.scrollWidth <= document.documentElement.clientWidth
@@ -1025,23 +1033,64 @@ test("opens the group rule editor from the activity rail", async () => {
   })).toBeVisible();
 });
 
-test("shows which region the activity rail moved to after a mouse click", async () => {
+test("explains every activity rail entry on hover and keyboard focus", async () => {
   const fixture = await createFixture();
   const running = await launch([fixture.path]);
-  await composeAuthResult(running.page, fixture.path);
+  const rail = running.page.getByRole("navigation", { name: "Workbench" });
+  const labels = [
+    "Repository",
+    "File History",
+    "Group Rules",
+  ] as const;
 
-  const history = running.page.getByRole("region", { name: "Commit History" });
-  const before = await borderColorOf(history);
-  // A plain click, which is the case that used to change nothing on screen.
-  await running.page.getByRole("button", { name: "Commit History" }).click();
+  await expect(rail.getByRole("button")).toHaveCount(3);
+  await expect(rail.getByRole("button", { name: "Commit History" })).toHaveCount(0);
+  await expect(rail.getByRole("button", { name: "Changed Files" })).toHaveCount(0);
+  await expect(rail.getByRole("button", { name: "Diff Review" })).toHaveCount(0);
 
-  await expect.poll(() => borderColorOf(history)).not.toBe(before);
-  await expect(running.page.getByRole("button", { name: "Commit History" }))
+  for (const label of labels) {
+    const button = rail.getByRole("button", { name: label, exact: true });
+    const tooltip = running.page.getByRole("tooltip").filter({ hasText: label });
+
+    await button.hover();
+    await expect(tooltip).toBeVisible();
+    const [railBox, tooltipBox] = await Promise.all([
+      rail.boundingBox(),
+      tooltip.boundingBox(),
+    ]);
+    expect(railBox).not.toBeNull();
+    expect(tooltipBox).not.toBeNull();
+    expect(tooltipBox?.x ?? 0).toBeGreaterThanOrEqual(
+      (railBox?.x ?? 0) + (railBox?.width ?? 0),
+    );
+
+    await button.focus();
+    await expect(tooltip).toBeVisible();
+  }
+
+  const fileHistory = rail.getByRole("button", { name: "File History", exact: true });
+  await expect(fileHistory).toHaveAttribute("aria-disabled", "true");
+  await fileHistory.focus();
+  const fileHistoryTooltip = running.page.locator("#activity-rail-fileHistory-tooltip");
+  await expect(fileHistoryTooltip).toContainText("Load a comparison range");
+  await expect(fileHistoryTooltip).toBeVisible();
+});
+
+test("opens file history from the second activity rail button", async () => {
+  const fixture = await createFixture();
+  const running = await launch([fixture.path]);
+  await openRepository(running.page, fixture.path);
+  await running.page.getByRole("button", { name: "Load Commit Range" }).click();
+
+  const rail = running.page.getByRole("navigation", { name: "Workbench" });
+  const buttons = rail.getByRole("button");
+  await expect(buttons.nth(1)).toHaveAccessibleName("File History");
+  await buttons.nth(1).click();
+
+  await expect(running.page.getByRole("region", { name: "File History" })).toBeFocused();
+  await expect(running.page.getByRole("heading", { name: "Choose a File" })).toBeVisible();
+  await expect(buttons.nth(1))
     .toHaveAttribute("aria-current", "page");
-
-  // Moving focus elsewhere leaves the marker where the rail points.
-  await running.page.getByRole("button", { name: "Change Repository" }).focus();
-  expect(await borderColorOf(history)).not.toBe(before);
 });
 
 test("shows the repository structure around a change and opens an unchanged file", async () => {
@@ -1232,11 +1281,6 @@ async function createInvalidRepositoryFixture(): Promise<string> {
   const path = await mkdtemp(join(tmpdir(), "prettifer-not-repository-"));
   fixtures.push({ dispose: () => rm(path, { force: true, recursive: true }) });
   return path;
-}
-
-/** Resolved border colour of a region, which carries the current-region marker. */
-async function borderColorOf(region: Locator): Promise<string> {
-  return region.evaluate((element) => getComputedStyle(element).borderTopColor);
 }
 
 async function createSettingsDirectory(): Promise<string> {

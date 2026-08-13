@@ -1,0 +1,17 @@
+.panel {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.heading {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.heading h2,
+.heading p {
+  margin: 0;
+}
+
+.heading p {
+  color: var(--color-muted);
+}

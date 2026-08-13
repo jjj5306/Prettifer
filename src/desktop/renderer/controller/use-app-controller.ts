@@ -39,7 +39,7 @@ export interface AppController {
   readonly chooseMainlineParent: (commitId: string, mainlineParent: number) => void;
   readonly cancelComposition: () => Promise<void>;
   readonly selectFile: (path: string) => void;
-  readonly loadFileHistory: () => Promise<void>;
+  readonly loadFileHistory: (path?: string) => Promise<void>;
   readonly loadMoreFileHistory: () => Promise<void>;
   readonly openFileCommit: (commitId: string, path: string) => Promise<void>;
   readonly closeFileCommit: () => void;
@@ -57,7 +57,7 @@ export interface AppController {
    * Reads the comparison base path list, once per range. Called when the review
    * first needs the whole repository structure.
    */
-  readonly loadBaseTree: () => Promise<void>;
+  readonly loadBaseTree: (revision?: "base" | "head") => Promise<void>;
   /** Replaces the grouping rules of the open repository and saves them. */
   readonly saveGroupingRules: (rules: readonly GroupRuleDto[]) => Promise<void>;
 }
@@ -216,9 +216,9 @@ export function useAppController(
     }
   };
 
-  const loadFileHistory = async (): Promise<void> => {
+  const loadFileHistory = async (explicitPath?: string): Promise<void> => {
     const session = selectRepositorySession(state.repository);
-    const path = state.selectedFilePath;
+    const path = explicitPath ?? state.selectedFilePath;
     if (session === null || path === null || state.range.status !== "ready") {
       return;
     }
@@ -415,7 +415,7 @@ export function useAppController(
    * read at most once per range. Asking again while an answer for the same range
    * exists or is on its way does nothing.
    */
-  const loadBaseTree = async (): Promise<void> => {
+  const loadBaseTree = async (revision: "base" | "head" = "base"): Promise<void> => {
     const session = selectRepositorySession(state.repository);
     if (session === null || state.range.status !== "ready") {
       return;
@@ -424,6 +424,7 @@ export function useAppController(
     if (
       state.baseTree.status !== "idle"
       && state.baseTree.rangeRevision === range.rangeRevision
+      && (state.baseTree.revision ?? "base") === revision
     ) {
       return;
     }
@@ -432,18 +433,21 @@ export function useAppController(
       type: "baseTree/loading",
       requestId,
       rangeRevision: range.rangeRevision,
+      revision,
     });
     try {
       const result = await api.listBaseTree({
         repositorySessionId: session.repositorySessionId,
         sessionRevision: session.sessionRevision,
         range,
+        ...(revision === "base" ? {} : { revision }),
       });
       if (result.status === "success") {
         dispatch({
           type: "baseTree/loaded",
           requestId,
           rangeRevision: range.rangeRevision,
+          revision,
           tree: result.data,
         });
       } else if (result.status === "error") {
@@ -451,6 +455,7 @@ export function useAppController(
           type: "baseTree/failed",
           requestId,
           rangeRevision: range.rangeRevision,
+          revision,
           diagnostic: result.diagnostic,
         });
       }
@@ -459,6 +464,7 @@ export function useAppController(
         type: "baseTree/failed",
         requestId,
         rangeRevision: range.rangeRevision,
+        revision,
         diagnostic: connectionDiagnostic(error),
       });
     }

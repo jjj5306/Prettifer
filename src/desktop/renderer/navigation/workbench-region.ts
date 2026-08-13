@@ -7,29 +7,29 @@ export type WorkbenchRegion =
   | "diff";
 
 /** The panel a rail item points at. Two items can share one panel. */
-export type WorkbenchPanel = "repository" | "history" | "files" | "diff";
+export type WorkbenchPanel = "repository" | "history" | "files" | "fileHistory" | "diff";
 
-/** Items below the history point at a selected result, which may not exist. */
+/** Review regions that point at a selected result, which may not exist. */
 export function regionNeedsResult(region: WorkbenchRegion): boolean {
-  return region === "files" || region === "fileHistory" || region === "rules" || region === "diff";
+  return region === "files" || region === "rules" || region === "diff";
 }
 
-export function regionNeedsFile(region: WorkbenchRegion): boolean {
+export function regionNeedsRange(region: WorkbenchRegion): boolean {
   return region === "fileHistory";
 }
 
 /**
  * The region that is current right now. A result-only region falls back to the
- * history while no result exists, so the rail never marks an item the user
- * cannot use.
+ * history panel while no result exists. When that fallback has no rail entry,
+ * the workbench keeps its panel marker without marking an unavailable button.
  */
 export function currentRegion(
   activeRegion: WorkbenchRegion,
   resultAvailable: boolean,
-  fileSelected: boolean = resultAvailable,
+  rangeAvailable: boolean = resultAvailable,
 ): WorkbenchRegion {
-  return (!resultAvailable && regionNeedsResult(activeRegion)) ||
-    (!fileSelected && regionNeedsFile(activeRegion))
+  return (!rangeAvailable && regionNeedsRange(activeRegion)) ||
+    (!resultAvailable && regionNeedsResult(activeRegion))
     ? "history"
     : activeRegion;
 }
@@ -41,8 +41,8 @@ export function currentRegion(
 export function currentPanel(
   activeRegion: WorkbenchRegion,
   resultAvailable: boolean,
-  fileSelected: boolean = resultAvailable,
+  rangeAvailable: boolean = resultAvailable,
 ): WorkbenchPanel {
-  const region = currentRegion(activeRegion, resultAvailable, fileSelected);
-  return region === "rules" || region === "fileHistory" ? "files" : region;
+  const region = currentRegion(activeRegion, resultAvailable, rangeAvailable);
+  return region === "rules" ? "files" : region;
 }

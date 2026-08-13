@@ -3,13 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   currentPanel,
   currentRegion,
+  regionNeedsRange,
   regionNeedsResult,
 } from "../../../../src/desktop/renderer/navigation/workbench-region.js";
 
 describe("regionNeedsResult", () => {
   it("marks the regions that only exist once a result does", () => {
     expect(regionNeedsResult("files")).toBe(true);
-    expect(regionNeedsResult("fileHistory")).toBe(true);
+    expect(regionNeedsResult("fileHistory")).toBe(false);
     expect(regionNeedsResult("rules")).toBe(true);
     expect(regionNeedsResult("diff")).toBe(true);
   });
@@ -17,6 +18,14 @@ describe("regionNeedsResult", () => {
   it("leaves the repository and history usable without a result", () => {
     expect(regionNeedsResult("repository")).toBe(false);
     expect(regionNeedsResult("history")).toBe(false);
+  });
+});
+
+describe("regionNeedsRange", () => {
+  it("requires a comparison range only for File History", () => {
+    expect(regionNeedsRange("fileHistory")).toBe(true);
+    expect(regionNeedsRange("repository")).toBe(false);
+    expect(regionNeedsRange("rules")).toBe(false);
   });
 });
 
@@ -31,7 +40,7 @@ describe("currentRegion", () => {
     expect(currentRegion("files", false)).toBe("history");
     expect(currentRegion("rules", false)).toBe("history");
     expect(currentRegion("diff", false)).toBe("history");
-    expect(currentRegion("fileHistory", true, false)).toBe("history");
+    expect(currentRegion("fileHistory", false, false)).toBe("history");
   });
 
   it("leaves a region that does not need a result alone", () => {
@@ -42,7 +51,7 @@ describe("currentRegion", () => {
 describe("currentPanel", () => {
   it("sends the group rules region to the changed file panel", () => {
     expect(currentPanel("rules", true)).toBe("files");
-    expect(currentPanel("fileHistory", true, true)).toBe("files");
+    expect(currentPanel("fileHistory", true, true)).toBe("fileHistory");
   });
 
   it("marks the panel of every other region directly", () => {

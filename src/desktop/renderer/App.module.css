@@ -195,6 +195,13 @@
   background: var(--color-border);
 }
 
+.fileHistoryStage {
+  display: grid;
+  grid-row: 1 / -1;
+  min-width: 0;
+  min-height: 0;
+}
+
 /*
  * The review and the symbol lookup share one column: the lookup is about the file
  * under review, and it takes only the height it needs.

@@ -1,6 +1,6 @@
 import {
   currentRegion,
-  regionNeedsFile,
+  regionNeedsRange,
   regionNeedsResult,
   type WorkbenchRegion,
 } from "./workbench-region.js";
@@ -8,53 +8,82 @@ import styles from "./ActivityRail.module.css";
 
 interface ActivityRailProps {
   readonly activeRegion: WorkbenchRegion;
+  readonly rangeAvailable: boolean;
   readonly resultAvailable: boolean;
-  readonly fileSelected?: boolean;
   readonly onActivate: (region: WorkbenchRegion) => void;
 }
 
 const items: readonly Readonly<{
   id: WorkbenchRegion;
   label: string;
+  description: string;
+  unavailableDescription?: string;
   targetId: string;
 }>[] = [
-  { id: "repository", label: "Repository", targetId: "repository-workspace" },
-  { id: "history", label: "Commit History", targetId: "commit-history" },
-  { id: "files", label: "Changed Files", targetId: "changed-files" },
-  { id: "fileHistory", label: "File History", targetId: "file-history" },
-  { id: "rules", label: "Group Rules", targetId: "changed-files" },
-  { id: "diff", label: "Diff Review", targetId: "diff-review" },
+  {
+    id: "repository",
+    label: "Repository",
+    description: "Choose the repository and comparison range.",
+    targetId: "repository-workspace",
+  },
+  {
+    id: "fileHistory",
+    label: "File History",
+    description: "Browse repository files and review each file's commit history.",
+    unavailableDescription: "Load a comparison range to browse file history.",
+    targetId: "file-history",
+  },
+  {
+    id: "rules",
+    label: "Group Rules",
+    description: "Edit the rules used to group changed files.",
+    unavailableDescription:
+      "Build a selected result to edit how its changed files are grouped.",
+    targetId: "changed-files",
+  },
 ];
 
 export const ActivityRail = ({
   activeRegion,
+  rangeAvailable,
   resultAvailable,
-  fileSelected = resultAvailable,
   onActivate,
 }: ActivityRailProps) => {
-  const marked = currentRegion(activeRegion, resultAvailable, fileSelected);
+  const marked = currentRegion(activeRegion, resultAvailable, rangeAvailable);
 
   return (
     <nav className={styles.rail} aria-label="Workbench">
       {items.map((item) => {
-        const disabled = (regionNeedsResult(item.id) && !resultAvailable) ||
-          (regionNeedsFile(item.id) && !fileSelected);
+        const disabled = (regionNeedsRange(item.id) && !rangeAvailable) ||
+          (regionNeedsResult(item.id) && !resultAvailable);
+        const description = disabled
+          ? item.unavailableDescription ?? item.description
+          : item.description;
+        const tooltipId = `activity-rail-${item.id}-tooltip`;
         return (
-          <button
-            key={item.id}
-            type="button"
-            title={item.label}
-            aria-label={item.label}
-            aria-current={item.id === marked ? "page" : undefined}
-            disabled={disabled}
-            className={item.id === marked ? styles.active : undefined}
-            onClick={() => {
-              onActivate(item.id);
-              focusRegion(item.targetId);
-            }}
-          >
-            <RailIcon region={item.id} />
-          </button>
+          <span key={item.id} className={styles.railItem}>
+            <button
+              type="button"
+              aria-label={item.label}
+              aria-describedby={tooltipId}
+              aria-current={item.id === marked ? "page" : undefined}
+              aria-disabled={disabled || undefined}
+              className={item.id === marked ? styles.active : undefined}
+              onClick={() => {
+                if (disabled) {
+                  return;
+                }
+                onActivate(item.id);
+                focusRegion(item.targetId);
+              }}
+            >
+              <RailIcon region={item.id} />
+            </button>
+            <span id={tooltipId} role="tooltip" className={styles.tooltip}>
+              <strong>{item.label}</strong>
+              <span>{description}</span>
+            </span>
+          </span>
         );
       })}
     </nav>
@@ -89,7 +118,7 @@ function iconPath(region: WorkbenchRegion): string {
     case "files":
       return "M5 4h5v5H5zM14 4h5v5h-5zM9 16h6M7.5 9v4h9V9M12 13v3";
     case "fileHistory":
-      return "M5 5h8M5 10h11M5 15h8M18 5v6l2 2M18 11l-2 2";
+      return "M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5M12 8v4l3 2";
     // Three rules, each with its own knob: the panel's own rule list, in small.
     case "rules":
       return "M4 6h6M14 6h6M4 12h10M18 12h2M4 18h4M12 18h8"

@@ -19,6 +19,7 @@ interface FullTreeViewProps {
   readonly selectedFilePath: string | null;
   readonly onSelectFile: (path: string) => void;
   readonly onToggleDirectory: (path: string) => void;
+  readonly mode?: "review" | "history";
 }
 
 /**
@@ -32,6 +33,7 @@ export const FullTreeView = ({
   selectedFilePath,
   onSelectFile,
   onToggleDirectory,
+  mode = "review",
 }: FullTreeViewProps) => {
   /*
    * The structure is built from every tracked path, which the limit puts in the
@@ -66,6 +68,7 @@ export const FullTreeView = ({
         selectedFilePath={selectedFilePath}
         onSelectFile={onSelectFile}
         onToggleDirectory={onToggleDirectory}
+        mode={mode}
       />
     </div>
   );
@@ -84,6 +87,7 @@ interface BaseTreeProps {
   readonly selectedFilePath: string | null;
   readonly onSelectFile: (path: string) => void;
   readonly onToggleDirectory: (path: string) => void;
+  readonly mode: "review" | "history";
 }
 
 const BaseTree = ({
@@ -92,6 +96,7 @@ const BaseTree = ({
   selectedFilePath,
   onSelectFile,
   onToggleDirectory,
+  mode,
 }: BaseTreeProps) => (
   <ul className={styles.tree}>
     {nodes.map((node) => (
@@ -103,6 +108,7 @@ const BaseTree = ({
             selectedFilePath={selectedFilePath}
             onSelectFile={onSelectFile}
             onToggleDirectory={onToggleDirectory}
+            mode={mode}
           />
         ) : node.entry === null ? (
           <UnchangedFileButton
@@ -110,6 +116,7 @@ const BaseTree = ({
             path={node.path}
             selectedFilePath={selectedFilePath}
             onSelectFile={onSelectFile}
+            mode={mode}
           />
         ) : (
           <FileButton
@@ -130,6 +137,7 @@ interface BaseDirectoryProps {
   readonly selectedFilePath: string | null;
   readonly onSelectFile: (path: string) => void;
   readonly onToggleDirectory: (path: string) => void;
+  readonly mode: "review" | "history";
 }
 
 const BaseDirectory = ({
@@ -138,6 +146,7 @@ const BaseDirectory = ({
   selectedFilePath,
   onSelectFile,
   onToggleDirectory,
+  mode,
 }: BaseDirectoryProps) => {
   const isExpanded = expandedDirectories.has(node.path);
 
@@ -147,9 +156,9 @@ const BaseDirectory = ({
         type="button"
         title={node.path}
         aria-expanded={isExpanded}
-        aria-label={
-          `${node.path}${node.hasChanges ? ", contains changes" : ", no changes"}`
-        }
+        aria-label={mode === "history"
+          ? node.path
+          : `${node.path}${node.hasChanges ? ", contains changes" : ", no changes"}`}
         className={node.hasChanges ? styles.changedDirectory : styles.directory}
         onClick={() => { onToggleDirectory(node.path); }}
       >
@@ -166,6 +175,7 @@ const BaseDirectory = ({
           selectedFilePath={selectedFilePath}
           onSelectFile={onSelectFile}
           onToggleDirectory={onToggleDirectory}
+          mode={mode}
         />
       ) : null}
     </>
@@ -181,11 +191,13 @@ const UnchangedFileButton = ({
   path,
   selectedFilePath,
   onSelectFile,
+  mode,
 }: Readonly<{
   name: string;
   path: string;
   selectedFilePath: string | null;
   onSelectFile: (path: string) => void;
+  mode: "review" | "history";
 }>) => {
   const isSelected = path === selectedFilePath;
 
@@ -194,9 +206,9 @@ const UnchangedFileButton = ({
       type="button"
       title={path}
       aria-pressed={isSelected}
-      aria-label={
-        `${isSelected ? "Currently viewing" : "View"} file: ${path} (Unchanged)`
-      }
+      aria-label={mode === "history"
+        ? `${isSelected ? "Currently viewing history" : "View history"}: ${path}`
+        : `${isSelected ? "Currently viewing" : "View"} file: ${path} (Unchanged)`}
       className={isSelected ? styles.selectedFile : styles.file}
       onClick={() => { onSelectFile(path); }}
     >
