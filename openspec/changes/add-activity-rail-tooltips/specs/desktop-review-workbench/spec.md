@@ -16,17 +16,12 @@
 - **THEN** activity rail은 Commit History, Changed Files와 Diff Review 항목을 표시하지 않는다
 - **THEN** Commit History, Changed Files와 Diff Review 화면 자체는 기존 작업대에 계속 표시된다
 
-#### Scenario: 전체 파일에서 파일 이력 탐색 시작
-- **WHEN** 사용자가 비교 범위를 로드하고 activity rail의 두 번째 File History 항목을 실행한다
-- **THEN** 검토 영역 전체가 비교 대상 브랜치의 파일 트리를 표시한다
-- **THEN** 선택 결과를 계산하거나 Changed Files에서 파일을 먼저 선택할 필요가 없다
-- **THEN** 기존 통합 대상 선택, 선택 파일과 현재 diff는 변경되지 않는다
-
-#### Scenario: 전체 파일에서 파일 선택
-- **WHEN** 사용자가 File History의 전체 파일 트리에서 파일을 선택한다
+#### Scenario: 선택한 변경 파일의 이력 탐색 시작
+- **WHEN** 사용자가 비교 범위의 선택 결과를 빌드하고 Changed Files에서 파일을 선택한 뒤 activity rail의 두 번째 File History 항목을 실행한다
 - **THEN** 검토 영역 전체가 선택 파일의 커밋 이력을 표시한다
 - **THEN** 이력이 한 건이어도 항목은 콘텐츠 높이로 상단에 표시된다
-- **THEN** 사용자는 전체 파일 트리로 돌아갈 수 있다
+- **THEN** 기존 통합 대상 선택, 선택 파일과 현재 diff는 변경되지 않는다
+- **THEN** 사용자는 선택 결과로 돌아갈 수 있다
 
 #### Scenario: 파일 이력에서 변경 내용 선택
 - **WHEN** 사용자가 파일 커밋 이력에서 커밋을 선택한다
@@ -45,8 +40,8 @@
 - **THEN** 보조 기술은 버튼의 이름과 동작 설명을 함께 확인할 수 있다
 
 #### Scenario: 사용할 수 없는 항목의 조건 확인
-- **WHEN** 비교 범위가 없어 File History를 사용할 수 없거나 통합 결과가 없어 Group Rules를 사용할 수 없다
-- **THEN** 사용자는 마우스 호버 또는 키보드 포커스로 필요한 비교 범위나 결과 조건을 확인할 수 있다
+- **WHEN** 선택 결과 또는 선택 파일이 없어 File History를 사용할 수 없거나 통합 결과가 없어 Group Rules를 사용할 수 없다
+- **THEN** 사용자는 마우스 호버 또는 키보드 포커스로 필요한 선택 결과나 파일 조건을 확인할 수 있다
 - **THEN** 해당 항목을 실행해도 현재 영역과 포커스 대상은 변경되지 않는다
 
 #### Scenario: 그룹 규칙 편집으로 이동
@@ -68,8 +63,9 @@
 - **THEN** 앱 바, 저장소 도구 모음과 검토 영역은 activity rail의 오른쪽에 표시된다
 
 #### Scenario: 진입점별 선행 조건
-- **WHEN** 비교 범위 또는 선택 결과가 아직 만들어지지 않았다
-- **THEN** 비교 범위가 없는 File History와 선택 결과가 없는 Group Rules는 각각 사용할 수 없는 상태로 표시된다
-- **THEN** 비교 범위가 있으면 선택 결과와 선택 파일이 없어도 File History를 사용할 수 있다
+- **WHEN** 선택 결과가 아직 만들어지지 않았거나 Changed Files에서 파일을 선택하지 않았다
+- **THEN** File History는 사용할 수 없는 상태로 표시된다
+- **THEN** 선택 결과가 준비되고 변경 파일이 선택되면 File History를 사용할 수 있다
+- **THEN** 선택 결과가 없는 Group Rules는 사용할 수 없는 상태로 표시된다
 - **THEN** Repository 항목은 계속 사용할 수 있다
 - **THEN** 사용할 수 없는 항목은 현재 메뉴로 표시되지 않는다

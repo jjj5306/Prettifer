@@ -8,7 +8,6 @@ import { ChangedFilePane } from "./files/ChangedFilePane.js";
 import { changedPathsOf } from "./files/full-tree.js";
 import { useChangedFileView } from "./files/use-changed-file-view.js";
 import { CommitHistoryPane } from "./history/CommitHistoryPane.js";
-import { FileHistoryFilePane } from "./history/FileHistoryFilePane.js";
 import { FileHistoryPane } from "./history/FileHistoryPane.js";
 import { ActivityRail } from "./navigation/ActivityRail.js";
 import {
@@ -41,15 +40,15 @@ interface DesktopWorkspaceProps {
   readonly controller: AppController;
 }
 
-type FileHistoryStage = "files" | "history" | "change";
+type FileHistoryStage = "history" | "change";
 
 export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
   const selectedFile = selectSelectedFile(controller.state);
   const repositorySession = selectRepositorySession(controller.state.repository);
   const [activeRegion, setActiveRegion] = useState<WorkbenchRegion>("repository");
-  const [fileHistoryStage, setFileHistoryStage] = useState<FileHistoryStage>("files");
-  const rangeAvailable = controller.state.range.status === "ready";
+  const [fileHistoryStage, setFileHistoryStage] = useState<FileHistoryStage>("history");
   const resultAvailable = controller.state.composition.status === "ready";
+  const fileSelected = controller.state.selectedFilePath !== null;
   /*
    * The panel the rail points at, marked so a mouse user sees where the rail
    * took them. The rail decides the same thing for its own current item, so both
@@ -58,7 +57,7 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
   const markedPanel = currentPanel(
     activeRegion,
     resultAvailable,
-    rangeAvailable,
+    fileSelected,
   );
   const changedFileView = useChangedFileView(
     controller.state.selectedFilePath,
@@ -82,37 +81,11 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
     }
     if (region === "fileHistory") {
       controller.closeFileCommit();
-      setFileHistoryStage("files");
-      void controller.loadBaseTree("head");
-    } else if (resultAvailable) {
-      // File History uses the target tree; restore the comparison-base tree
-      // before showing the selected-result review again.
-      void controller.loadBaseTree("base");
+      setFileHistoryStage("history");
+      void controller.loadFileHistory();
     }
     setActiveRegion(region);
   };
-  const handleOpenRepository = (): void => {
-    controller.closeFileCommit();
-    setFileHistoryStage("files");
-    setActiveRegion("repository");
-    void controller.openRepository();
-  };
-  const handleLoadRange = (baseRef: string, headRef: string): Promise<void> => {
-    controller.closeFileCommit();
-    setFileHistoryStage("files");
-    if (activeRegion === "fileHistory") {
-      setActiveRegion("repository");
-    }
-    return controller.loadRange(baseRef, headRef);
-  };
-  const handleSelectHistoryFile = (path: string): void => {
-    controller.closeFileCommit();
-    setFileHistoryStage("history");
-    void controller.loadFileHistory(path);
-  };
-  const historyPath = controller.state.fileHistory.status === "idle"
-    ? null
-    : controller.state.fileHistory.path;
   const {
     containerRef: resultGridRef,
     control: changedFilesWidth,
@@ -121,8 +94,8 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
     <>
       <ActivityRail
         activeRegion={activeRegion}
-        rangeAvailable={rangeAvailable}
         resultAvailable={resultAvailable}
+        fileSelected={fileSelected}
         onActivate={handleActivateRegion}
       />
       <div className={styles.appContent}>
@@ -144,8 +117,8 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
           isCurrentRegion={markedPanel === "repository"}
           repository={controller.state.repository}
           range={controller.state.range}
-          onOpenRepository={handleOpenRepository}
-          onLoadRange={handleLoadRange}
+          onOpenRepository={controller.openRepository}
+          onLoadRange={controller.loadRange}
         />
         <div className={styles.workbench}>
           <div className={styles.workspaceGrid}>
@@ -163,30 +136,24 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
               onClearSelection={controller.clearCommitSelection}
             />
             <div className={styles.reviewArea}>
-              {activeRegion === "fileHistory" && rangeAvailable ? (
+              {activeRegion === "fileHistory" && resultAvailable && fileSelected ? (
                 <div className={styles.fileHistoryStage}>
-                  {fileHistoryStage === "files" ? (
-                    <FileHistoryFilePane
-                      isCurrentRegion={markedPanel === "fileHistory"}
-                      tree={controller.state.baseTree}
-                      selectedPath={historyPath}
-                      expandedDirectories={changedFileView.expandedBaseDirectories}
-                      onSelectFile={handleSelectHistoryFile}
-                      onToggleDirectory={changedFileView.toggleBaseDirectory}
-                    />
-                  ) : fileHistoryStage === "history" ? (
+                  {fileHistoryStage === "history" ? (
                     <FileHistoryPane
                       isCurrentRegion={markedPanel === "fileHistory"}
                       history={controller.state.fileHistory}
+                      selectedCommits={controller.state.selectedCommitIds}
+                      result={controller.state.composition.result}
                       onFocusCommit={controller.focusFileHistoryCommit}
                       onOpenCommit={(commitId, path) => {
                         setFileHistoryStage("change");
                         void controller.openFileCommit(commitId, path);
                       }}
                       onLoadMore={() => { void controller.loadMoreFileHistory(); }}
-                      onBackToFiles={() => {
+                      onReturnToResult={() => {
                         controller.closeFileCommit();
-                        setFileHistoryStage("files");
+                        setFileHistoryStage("history");
+                        setActiveRegion("files");
                       }}
                     />
                   ) : (

@@ -5,10 +5,10 @@ Activity Rail은 아이콘과 짧은 이름만 제공하고 현재 화면 안에
 ## What Changes
 
 - Activity Rail을 Repository, File History와 Group Rules 세 버튼으로 단순화한다.
-- 기존 Commit History 위치의 두 번째 버튼은 비교 대상 브랜치의 전체 파일에서 시작하는 File History 탐색기를 연다.
+- 기존 Commit History 위치의 두 번째 버튼은 Changed Files에서 선택한 파일의 File History를 연다.
 - Commit History, Changed Files와 Diff Review 전용 이동 버튼을 제거한다.
-- File History는 전체 파일 선택, 선택 파일의 커밋 이력, 선택 커밋의 변경 내용 순서로 전용 전체 폭 화면을 제공한다.
-- File History는 선택 결과 계산과 Changed Files의 파일 선택을 선행 조건으로 요구하지 않는다.
+- File History는 선택 파일의 커밋 이력과 선택 커밋의 변경 내용을 전용 전체 폭 화면으로 제공한다.
+- File History는 비교 범위의 선택 결과가 준비되고 Changed Files에서 파일이 선택된 때 사용할 수 있다.
 - 남은 Activity Rail 버튼에 화면에서 읽을 수 있는 이름과 동작 설명을 제공한다.
 - 마우스 호버와 키보드 포커스에서 같은 도움말을 표시한다.
 - 비활성 버튼의 도움말에는 필요한 선행 조건을 함께 안내한다.
@@ -29,6 +29,6 @@ Activity Rail은 아이콘과 짧은 이름만 제공하고 현재 화면 안에
 
 - GitHub 이슈 #96
 - Activity Rail renderer 컴포넌트와 File History 전용 탐색 화면
-- 비교 대상 브랜치의 파일 목록 조회 상태와 renderer controller
+- 선택 파일의 이력 조회 상태와 renderer controller
 - Activity Rail 단위·접근성 테스트와 Electron 사용자 흐름
 - 외부 API와 의존성 변경 없음

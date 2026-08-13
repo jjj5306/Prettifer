@@ -3,14 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   currentPanel,
   currentRegion,
-  regionNeedsRange,
+  regionNeedsFile,
   regionNeedsResult,
 } from "../../../../src/desktop/renderer/navigation/workbench-region.js";
 
 describe("regionNeedsResult", () => {
   it("marks the regions that only exist once a result does", () => {
     expect(regionNeedsResult("files")).toBe(true);
-    expect(regionNeedsResult("fileHistory")).toBe(false);
+    expect(regionNeedsResult("fileHistory")).toBe(true);
     expect(regionNeedsResult("rules")).toBe(true);
     expect(regionNeedsResult("diff")).toBe(true);
   });
@@ -21,11 +21,11 @@ describe("regionNeedsResult", () => {
   });
 });
 
-describe("regionNeedsRange", () => {
-  it("requires a comparison range only for File History", () => {
-    expect(regionNeedsRange("fileHistory")).toBe(true);
-    expect(regionNeedsRange("repository")).toBe(false);
-    expect(regionNeedsRange("rules")).toBe(false);
+describe("regionNeedsFile", () => {
+  it("requires a selected changed file only for File History", () => {
+    expect(regionNeedsFile("fileHistory")).toBe(true);
+    expect(regionNeedsFile("repository")).toBe(false);
+    expect(regionNeedsFile("rules")).toBe(false);
   });
 });
 

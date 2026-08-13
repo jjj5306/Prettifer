@@ -714,7 +714,7 @@ test("switches the diff between side-by-side and inline without losing the place
   expect(fixture.git(["status", "--porcelain"])).toBe("");
 });
 
-test("browses all files, file commits and a commit change without building a result", async () => {
+test("opens the selected changed file history and its commit change", async () => {
   const fixture = await createFixture();
   const running = await launch([fixture.path]);
   await setViewportSize(running.page, 1280, 900);
@@ -722,16 +722,21 @@ test("browses all files, file commits and a commit change without building a res
   await running.page.getByRole("button", { name: "Load Commit Range" }).click();
 
   const fileHistory = running.page.getByRole("button", { name: "File History" });
+  await expect(fileHistory).toHaveAttribute("aria-disabled", "true");
+  await running.page.getByRole("checkbox", {
+    name: "Include in selected result: refactor(auth): extract credential helpers",
+  }).check();
+  await running.page.getByRole("button", { name: "Build Selected Result" }).click();
+  await expect(running.page.getByText(/Result ready · \d+ changed files/u)).toBeVisible();
+  await running.page.getByRole("button", {
+    name: /file: src\/auth\/credentials\.ts/u,
+  }).click();
   await expect(fileHistory).not.toHaveAttribute("aria-disabled");
   await fileHistory.focus();
   await fileHistory.press("Enter");
   await expect(fileHistory).toHaveAttribute("aria-current", "page");
-  await expect(running.page.getByRole("heading", { name: "Choose a File" })).toBeVisible();
-  await running.page.getByRole("button", { name: "src" }).click();
-  await running.page.getByRole("button", { name: "src/auth" }).click();
-  await running.page.getByRole("button", {
-    name: "View history: src/auth/credentials.ts",
-  }).click();
+  await expect(running.page.getByRole("heading", { name: "File History" })).toBeVisible();
+  await expect(running.page.getByText("src/auth/credentials.ts", { exact: true })).toBeVisible();
 
   const historyCommits = running.page
     .getByRole("list", { name: "File commits, oldest first" })
@@ -769,17 +774,16 @@ test("browses all files, file commits and a commit change without building a res
   await running.page.getByRole("button", { name: "Back to File History" }).click();
   await expect(running.page.getByRole("list", { name: "File commits, oldest first" }))
     .toBeVisible();
-  await running.page.getByRole("button", { name: "Back to All Files" }).click();
-  await expect(running.page.getByRole("heading", { name: "Choose a File" })).toBeVisible();
-  await expect(running.page.getByText(/Result ready/u)).toHaveCount(0);
+  await running.page.getByRole("button", { name: "Return to Selected Result" }).click();
+  await expect(running.page.getByText(/Result ready/u)).toBeVisible();
+  await expect(running.page.getByRole("button", {
+    name: /Currently viewing file: src\/auth\/credentials\.ts/u,
+  })).toBeVisible();
 
   await setViewportSize(running.page, 720, 720);
-  await expect.poll(() => running.page.evaluate(() => {
-    const historyPanel = document.getElementById("file-history");
-    return document.documentElement.scrollWidth <= document.documentElement.clientWidth
-      && historyPanel !== null
-      && historyPanel.scrollWidth <= historyPanel.clientWidth;
-  })).toBe(true);
+  await expect.poll(() => running.page.evaluate(() =>
+    document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+  )).toBe(true);
   expect(fixture.git(["status", "--porcelain"])).toBe("");
 });
 
@@ -1072,7 +1076,7 @@ test("explains every activity rail entry on hover and keyboard focus", async () 
   await expect(fileHistory).toHaveAttribute("aria-disabled", "true");
   await fileHistory.focus();
   const fileHistoryTooltip = running.page.locator("#activity-rail-fileHistory-tooltip");
-  await expect(fileHistoryTooltip).toContainText("Load a comparison range");
+  await expect(fileHistoryTooltip).toContainText("Build a selected result");
   await expect(fileHistoryTooltip).toBeVisible();
 });
 
@@ -1081,6 +1085,14 @@ test("opens file history from the second activity rail button", async () => {
   const running = await launch([fixture.path]);
   await openRepository(running.page, fixture.path);
   await running.page.getByRole("button", { name: "Load Commit Range" }).click();
+  await running.page.getByRole("checkbox", {
+    name: "Include in selected result: refactor(auth): extract credential helpers",
+  }).check();
+  await running.page.getByRole("button", { name: "Build Selected Result" }).click();
+  await expect(running.page.getByText(/Result ready · \d+ changed files/u)).toBeVisible();
+  await running.page.getByRole("button", {
+    name: /file: src\/auth\/credentials\.ts/u,
+  }).click();
 
   const rail = running.page.getByRole("navigation", { name: "Workbench" });
   const buttons = rail.getByRole("button");
@@ -1088,7 +1100,7 @@ test("opens file history from the second activity rail button", async () => {
   await buttons.nth(1).click();
 
   await expect(running.page.getByRole("region", { name: "File History" })).toBeFocused();
-  await expect(running.page.getByRole("heading", { name: "Choose a File" })).toBeVisible();
+  await expect(running.page.getByRole("heading", { name: "File History" })).toBeVisible();
   await expect(buttons.nth(1))
     .toHaveAttribute("aria-current", "page");
 });

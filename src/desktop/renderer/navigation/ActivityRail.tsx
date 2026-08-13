@@ -1,6 +1,6 @@
 import {
   currentRegion,
-  regionNeedsRange,
+  regionNeedsFile,
   regionNeedsResult,
   type WorkbenchRegion,
 } from "./workbench-region.js";
@@ -8,8 +8,8 @@ import styles from "./ActivityRail.module.css";
 
 interface ActivityRailProps {
   readonly activeRegion: WorkbenchRegion;
-  readonly rangeAvailable: boolean;
   readonly resultAvailable: boolean;
+  readonly fileSelected: boolean;
   readonly onActivate: (region: WorkbenchRegion) => void;
 }
 
@@ -29,8 +29,8 @@ const items: readonly Readonly<{
   {
     id: "fileHistory",
     label: "File History",
-    description: "Browse repository files and review each file's commit history.",
-    unavailableDescription: "Load a comparison range to browse file history.",
+    description: "Review the selected changed file's commit history.",
+    unavailableDescription: "Build a selected result to browse file history.",
     targetId: "file-history",
   },
   {
@@ -45,19 +45,22 @@ const items: readonly Readonly<{
 
 export const ActivityRail = ({
   activeRegion,
-  rangeAvailable,
   resultAvailable,
+  fileSelected,
   onActivate,
 }: ActivityRailProps) => {
-  const marked = currentRegion(activeRegion, resultAvailable, rangeAvailable);
+  const marked = currentRegion(activeRegion, resultAvailable, fileSelected);
 
   return (
     <nav className={styles.rail} aria-label="Workbench">
       {items.map((item) => {
-        const disabled = (regionNeedsRange(item.id) && !rangeAvailable) ||
-          (regionNeedsResult(item.id) && !resultAvailable);
+        const missingResult = regionNeedsResult(item.id) && !resultAvailable;
+        const missingFile = regionNeedsFile(item.id) && !fileSelected;
+        const disabled = missingResult || missingFile;
         const description = disabled
-          ? item.unavailableDescription ?? item.description
+          ? missingResult
+            ? item.unavailableDescription ?? item.description
+            : "Select a changed file to browse its history."
           : item.description;
         const tooltipId = `activity-rail-${item.id}-tooltip`;
         return (

@@ -11,15 +11,15 @@ describe("ActivityRail", () => {
     render(
       <ActivityRail
         activeRegion="repository"
-        rangeAvailable
         resultAvailable
+        fileSelected
         onActivate={vi.fn()}
       />,
     );
 
     const descriptions = new Map([
       ["Repository", "Choose the repository and comparison range."],
-      ["File History", "Browse repository files and review each file's commit history."],
+      ["File History", "Review the selected changed file's commit history."],
       ["Group Rules", "Edit the rules used to group changed files."],
     ]);
 
@@ -44,8 +44,8 @@ describe("ActivityRail", () => {
     render(
       <ActivityRail
         activeRegion="history"
-        rangeAvailable={false}
         resultAvailable={false}
+        fileSelected={false}
         onActivate={onActivate}
       />,
     );
@@ -55,7 +55,7 @@ describe("ActivityRail", () => {
     expect(fileHistory).not.toBeDisabled();
     const descriptionId = fileHistory.getAttribute("aria-describedby");
     expect(document.getElementById(descriptionId ?? "")).toHaveTextContent(
-      "Load a comparison range to browse file history.",
+      "Build a selected result to browse file history.",
     );
 
     await user.click(fileHistory);
@@ -64,12 +64,12 @@ describe("ActivityRail", () => {
     expect(fileHistory).toHaveFocus();
   });
 
-  it("enables File History after a comparison range without a selected result", () => {
+  it("enables File History only after a result and changed file are selected", () => {
     const { rerender } = render(
       <ActivityRail
         activeRegion="history"
-        rangeAvailable={false}
         resultAvailable={false}
+        fileSelected={false}
         onActivate={vi.fn()}
       />,
     );
@@ -79,8 +79,24 @@ describe("ActivityRail", () => {
     rerender(
       <ActivityRail
         activeRegion="fileHistory"
-        rangeAvailable
-        resultAvailable={false}
+        resultAvailable
+        fileSelected={false}
+        onActivate={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "File History" }))
+      .toHaveAttribute("aria-disabled", "true");
+    const descriptionId = screen.getByRole("button", { name: "File History" })
+      .getAttribute("aria-describedby");
+    expect(document.getElementById(descriptionId ?? "")).toHaveTextContent(
+      "Select a changed file to browse its history.",
+    );
+
+    rerender(
+      <ActivityRail
+        activeRegion="fileHistory"
+        resultAvailable
+        fileSelected
         onActivate={vi.fn()}
       />,
     );
@@ -97,8 +113,8 @@ describe("ActivityRail", () => {
       <>
         <ActivityRail
           activeRegion="files"
-          rangeAvailable
           resultAvailable
+          fileSelected
           onActivate={onActivate}
         />
         <section id="file-history" tabIndex={-1}>History panel</section>

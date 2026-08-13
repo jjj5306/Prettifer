@@ -265,13 +265,11 @@ export const baseFileSchema = z.object({
 }).strict();
 
 /**
- * The paths tracked at one side of the comparison. Review defaults to the
- * comparison base; file-history browsing explicitly asks for the target.
+ * The paths tracked at the range's comparison base. Asked for once per range,
+ * when the review first shows the whole repository structure.
  */
 export const baseTreeRequestSchema = sessionIdentitySchema.extend({
   range: repositoryRangeSchema,
-  /** Which side supplies the repository file list. Defaults to the comparison base. */
-  revision: z.enum(["base", "head"]).optional(),
 }).strict();
 
 export const baseTreeSchema = z.object({

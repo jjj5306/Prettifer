@@ -11,10 +11,10 @@ export type WorkbenchPanel = "repository" | "history" | "files" | "fileHistory" 
 
 /** Review regions that point at a selected result, which may not exist. */
 export function regionNeedsResult(region: WorkbenchRegion): boolean {
-  return region === "files" || region === "rules" || region === "diff";
+  return region === "files" || region === "fileHistory" || region === "rules" || region === "diff";
 }
 
-export function regionNeedsRange(region: WorkbenchRegion): boolean {
+export function regionNeedsFile(region: WorkbenchRegion): boolean {
   return region === "fileHistory";
 }
 
@@ -26,10 +26,10 @@ export function regionNeedsRange(region: WorkbenchRegion): boolean {
 export function currentRegion(
   activeRegion: WorkbenchRegion,
   resultAvailable: boolean,
-  rangeAvailable: boolean = resultAvailable,
+  fileSelected: boolean = resultAvailable,
 ): WorkbenchRegion {
-  return (!rangeAvailable && regionNeedsRange(activeRegion)) ||
-    (!resultAvailable && regionNeedsResult(activeRegion))
+  return (!resultAvailable && regionNeedsResult(activeRegion)) ||
+    (!fileSelected && regionNeedsFile(activeRegion))
     ? "history"
     : activeRegion;
 }
@@ -41,8 +41,8 @@ export function currentRegion(
 export function currentPanel(
   activeRegion: WorkbenchRegion,
   resultAvailable: boolean,
-  rangeAvailable: boolean = resultAvailable,
+  fileSelected: boolean = resultAvailable,
 ): WorkbenchPanel {
-  const region = currentRegion(activeRegion, resultAvailable, rangeAvailable);
+  const region = currentRegion(activeRegion, resultAvailable, fileSelected);
   return region === "rules" ? "files" : region;
 }

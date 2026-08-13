@@ -23,7 +23,7 @@ const baseCommit = "b".repeat(40);
 const headCommit = firstCommit.id;
 const commonCommit = "c".repeat(40);
 
-function createController(withResult = false): AppController {
+function createController(withResult = false, withSelectedFile = withResult): AppController {
   const result = {
     baseCommit: commonCommit,
     selectedCommits: [firstCommit.id],
@@ -75,7 +75,7 @@ function createController(withResult = false): AppController {
       composition: withResult
         ? { status: "ready", requestId: "composition-1", result }
         : { status: "idle" },
-      selectedFilePath: withResult ? "src/app.ts" : null,
+      selectedFilePath: withSelectedFile ? "src/app.ts" : null,
       fileHistory: { status: "idle" },
       fileCommit: { status: "idle" },
       symbolLookup: { status: "idle" },
@@ -174,7 +174,7 @@ describe("desktop workspace accessibility", () => {
     expect(repository).not.toHaveAttribute("aria-current");
   });
 
-  it("keeps File History available when the selected result disappears", async () => {
+  it("disables File History when the selected result disappears", async () => {
     const user = userEvent.setup();
     const ready = createController(true);
     const { rerender } = render(
@@ -190,10 +190,10 @@ describe("desktop workspace accessibility", () => {
     );
 
     expect(screen.getByRole("button", { name: "File History" }))
-      .not.toHaveAttribute("aria-disabled");
+      .toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("button", { name: "File History" }))
-      .toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("region", { name: "File History" })).toBeVisible();
+      .not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("region", { name: "Commit History" })).toBeVisible();
   });
 
   it("continues keyboard order through calculation, files and accessible diff", async () => {
@@ -368,28 +368,22 @@ describe("desktop workspace accessibility", () => {
       .toHaveClass(currentRegionMarker);
   });
 
-  it("restores the comparison-base tree when leaving file history", async () => {
+  it("loads the selected changed file history without replacing the base tree", async () => {
     const user = userEvent.setup();
     const controller = createController(true);
     render(<StrictMode><DesktopWorkspace controller={controller} /></StrictMode>);
 
     await user.click(screen.getByRole("button", { name: "File History" }));
-    await user.click(screen.getByRole("button", { name: "Repository" }));
 
-    expect(controller.loadBaseTree).toHaveBeenNthCalledWith(1, "head");
-    expect(controller.loadBaseTree).toHaveBeenNthCalledWith(2, "base");
+    expect(controller.loadFileHistory).toHaveBeenCalledOnce();
+    expect(controller.loadBaseTree).not.toHaveBeenCalled();
   });
 
-  it("returns to the repository view when loading a new range from file history", async () => {
-    const user = userEvent.setup();
-    const controller = createController(true);
-    render(<StrictMode><DesktopWorkspace controller={controller} /></StrictMode>);
+  it("keeps File History disabled until a changed file is selected", () => {
+    render(<StrictMode><DesktopWorkspace controller={createController(true, false)} /></StrictMode>);
 
-    await user.click(screen.getByRole("button", { name: "File History" }));
-    await user.click(screen.getByRole("button", { name: "Load Commit Range" }));
-
-    expect(screen.getByRole("button", { name: "Repository" }))
-      .toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "File History" }))
+      .toHaveAttribute("aria-disabled", "true");
   });
 
   it("marks the changed file region for the group rule entry", async () => {
@@ -402,7 +396,7 @@ describe("desktop workspace accessibility", () => {
       .toHaveClass(currentRegionMarker);
   });
 
-  it("keeps file history active when the selected result goes away", async () => {
+  it("returns the marker to commit history when the selected result goes away", async () => {
     const user = userEvent.setup();
     const { rerender } = render(
       <StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>,
@@ -414,8 +408,8 @@ describe("desktop workspace accessibility", () => {
     rerender(<StrictMode><DesktopWorkspace controller={createController()} /></StrictMode>);
 
     expect(screen.getByRole("button", { name: "File History" }))
-      .toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("region", { name: "File History" }))
+      .not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("region", { name: "Commit History" }))
       .toHaveClass(currentRegionMarker);
   });
 

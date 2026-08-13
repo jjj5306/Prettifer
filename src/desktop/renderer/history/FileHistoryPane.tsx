@@ -14,7 +14,7 @@ interface FileHistoryPaneProps {
   readonly onFocusCommit: (commitId: string) => void;
   readonly onOpenCommit: (commitId: string, path: string) => void;
   readonly onLoadMore: () => void;
-  readonly onBackToFiles: () => void;
+  readonly onReturnToResult: () => void;
 }
 
 type CompositeProblem = CompositeDiffResultDto["problemFiles"][number];
@@ -29,7 +29,7 @@ export const FileHistoryPane = ({
   onFocusCommit,
   onOpenCommit,
   onLoadMore,
-  onBackToFiles,
+  onReturnToResult,
 }: FileHistoryPaneProps) => {
   const buttons = useRef(new Map<string, HTMLButtonElement>());
   const listRef = useRef<HTMLOListElement>(null);
@@ -94,14 +94,14 @@ export const FileHistoryPane = ({
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault();
-          onBackToFiles();
+          onReturnToResult();
         }
       }}
     >
       <header className={styles.heading}>
         <div className={styles.headingRow}>
           <h2 id="file-history-heading">File History</h2>
-          <button type="button" onClick={onBackToFiles}>Back to All Files</button>
+          <button type="button" onClick={onReturnToResult}>Return to Selected Result</button>
         </div>
         <p title={history.status === "idle" ? undefined : history.path}>
           {history.status === "idle" ? "Select a file to inspect its history." : history.path}

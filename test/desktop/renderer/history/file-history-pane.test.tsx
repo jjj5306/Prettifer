@@ -67,7 +67,7 @@ describe("FileHistoryPane", () => {
         onFocusCommit={vi.fn()}
         onOpenCommit={vi.fn()}
         onLoadMore={vi.fn()}
-        onBackToFiles={vi.fn()}
+        onReturnToResult={vi.fn()}
       />,
     );
 
@@ -85,7 +85,7 @@ describe("FileHistoryPane", () => {
     const user = userEvent.setup();
     const onFocusCommit = vi.fn();
     const onOpenCommit = vi.fn();
-    const onBackToFiles = vi.fn();
+    const onReturnToResult = vi.fn();
     render(
       <FileHistoryPane
         isCurrentRegion={false}
@@ -95,7 +95,7 @@ describe("FileHistoryPane", () => {
         onFocusCommit={onFocusCommit}
         onOpenCommit={onOpenCommit}
         onLoadMore={vi.fn()}
-        onBackToFiles={onBackToFiles}
+        onReturnToResult={onReturnToResult}
       />,
     );
 
@@ -105,7 +105,7 @@ describe("FileHistoryPane", () => {
 
     expect(onFocusCommit).toHaveBeenCalledWith(newer);
     expect(onOpenCommit).toHaveBeenCalledWith(newer, history.path);
-    expect(onBackToFiles).toHaveBeenCalledOnce();
+    expect(onReturnToResult).toHaveBeenCalledOnce();
   });
 
   it("restores the timeline scroll position after the panel is reopened", () => {
@@ -117,7 +117,7 @@ describe("FileHistoryPane", () => {
       onFocusCommit: vi.fn(),
       onOpenCommit: vi.fn(),
       onLoadMore: vi.fn(),
-      onBackToFiles: vi.fn(),
+      onReturnToResult: vi.fn(),
     } as const;
     const first = render(<FileHistoryPane {...props} />);
     const list = screen.getByRole("list", { name: "File commits, oldest first" });
@@ -129,9 +129,9 @@ describe("FileHistoryPane", () => {
     expect(screen.getByRole("list", { name: "File commits, oldest first" }).scrollTop).toBe(75);
   });
 
-  it("returns to the repository file list from the panel header", async () => {
+  it("returns to the selected result from the panel header", async () => {
     const user = userEvent.setup();
-    const onBackToFiles = vi.fn();
+    const onReturnToResult = vi.fn();
     render(
       <FileHistoryPane
         isCurrentRegion
@@ -141,12 +141,12 @@ describe("FileHistoryPane", () => {
         onFocusCommit={vi.fn()}
         onOpenCommit={vi.fn()}
         onLoadMore={vi.fn()}
-        onBackToFiles={onBackToFiles}
+        onReturnToResult={onReturnToResult}
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Back to All Files" }));
+    await user.click(screen.getByRole("button", { name: "Return to Selected Result" }));
 
-    expect(onBackToFiles).toHaveBeenCalledOnce();
+    expect(onReturnToResult).toHaveBeenCalledOnce();
   });
 });

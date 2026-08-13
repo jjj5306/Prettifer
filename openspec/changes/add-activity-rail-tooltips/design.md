@@ -10,8 +10,8 @@ UI 기본 문구는 영어를 유지해야 하고, renderer는 외부 툴팁 의
 
 - Activity Rail을 Repository, File History와 Group Rules 세 항목으로 축소
 - 기존 Commit History 위치의 두 번째 항목으로 File History 전환
-- 비교 범위만 로드된 상태에서 결과 계산과 무관하게 전체 파일부터 탐색
-- 전체 파일 → 파일 커밋 이력 → 커밋 변경 내용의 전용 전체 폭 단계 제공
+- 선택 결과와 Changed Files의 선택 파일을 기준으로 File History 진입
+- 파일 커밋 이력 → 커밋 변경 내용의 전용 전체 폭 단계 제공
 - 남은 항목에 이름, 동작과 필요한 선행 조건을 설명하는 일관된 도움말 제공
 - 마우스 호버와 키보드 포커스에서 같은 시각 도움말 제공
 - 도움말 문구를 각 버튼의 접근 가능한 설명으로 연결
@@ -27,13 +27,11 @@ UI 기본 문구는 영어를 유지해야 하고, renderer는 외부 툴팁 의
 
 ### 실제 화면 전환을 일으키는 세 진입점만 유지
 
-Activity Rail 항목은 Repository, File History, Group Rules 순서로 제공한다. Commit History, Changed Files와 Diff Review는 항상 보이는 작업대 영역이므로 레일에서 제거한다. File History는 기존 Commit History의 두 번째 위치와 시간 흐름 아이콘을 이어받아 사용자가 기대하는 이력 진입점에서 전체 파일 탐색을 시작하도록 한다.
+Activity Rail 항목은 Repository, File History, Group Rules 순서로 제공한다. Commit History, Changed Files와 Diff Review는 항상 보이는 작업대 영역이므로 레일에서 제거한다. File History는 기존 Commit History의 두 번째 위치와 시간 흐름 아이콘을 이어받아 Changed Files에서 선택한 파일의 이력을 열도록 한다.
 
-File History는 기존 Changed Files 열을 대체하지 않고 검토 영역 전체를 사용하는 별도 탐색 흐름으로 연다. 첫 단계는 비교 대상 브랜치의 전체 파일 트리, 두 번째 단계는 선택 파일의 커밋 이력, 세 번째 단계는 선택 커밋이 만든 파일 diff다. 각 하위 단계는 바로 이전 단계로 돌아가는 버튼을 제공한다.
+File History는 검토 영역 전체를 사용하는 별도 탐색 흐름으로 연다. 첫 단계는 선택 파일의 커밋 이력, 두 번째 단계는 선택 커밋이 만든 파일 diff다. 커밋 변경 내용은 파일 이력으로 돌아가고, 파일 이력은 선택 결과로 돌아가는 버튼을 제공한다.
 
-기존 선택 결과 계산과 `selectedFilePath`는 File History 탐색의 상태로 재사용하지 않는다. 파일 이력 조회 함수가 명시적인 경로를 받아 독립적으로 이력을 읽고, 선택 결과와 현재 diff는 보존한다. 이 방식은 File History를 열기 전에 결과를 만들고 Changed Files에서 파일을 고르게 하는 역방향 의존을 제거한다.
-
-전체 파일 목록은 비교 대상 브랜치의 `headCommit`에서 읽는다. 기존 Full Tree는 비교 기준점의 구조를 계속 사용하므로 파일 목록 요청에 `base` 또는 `head` 기준을 명시하고 renderer 상태에서도 어느 기준의 목록인지 구분한다. File History에서 선택 결과 화면으로 나갈 때는 비교 기준점의 트리를 다시 준비하며, 저장소나 비교 범위를 바꾸는 동작은 File History 단계를 초기화하고 Repository 영역으로 복귀시킨다.
+File History는 기존 `selectedFilePath`를 그대로 사용해 이력을 읽는다. 별도 파일 선택 상태나 전체 파일 트리 API를 추가하지 않으므로 Changed Files의 선택과 File History 대상이 어긋나지 않는다. 탐색 중에도 선택 결과와 현재 diff는 보존한다.
 
 ### 항목 메타데이터에서 이름과 설명을 함께 관리
 
@@ -60,7 +58,6 @@ native `disabled` 버튼은 키보드 포커스를 받을 수 없어 비활성 �
 ## Risks / Trade-offs
 
 - [비활성 항목도 Tab 순서에 포함됨] → 실행할 수 없는 이유를 키보드로 확인해야 하는 요구사항을 우선하고 세 개의 고정된 항목 순서를 테스트한다.
-- [대규모 저장소의 전체 파일 목록이 길 수 있음] → 기존 20,000개 제한과 잘림 안내를 재사용하고 디렉터리는 기본적으로 접힌 상태로 연다.
 - [짧은 이력이 남은 높이를 카드 하나가 차지할 수 있음] → 이력 목록은 자체 스크롤 영역을 가지되 항목은 콘텐츠 높이로 상단 정렬한다.
 - [도움말이 좁은 창에서 검토 내용을 덮을 수 있음] → Activity Rail 바로 오른쪽에 최대 너비를 제한하고 도움말 자체는 포인터 입력을 받지 않게 한다.
 - [CSS로 숨긴 설명의 보조 기술 해석 차이] → `aria-describedby`가 참조하는 요소를 DOM에 항상 유지하고 접근성 테스트에서 이름, 설명과 비활성 상태를 검증한다.
