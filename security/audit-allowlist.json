@@ -4,9 +4,9 @@
     "package": "extract-zip",
     "severity": "high",
     "title": "extract-zip unvalidated symlink path traversal",
-    "reason": "No patched extract-zip release or stable Electron Forge upgrade path is available as of 2026-08-13.",
+    "reason": "extract-zip has no patched release: 2.0.1 is the latest and the advisory covers <=2.0.1. The upstream fix is @electron/packager 20, which replaced extract-zip with @electron-internal/extract-zip, and stable Electron Forge 7.11.2 requires @electron/packager ^18.3.5.",
     "notExploitableHere": "The dependency is reached through Electron Packager during trusted application builds and is not exposed to user-supplied archives at runtime.",
-    "resolvesWhen": "Remove this entry when stable Electron Forge uses a patched archive extraction dependency.",
-    "reviewBy": "2026-09-30"
+    "resolvesWhen": "Remove this entry once Electron Forge 8 is released as stable, which requires @electron/packager ^20, and packaging plus the Electron end-to-end run pass on it. Forcing @electron/packager 20 under Forge 7 clears the advisory but breaks packaging, because Forge 7 passes callback-style afterFinalizePackageTargets hooks that packager 20 expects to return promises. Tracked in issue #103.",
+    "reviewBy": "2026-10-31"
   }
 ]
