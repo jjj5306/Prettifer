@@ -28,6 +28,7 @@ interface PaneProps {
   readonly repositoryPath?: string;
   readonly onSelectFile: (path: string) => void;
   readonly onChangeRules?: (rules: readonly GroupRuleDto[]) => void;
+  readonly onOpenFileHistory?: () => void;
 }
 
 /**
@@ -42,6 +43,7 @@ export const Pane = ({
   repositoryPath = REPOSITORY_PATH,
   onSelectFile,
   onChangeRules = () => undefined,
+  onOpenFileHistory = () => undefined,
 }: PaneProps) => {
   const control = useChangedFileView(selectedFilePath, groupingRules, {
     changedPaths: changedPathsOf(result),
@@ -57,6 +59,7 @@ export const Pane = ({
       control={control}
       onSelectFile={onSelectFile}
       onChangeRules={onChangeRules}
+      onOpenFileHistory={onOpenFileHistory}
     />
   );
 };

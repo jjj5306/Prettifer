@@ -628,4 +628,35 @@ describe("app reducer", () => {
     expect(closed.selectedCommitIds).toEqual(selected.selectedCommitIds);
     expect(closed.selectedFilePath).toBe(selected.selectedFilePath);
   });
+
+  it("closes the file history and the commit it opened in one step", () => {
+    const loading = appReducer(readyState(), {
+      type: "fileHistory/loading",
+      requestId: "history-1",
+      rangeRevision: range.rangeRevision,
+      path: "src/app.ts",
+    });
+    const opened = appReducer(loading, {
+      type: "fileCommit/loading",
+      requestId: "file-commit-1",
+      rangeRevision: range.rangeRevision,
+      path: "src/app.ts",
+      commitId: commits[0]!.id,
+    });
+
+    const closed = appReducer(opened, { type: "fileHistory/closed" });
+
+    // Leaving the history leaves the change it was showing too, so the review
+    // area cannot come back to a commit whose list is gone.
+    expect(closed.fileHistory).toEqual({ status: "idle" });
+    expect(closed.fileCommit).toEqual({ status: "idle" });
+    expect(closed.selectedFilePath).toBe(opened.selectedFilePath);
+    expect(closed.selectedCommitIds).toEqual(opened.selectedCommitIds);
+  });
+
+  it("leaves an already closed file history untouched", () => {
+    const state = readyState();
+
+    expect(appReducer(state, { type: "fileHistory/closed" })).toBe(state);
+  });
 });

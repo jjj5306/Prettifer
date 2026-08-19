@@ -77,6 +77,38 @@ describe("DiffPane", () => {
     expect(restoredAdapter.restoreViewState).toHaveBeenCalledWith(viewState);
   });
 
+  it("restores the editor state after the file history took the panel's place", async () => {
+    const viewState = { modified: { scrollTop: 512, lineNumber: 41, column: 2 } };
+    const leaving = {
+      show: vi.fn(),
+      saveViewState: vi.fn().mockReturnValue(viewState),
+      dispose: vi.fn(),
+    };
+    const returning = {
+      show: vi.fn(),
+      restoreViewState: vi.fn(),
+      dispose: vi.fn(),
+    };
+    const loadAdapter = vi.fn()
+      .mockResolvedValueOnce(leaving)
+      .mockResolvedValueOnce(returning);
+    const { unmount } = render(
+      <DiffPane isCurrentRegion={false} identity={identity} file={file} loadAdapter={loadAdapter} />,
+    );
+    await waitFor(() => { expect(leaving.show).toHaveBeenCalled(); });
+
+    // The history list replaces this panel entirely, so the position has to
+    // survive the panel itself going away.
+    unmount();
+    render(
+      <DiffPane isCurrentRegion={false} identity={identity} file={file} loadAdapter={loadAdapter} />,
+    );
+    await waitFor(() => { expect(returning.show).toHaveBeenCalled(); });
+
+    expect(leaving.saveViewState).toHaveBeenCalledOnce();
+    expect(returning.restoreViewState).toHaveBeenCalledWith(viewState);
+  });
+
   it("shows a file history commit in the same diff area and returns to the result", async () => {
     const user = userEvent.setup();
     const adapter = { show: vi.fn(), dispose: vi.fn() };
@@ -111,7 +143,7 @@ describe("DiffPane", () => {
     await waitFor(() => { expect(adapter.show).toHaveBeenCalled(); });
     expect(screen.getByRole("heading", { name: "File History Change" })).toBeVisible();
     expect(screen.getByRole("textbox")).toHaveAccessibleName(/commit ddddddd compared with parent 1/u);
-    await user.click(screen.getByRole("button", { name: "Return to Selected Result" }));
+    await user.click(screen.getByRole("button", { name: "Back to File History" }));
     expect(onCloseFileCommit).toHaveBeenCalledOnce();
   });
 

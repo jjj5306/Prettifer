@@ -1,118 +1,22 @@
 // @vitest-environment jsdom
 
 import { StrictMode } from "react";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { AppController } from "../../../../src/desktop/renderer/controller/use-app-controller.js";
 import { DesktopWorkspace } from "../../../../src/desktop/renderer/DesktopWorkspace.js";
 import surface from "../../../../src/desktop/renderer/PanelSurface.module.css";
 
-const firstCommit = {
-  id: "a".repeat(40),
-  shortId: "a".repeat(7),
-  parents: [{ id: "b".repeat(40), shortId: "b".repeat(7), title: null }],
-  title: "add desktop shell",
-  authorName: "Prettifer Test",
-  authoredAt: "2026-07-23T00:00:00.000Z",
-  isMerge: false,
-  selectable: true,
-};
-const baseCommit = "b".repeat(40);
-const headCommit = firstCommit.id;
-const commonCommit = "c".repeat(40);
-
-function createController(withResult = false, withSelectedFile = withResult): AppController {
-  const result = {
-    baseCommit: commonCommit,
-    selectedCommits: [firstCommit.id],
-    files: [
-      {
-        path: "src/app.ts",
-        status: "modified" as const,
-        beforeContent: "before",
-        afterContent: "after",
-      },
-    ],
-    mainlineParents: {},
-    problemFiles: [],
-    unifiedDiff: "diff",
-  };
-  return {
-    state: {
-      repository: {
-        status: "ready",
-        session: {
-          repositorySessionId: "00000000-0000-4000-8000-000000000001",
-          sessionRevision: 1,
-          rootPath: "C:\\work\\repo",
-          currentBranch: "feature/ui",
-          branches: [
-            { name: "main", commitId: baseCommit, isCurrent: false },
-            { name: "feature/ui", commitId: headCommit, isCurrent: true },
-          ],
-        },
-      },
-      range: {
-        status: "ready",
-        range: {
-          baseRef: "main",
-          baseRefCommit: baseCommit,
-          headRef: "feature/ui",
-          headCommit,
-          baseCommit: commonCommit,
-          rangeRevision: `${baseCommit}:${headCommit}:${commonCommit}`,
-        },
-        commits: [firstCommit],
-        nextOffset: null,
-        firstPageOffset: null,
-        pagination: { status: "idle" },
-      },
-      selectedCommitIds: withResult ? [firstCommit.id] : [],
-      mergeParents: {},
-      inspectedCommitId: null,
-      composition: withResult
-        ? { status: "ready", requestId: "composition-1", result }
-        : { status: "idle" },
-      selectedFilePath: withSelectedFile ? "src/app.ts" : null,
-      fileHistory: { status: "idle" },
-      fileCommit: { status: "idle" },
-      symbolLookup: { status: "idle" },
-      groupingRules: {
-        status: "ready",
-        rules: [{ prefix: "src", name: "Source" }],
-        saveDiagnostic: null,
-      },
-      baseTree: { status: "idle" },
-      externalFile: { status: "idle" },
-      reveal: null,
-      navigationHistory: [],
-    },
-    openRepository: vi.fn(),
-    loadRange: vi.fn(),
-    loadMoreCommits: vi.fn(),
-    toggleCommit: vi.fn(),
-    resetLoadedCommits: vi.fn(),
-    clearCommitSelection: vi.fn(),
-    inspectCommit: vi.fn(),
-    chooseMainlineParent: vi.fn(),
-    composeSelection: vi.fn(),
-    cancelComposition: vi.fn(),
-    selectFile: vi.fn(),
-    loadFileHistory: vi.fn().mockResolvedValue(undefined),
-    loadMoreFileHistory: vi.fn().mockResolvedValue(undefined),
-    openFileCommit: vi.fn().mockResolvedValue(undefined),
-    closeFileCommit: vi.fn(),
-    focusFileHistoryCommit: vi.fn(),
-    lookUpSymbol: vi.fn().mockResolvedValue(undefined),
-    goToHit: vi.fn(),
-    dismissSymbolLookup: vi.fn(),
-    goBack: vi.fn(),
-    loadBaseTree: vi.fn().mockResolvedValue(undefined),
-    saveGroupingRules: vi.fn().mockResolvedValue(undefined),
-  };
-}
+import {
+  baseCommit,
+  commonCommit,
+  createController,
+  firstCommit,
+  headCommit,
+  readyFileHistory,
+} from "../workspace-harness.js";
 
 describe("desktop workspace accessibility", () => {
   it("follows repository, branch and commit keyboard order", async () => {
@@ -122,9 +26,7 @@ describe("desktop workspace accessibility", () => {
     await user.tab();
     expect(screen.getByRole("button", { name: "Repository" })).toHaveFocus();
     await user.tab();
-    expect(screen.getByRole("button", { name: "File History" })).toHaveFocus();
-    await user.tab();
-    expect(screen.getByRole("button", { name: "Group Rules" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "About Prettifer" })).toHaveFocus();
     await user.tab();
     expect(screen.getByRole("button", { name: "Change Repository" })).toHaveFocus();
     await user.tab();
@@ -150,50 +52,38 @@ describe("desktop workspace accessibility", () => {
     ).toBeVisible();
   });
 
-  it("provides only the workbench entries that open a distinct view", async () => {
-    const user = userEvent.setup();
+  it("keeps the rail to entries no panel already offers", () => {
     render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
 
     const rail = screen.getByRole("navigation", { name: "Workbench" });
-    expect(within(rail).getByRole("button", { name: "Repository" })).toBeEnabled();
-    expect(within(rail).getByRole("button", { name: "File History" })).toBeEnabled();
-    expect(within(rail).getByRole("button", { name: "Group Rules" })).toBeEnabled();
-    expect(within(rail).queryByRole("button", { name: "Commit History" })).toBeNull();
-    expect(within(rail).queryByRole("button", { name: "Changed Files" })).toBeNull();
-    expect(within(rail).queryByRole("button", { name: "Diff Review" })).toBeNull();
+    expect(within(rail).getByRole("button", { name: "Repository" }))
+      .toHaveAttribute("aria-current", "page");
+    expect(within(rail).getByRole("button", { name: "About Prettifer" })).toBeEnabled();
+    for (const label of ["File History", "Group Rules", "Commit History", "Changed Files", "Diff Review"]) {
+      expect(within(rail).queryByRole("button", { name: label })).toBeNull();
+    }
+    // File history moved to the header of the panel the file is picked in.
+    expect(within(screen.getByRole("region", { name: "Changed Files" }))
+      .getByRole("button", { name: "File History" })).toBeEnabled();
+  });
 
-    const repository = within(rail).getByRole("button", { name: "Repository" });
-    const fileHistory = within(rail).getByRole("button", { name: "File History" });
-    expect(repository).toHaveAttribute("aria-current", "page");
+  it("opens the file history of the selected file and marks that region", async () => {
+    const user = userEvent.setup();
+    const controller = createController(true);
+    render(<StrictMode><DesktopWorkspace controller={controller} /></StrictMode>);
+    const repository = screen.getByRole("button", { name: "Repository" });
 
-    await user.click(fileHistory);
-    await waitFor(() => {
-      expect(screen.getByRole("region", { name: "File History" })).toHaveFocus();
-    });
-    expect(fileHistory).toHaveAttribute("aria-current", "page");
+    await user.click(screen.getByRole("button", { name: "File History" }));
+
+    expect(controller.loadFileHistory).toHaveBeenCalledOnce();
     expect(repository).not.toHaveAttribute("aria-current");
   });
 
-  it("disables File History when the selected result disappears", async () => {
-    const user = userEvent.setup();
-    const ready = createController(true);
-    const { rerender } = render(
-      <StrictMode><DesktopWorkspace controller={ready} /></StrictMode>,
-    );
-    const fileHistory = screen.getByRole("button", { name: "File History" });
+  it("keeps the file history control unusable while no file is selected", () => {
+    render(<StrictMode><DesktopWorkspace controller={createController(true, false)} /></StrictMode>);
 
-    await user.click(fileHistory);
-    expect(fileHistory).toHaveAttribute("aria-current", "page");
-
-    rerender(
-      <StrictMode><DesktopWorkspace controller={createController()} /></StrictMode>,
-    );
-
-    expect(screen.getByRole("button", { name: "File History" }))
+    expect(screen.getByRole("button", { name: /file history/iu }))
       .toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("button", { name: "File History" }))
-      .not.toHaveAttribute("aria-current");
-    expect(screen.getByRole("region", { name: "Commit History" })).toBeVisible();
   });
 
   it("continues keyboard order through calculation, files and accessible diff", async () => {
@@ -202,8 +92,7 @@ describe("desktop workspace accessibility", () => {
 
     const expected = [
       screen.getByRole("button", { name: "Repository" }),
-      screen.getByRole("button", { name: "File History" }),
-      screen.getByRole("button", { name: "Group Rules" }),
+      screen.getByRole("button", { name: "About Prettifer" }),
       screen.getByRole("button", { name: "Change Repository" }),
       screen.getByRole("combobox", { name: "Base branch" }),
       screen.getByRole("combobox", { name: "Working branch" }),
@@ -224,6 +113,7 @@ describe("desktop workspace accessibility", () => {
       screen.getByRole("button", { name: "List View" }),
       screen.getByRole("button", { name: "Config View" }),
       screen.getByRole("button", { name: "Full Tree" }),
+      screen.getByRole("button", { name: "File History" }),
       screen.getByRole("button", { name: "Currently viewing file: src/app.ts (Modified)" }),
       screen.getByRole("separator", { name: "Resize Changed Files" }),
       screen.getByRole("button", { name: "Side-by-side" }),
@@ -293,51 +183,64 @@ describe("desktop workspace accessibility", () => {
 
     expect(screen.queryByRole("separator", { name: "Resize Changed Files" })).toBeNull();
   });
-  it("opens the group rule editor from the activity rail", async () => {
+  it("opens the introduction from the rail and leaves the review untouched", async () => {
     const user = userEvent.setup();
-    render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
+    const controller = createController(true);
+    render(<StrictMode><DesktopWorkspace controller={controller} /></StrictMode>);
 
-    await user.click(screen.getByRole("button", { name: "Group Rules" }));
+    await user.click(screen.getByRole("button", { name: "About Prettifer" }));
 
-    expect(screen.getByRole("button", { name: "Config View" }))
-      .toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("region", { name: "Group rules" })).toBeVisible();
-    expect(screen.getByLabelText("Path prefix")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Group Rules" }))
-      .toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("dialog", { name: "About Prettifer" })).toBeVisible();
+    expect(controller.loadAppInfo).toHaveBeenCalledOnce();
+    expect(controller.selectFile).not.toHaveBeenCalled();
+    expect(screen.getByRole("region", { name: "Changed Files" })).toBeVisible();
   });
 
-  it("keeps the reviewed file visible when the rail opens the rule editor", async () => {
+  it("shows the version the workbench read", async () => {
+    const user = userEvent.setup();
+    render(
+      <StrictMode>
+        <DesktopWorkspace
+          controller={createController(true, true, {
+            appInfo: { status: "ready", version: "0.5.0" },
+          })}
+        />
+      </StrictMode>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "About Prettifer" }));
+
+    expect(within(screen.getByRole("dialog", { name: "About Prettifer" }))
+      .getByText("0.5.0")).toBeVisible();
+  });
+
+  it("opens the group rule editor from Config View", async () => {
     const user = userEvent.setup();
     render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
 
     await user.click(screen.getByRole("button", { name: "Config View" }));
-    // Fold the group away, then arrive again through the rail.
-    await user.click(screen.getByRole("button", { name: /^Source, / }));
-    await user.click(screen.getByRole("button", { name: "List View" }));
-    await user.click(screen.getByRole("button", { name: "Group Rules" }));
+    await user.click(screen.getByRole("button", { name: "Edit group rules" }));
 
-    expect(screen.getByRole("button", { name: /^Source, / }))
-      .toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("button", {
-      name: /Currently viewing file: src\/app\.ts .*rule src to Source/u,
-    })).toBeVisible();
+    expect(screen.getByRole("region", { name: "Group rules" })).toBeVisible();
+    expect(screen.getByLabelText("Path prefix")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Config View" }))
+      .toHaveAttribute("aria-pressed", "true");
   });
 
-  it("marks the group rule entry unavailable until a result exists", () => {
-    render(<StrictMode><DesktopWorkspace controller={createController()} /></StrictMode>);
-
-    expect(screen.getByRole("button", { name: "Group Rules" }))
-      .toHaveAttribute("aria-disabled", "true");
-  });
   const currentRegionMarker = surface.currentRegion ?? "";
 
-  it("marks file history when opened from the rail with a mouse", async () => {
+  it("marks the file history region while it holds the review area", async () => {
     const user = userEvent.setup();
-    render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
-    const history = screen.getByRole("region", { name: "Commit History" });
+    render(
+      <StrictMode>
+        <DesktopWorkspace
+          controller={createController(true, true, { fileHistory: readyFileHistory })}
+        />
+      </StrictMode>,
+    );
+    expect(screen.getByRole("region", { name: "Commit History" }))
+      .not.toHaveClass(currentRegionMarker);
 
-    expect(history).not.toHaveClass(currentRegionMarker);
     await user.click(screen.getByRole("button", { name: "File History" }));
 
     expect(screen.getByRole("region", { name: "File History" }))
@@ -346,9 +249,15 @@ describe("desktop workspace accessibility", () => {
       .not.toHaveClass(currentRegionMarker);
   });
 
-  it("marks the same region when the rail is used from the keyboard", async () => {
+  it("marks the same region when the history is opened from the keyboard", async () => {
     const user = userEvent.setup();
-    render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
+    render(
+      <StrictMode>
+        <DesktopWorkspace
+          controller={createController(true, true, { fileHistory: readyFileHistory })}
+        />
+      </StrictMode>,
+    );
 
     screen.getByRole("button", { name: "File History" }).focus();
     await user.keyboard("{Enter}");
@@ -359,7 +268,13 @@ describe("desktop workspace accessibility", () => {
 
   it("keeps the marker after focus moves into another region", async () => {
     const user = userEvent.setup();
-    render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
+    render(
+      <StrictMode>
+        <DesktopWorkspace
+          controller={createController(true, true, { fileHistory: readyFileHistory })}
+        />
+      </StrictMode>,
+    );
     await user.click(screen.getByRole("button", { name: "File History" }));
 
     await user.click(screen.getByRole("combobox", { name: "Base branch" }));
@@ -379,27 +294,14 @@ describe("desktop workspace accessibility", () => {
     expect(controller.loadBaseTree).not.toHaveBeenCalled();
   });
 
-  it("keeps File History disabled until a changed file is selected", () => {
-    render(<StrictMode><DesktopWorkspace controller={createController(true, false)} /></StrictMode>);
-
-    expect(screen.getByRole("button", { name: "File History" }))
-      .toHaveAttribute("aria-disabled", "true");
-  });
-
-  it("marks the changed file region for the group rule entry", async () => {
-    const user = userEvent.setup();
-    render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
-
-    await user.click(screen.getByRole("button", { name: "Group Rules" }));
-
-    expect(screen.getByRole("region", { name: "Changed Files" }))
-      .toHaveClass(currentRegionMarker);
-  });
-
   it("returns the marker to commit history when the selected result goes away", async () => {
     const user = userEvent.setup();
     const { rerender } = render(
-      <StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>,
+      <StrictMode>
+        <DesktopWorkspace
+          controller={createController(true, true, { fileHistory: readyFileHistory })}
+        />
+      </StrictMode>,
     );
     await user.click(screen.getByRole("button", { name: "File History" }));
     expect(screen.getByRole("region", { name: "File History" }))
@@ -407,19 +309,23 @@ describe("desktop workspace accessibility", () => {
 
     rerender(<StrictMode><DesktopWorkspace controller={createController()} /></StrictMode>);
 
-    expect(screen.getByRole("button", { name: "File History" }))
-      .not.toHaveAttribute("aria-current");
     expect(screen.getByRole("region", { name: "Commit History" }))
       .toHaveClass(currentRegionMarker);
   });
 
   it("does not add a state to the region for assistive technology", async () => {
     const user = userEvent.setup();
-    render(<StrictMode><DesktopWorkspace controller={createController(true)} /></StrictMode>);
+    render(
+      <StrictMode>
+        <DesktopWorkspace
+          controller={createController(true, true, { fileHistory: readyFileHistory })}
+        />
+      </StrictMode>,
+    );
 
     await user.click(screen.getByRole("button", { name: "File History" }));
 
-    // The rail already says where the user is; the region must not repeat it.
+    // The marker class already says where the user is; the region must not repeat it.
     const history = screen.getByRole("region", { name: "File History" });
     expect(history).not.toHaveAttribute("aria-current");
     expect(history).not.toHaveAttribute("aria-selected");

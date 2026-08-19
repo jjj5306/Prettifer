@@ -26,6 +26,9 @@ const FILE_VIEWS = [
   { id: "fullTree", label: "Full Tree" },
 ] as const satisfies readonly { id: FileView; label: string }[];
 
+const FILE_HISTORY_LABEL = "File History";
+const FILE_HISTORY_CONDITION = "select a changed file first";
+
 interface ChangedFilePaneProps {
   /** True while the activity rail points at this region. */
   readonly isCurrentRegion: boolean;
@@ -40,6 +43,8 @@ interface ChangedFilePaneProps {
   readonly control: ChangedFileViewControl;
   readonly onSelectFile: (path: string) => void;
   readonly onChangeRules: (rules: readonly GroupRuleDto[]) => void;
+  /** Opens the commit history of the selected file in the review area. */
+  readonly onOpenFileHistory: () => void;
 }
 
 export const ChangedFilePane = ({
@@ -52,6 +57,7 @@ export const ChangedFilePane = ({
   control,
   onSelectFile,
   onChangeRules,
+  onOpenFileHistory,
 }: ChangedFilePaneProps) => {
   const { view, review } = control;
   /*
@@ -89,6 +95,10 @@ export const ChangedFilePane = ({
             </button>
           ))}
         </div>
+        <FileHistoryButton
+          isFileSelected={selectedFilePath !== null}
+          onOpen={onOpenFileHistory}
+        />
       </header>
 
       <div className={styles.content}>
@@ -145,6 +155,54 @@ export const ChangedFilePane = ({
     </section>
   );
 };
+
+/**
+ * Opens the history of the file the panel has selected. It sits beside the view
+ * toggles because that is where the file was picked, but outside their group: it
+ * changes what the review area shows rather than what this panel lists.
+ */
+const FileHistoryButton = ({
+  isFileSelected,
+  onOpen,
+}: Readonly<{ isFileSelected: boolean; onOpen: () => void }>) => (
+  <button
+    type="button"
+    /*
+     * The condition rides in the name rather than in a tooltip, and the button
+     * stays focusable, so a keyboard user reaches the reason it cannot be used.
+     * A native disabled button cannot be focused and says nothing.
+     */
+    title={isFileSelected ? FILE_HISTORY_LABEL : FILE_HISTORY_CONDITION}
+    aria-label={isFileSelected
+      ? FILE_HISTORY_LABEL
+      : `${FILE_HISTORY_LABEL} · ${FILE_HISTORY_CONDITION}`}
+    aria-disabled={isFileSelected ? undefined : true}
+    className={styles.historyAction}
+    onClick={() => {
+      if (isFileSelected) {
+        onOpen();
+      }
+    }}
+  >
+    <FileHistoryIcon />
+  </button>
+);
+
+const FileHistoryIcon = () => (
+  <svg
+    aria-hidden="true"
+    viewBox="0 0 16 16"
+    width="15"
+    height="15"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.4"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M2.5 8a5.5 5.5 0 1 0 1.7-4M2.5 2.5v3.5h3.5M8 5.5V8l2 1.5" />
+  </svg>
+);
 
 const ViewIcon = ({ view }: Readonly<{ view: FileView }>) => (
   <svg

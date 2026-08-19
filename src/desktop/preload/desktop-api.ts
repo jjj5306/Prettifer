@@ -1,6 +1,7 @@
 import {
   DESKTOP_CHANNELS,
   type ApiResult,
+  type AppInfoDto,
   type BaseFileDto,
   type BaseFileRequest,
   type BaseTreeDto,
@@ -84,5 +85,8 @@ export function createDesktopApi(invoke: Invoke): DesktopApi {
       DESKTOP_CHANNELS.saveGroupingRules,
       request,
     ) as Promise<ApiResult<GroupingRulesDto>>,
+    readAppInfo: () => invoke(
+      DESKTOP_CHANNELS.readAppInfo,
+    ) as Promise<ApiResult<AppInfoDto>>,
   });
 }

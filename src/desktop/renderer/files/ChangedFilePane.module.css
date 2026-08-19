@@ -10,6 +10,25 @@
   align-items: center;
 }
 
+/* Reads as one control beside the view toggles, at the same size as one of them. */
+.historyAction {
+  display: grid;
+  flex: 0 0 auto;
+  width: 1.9rem;
+  min-height: 1.75rem;
+  place-content: center;
+  padding: 0;
+  color: var(--color-muted);
+}
+
+.historyAction[aria-disabled="true"],
+.historyAction[aria-disabled="true"]:hover {
+  border-color: transparent;
+  background: transparent;
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .header {
   justify-content: space-between;
   gap: var(--space-2);

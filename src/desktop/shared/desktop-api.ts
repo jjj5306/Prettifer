@@ -407,10 +407,16 @@ export type FileHistoryPageDto = z.infer<typeof fileHistoryPageSchema>;
 export type FileCommitRequest = z.infer<typeof fileCommitRequestSchema>;
 export type FileCommitChangeDto = z.infer<typeof fileCommitChangeSchema>;
 export type CancelFileHistoryRequest = z.infer<typeof cancelFileHistoryRequestSchema>;
+/** What the running application says about itself, for the introduction screen. */
+export const appInfoSchema = z.object({
+  version: z.string().trim().min(1),
+}).strict();
+
 export type GroupRuleDto = z.infer<typeof groupRuleSchema>;
 export type GroupingRulesRequest = z.infer<typeof groupingRulesRequestSchema>;
 export type SaveGroupingRulesRequest = z.infer<typeof saveGroupingRulesRequestSchema>;
 export type GroupingRulesDto = z.infer<typeof groupingRulesSchema>;
+export type AppInfoDto = z.infer<typeof appInfoSchema>;
 export type ApiResult<T> =
   | Readonly<{ status: "success"; data: T }>
   | Readonly<{ status: "cancelled" }>
@@ -431,6 +437,7 @@ export const DESKTOP_CHANNELS = Object.freeze({
   cancelFileHistory: "files:cancel-history",
   readGroupingRules: "grouping:read-rules",
   saveGroupingRules: "grouping:save-rules",
+  readAppInfo: "app:read-info",
 });
 
 export interface DesktopApi {
@@ -457,4 +464,6 @@ export interface DesktopApi {
   readGroupingRules(request: GroupingRulesRequest): Promise<ApiResult<GroupingRulesDto>>;
   /** Replaces the grouping rules kept for the session's repository. */
   saveGroupingRules(request: SaveGroupingRulesRequest): Promise<ApiResult<GroupingRulesDto>>;
+  /** Reads what the running application says about itself. Takes no repository. */
+  readAppInfo(): Promise<ApiResult<AppInfoDto>>;
 }

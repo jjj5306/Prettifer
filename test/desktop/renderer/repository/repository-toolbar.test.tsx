@@ -37,6 +37,7 @@ const baseState: AppState = {
   externalFile: { status: "idle" },
   reveal: null,
   navigationHistory: [],
+  appInfo: { status: "idle" },
 };
 
 describe("RepositoryToolbar", () => {

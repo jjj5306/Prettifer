@@ -22,6 +22,16 @@ import styles from "./DiffPane.module.css";
  * reader's choice in the toggle beside this heading, not what the panel is for.
  */
 const COMPARISON_HEADING = "Differentia Codicis";
+/** A change is only ever opened from the history list, so that is where it returns. */
+const CLOSE_HISTORY_CHANGE_LABEL = "Back to File History";
+
+/*
+ * Where the reader was in the selected-result comparison, kept outside the
+ * component: the file history takes this panel's place, and a position stored in
+ * a ref would be gone by the time the reader comes back. The file history list
+ * keeps its own scroll position the same way.
+ */
+const compositeViewStates = new Map<string, object>();
 
 type CompositeFile = CompositeDiffResultDto["files"][number];
 type TextCompositeFile = Exclude<CompositeFile, { binary: true }>;
@@ -61,7 +71,6 @@ interface DiffPaneProps {
   readonly reveal?: ReviewPosition | null;
   readonly fileCommit?: FileCommitState;
   readonly onCloseFileCommit?: () => void;
-  readonly closeFileCommitLabel?: string;
   readonly onSymbol?: SymbolRequestHandler;
   readonly loadAdapter?: () => Promise<DiffAdapter>;
 }
@@ -89,16 +98,11 @@ export const DiffPane = ({
   reveal = null,
   fileCommit = { status: "idle" },
   onCloseFileCommit,
-  closeFileCommitLabel = "Return to Selected Result",
   onSymbol,
   loadAdapter = loadMonacoAdapter,
 }: DiffPaneProps) => {
   const hostRef = useRef<HTMLDivElement>(null);
   const adapterRef = useRef<DiffAdapter | null>(null);
-  const savedCompositeViewRef = useRef<Readonly<{
-    key: string;
-    state: object;
-  }> | null>(null);
   /*
    * The editor is told about symbol requests through a stable function that reads
    * the current handler. Passing the handler itself would tie the editor's life to
@@ -171,11 +175,11 @@ export const DiffPane = ({
       } else {
         loadedAdapter.show(effectHost, identityForModel, target.file, hooks);
       }
-      if (
-        target.kind === "diff"
-        && savedCompositeViewRef.current?.key === compositeViewKey
-      ) {
-        loadedAdapter.restoreViewState?.(savedCompositeViewRef.current.state);
+      const savedView = compositeViewKey === null
+        ? undefined
+        : compositeViewStates.get(compositeViewKey);
+      if (target.kind === "diff" && savedView !== undefined) {
+        loadedAdapter.restoreViewState?.(savedView);
       }
       setOutcome({ key: currentKey, status: "ready" });
       if (retry > 0) {
@@ -194,7 +198,7 @@ export const DiffPane = ({
       if (target.kind === "diff" && compositeViewKey !== null) {
         const savedState = adapter?.saveViewState?.();
         if (savedState != null) {
-          savedCompositeViewRef.current = { key: compositeViewKey, state: savedState };
+          compositeViewStates.set(compositeViewKey, savedState);
         }
       }
       adapter?.dispose();
@@ -236,7 +240,7 @@ export const DiffPane = ({
 
   if (fileCommit.status === "loading") {
     return (
-      <ReviewPanel heading="File History Change" subheading={fileCommit.path} isCurrentRegion={isCurrentRegion}>
+      <ReviewPanel heading="File History Change" subheading={fileCommit.path} isCurrentRegion={isCurrentRegion} onEscape={onCloseFileCommit}>
         <p aria-live="polite">Loading the file change…</p>
       </ReviewPanel>
     );
@@ -244,12 +248,12 @@ export const DiffPane = ({
 
   if (fileCommit.status === "error") {
     return (
-      <ReviewPanel heading="File History Change" subheading={fileCommit.path} isCurrentRegion={isCurrentRegion}>
+      <ReviewPanel heading="File History Change" subheading={fileCommit.path} isCurrentRegion={isCurrentRegion} onEscape={onCloseFileCommit}>
         <div className={styles.problemState} role="alert">
           <strong>This file change could not be opened</strong>
           <p>{fileCommit.diagnostic.message}</p>
           <p>{fileCommit.diagnostic.nextAction}</p>
-          <button type="button" onClick={onCloseFileCommit}>{closeFileCommitLabel}</button>
+          <button type="button" onClick={onCloseFileCommit}>{CLOSE_HISTORY_CHANGE_LABEL}</button>
         </div>
       </ReviewPanel>
     );
@@ -258,13 +262,13 @@ export const DiffPane = ({
   if (fileCommit.status === "ready" && fileCommit.change.binary) {
     const change = fileCommit.change;
     return (
-      <ReviewPanel heading="Binary File History Change" subheading={change.path} isCurrentRegion={isCurrentRegion}>
+      <ReviewPanel heading="Binary File History Change" subheading={change.path} isCurrentRegion={isCurrentRegion} onEscape={onCloseFileCommit}>
         <div className={styles.binaryState}>
           <strong>Binary content comparison is not available</strong>
           <p>{historyChangeSummary(change)}</p>
           <p>Compared with {parentLabel(change)}.</p>
           <p>Blob sizes: {sizeLabel(change.beforeSize)} → {sizeLabel(change.afterSize)}</p>
-          <button type="button" onClick={onCloseFileCommit}>{closeFileCommitLabel}</button>
+          <button type="button" onClick={onCloseFileCommit}>{CLOSE_HISTORY_CHANGE_LABEL}</button>
         </div>
       </ReviewPanel>
     );
@@ -288,17 +292,21 @@ export const DiffPane = ({
     // Only a comparison has two sides to arrange.
     const comparable = target.kind === "diff" && target.file.status !== "added";
     return (
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
       <section
         id="diff-review"
         className={panelClass(styles.panel, isCurrentRegion)}
         aria-labelledby="diff-heading"
         tabIndex={-1}
+        onKeyDown={(event) => {
+          leaveOnEscape(event, target.kind === "history" ? onCloseFileCommit : undefined);
+        }}
       >
         <div className={styles.headingRow}>
           <h2 id="diff-heading">{shown.heading}</h2>
           <ReviewedPath path={shown.path} />
           {target.kind === "history" ? (
-            <button type="button" onClick={onCloseFileCommit}>{closeFileCommitLabel}</button>
+            <button type="button" onClick={onCloseFileCommit}>{CLOSE_HISTORY_CHANGE_LABEL}</button>
           ) : null}
           {shown.rename === undefined ? null : <RenameNote rename={shown.rename} />}
           {comparable ? (
@@ -427,6 +435,20 @@ const LayoutIcon = ({ view }: Readonly<{ view: DiffView }>) => (
 );
 
 /**
+ * Escape steps back from a file-history change to the list it was opened from.
+ * A panel with no change to leave passes nothing and keeps the key.
+ */
+function leaveOnEscape(
+  event: React.KeyboardEvent<HTMLElement>,
+  onEscape: (() => void) | undefined,
+): void {
+  if (event.key === "Escape" && onEscape !== undefined) {
+    event.preventDefault();
+    onEscape();
+  }
+}
+
+/**
  * The path of the file under review. Symbol navigation changes it under the user,
  * so the file name never truncates: only the directories above it give way when
  * the panel is narrow.
@@ -448,18 +470,24 @@ const ReviewPanel = ({
   heading,
   subheading,
   isCurrentRegion,
+  onEscape,
   children,
 }: {
   readonly heading: string;
   readonly subheading: string;
   readonly isCurrentRegion: boolean;
+  /** Set while the panel shows a file-history change, which Escape leaves. */
+  readonly onEscape?: (() => void) | undefined;
   readonly children: React.ReactNode;
 }) => (
+  // The review region takes Escape while it stands in for the file history. (#99)
+  // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
   <section
     id="diff-review"
     className={panelClass(styles.panel, isCurrentRegion)}
     aria-labelledby="diff-heading"
     tabIndex={-1}
+    onKeyDown={(event) => { leaveOnEscape(event, onEscape); }}
   >
     <div className={styles.headingRow}>
       <h2 id="diff-heading">{heading}</h2>
