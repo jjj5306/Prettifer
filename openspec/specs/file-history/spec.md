@@ -1,7 +1,9 @@
 # file-history Specification
 
 ## Purpose
-TBD - created by archiving change add-file-history. Update Purpose after archive.
+선택한 파일이 대상 브랜치에서 어떻게 바뀌어 왔는지 확인하는 기능의 요구사항을
+정의한다. 이력의 범위와 순서, 이름 변경 계보, 통합 결과와의 관계, 커밋별 변경 검토와
+복귀, 진입점과 키보드 조작을 다룬다.
 ## Requirements
 ### Requirement: 선택 파일 이력 범위와 순서
 시스템은 선택한 파일이 대상 브랜치 HEAD에서 도달 가능한 커밋을 거쳐 변경된
@@ -20,7 +22,7 @@ TBD - created by archiving change add-file-history. Update Purpose after archive
 
 #### Scenario: 선택 파일이 없는 상태
 - **WHEN** 선택한 파일이 없거나 통합 결과가 준비되지 않았다
-- **THEN** 시스템은 File History를 실행 가능한 상태로 표시하지 않는다
+- **THEN** 시스템은 File History를 실행할 수 있는 상태로 표시하지 않는다
 
 ### Requirement: 지연 조회와 페이지 추가
 시스템은 사용자가 File History를 열 때 선택 파일 이력을 처음 조회해야 하며(MUST),
@@ -33,7 +35,7 @@ TBD - created by archiving change add-file-history. Update Purpose after archive
 - **THEN** 시스템은 선택 파일 이력 조회를 시작하고 진행 상태를 표시한다
 
 #### Scenario: 파일 선택만 변경
-- **WHEN** 사용자가 Changed Files에서 다른 파일을 선택하고 File History를 열지 않는다
+- **WHEN** 사용자가 `Changed Files`에서 다른 파일을 선택하고 File History를 열지 않는다
 - **THEN** 시스템은 새 파일의 이력을 조회하지 않는다
 
 #### Scenario: 오래된 이력 추가
@@ -119,25 +121,27 @@ TBD - created by archiving change add-file-history. Update Purpose after archive
 - **AND** Commit History에서 기준 부모를 선택하도록 안내한다
 
 ### Requirement: 파일 이력 커밋 검토와 복귀
-시스템은 사용자가 파일 이력 커밋을 실행하면 현재 diff 영역에서 해당 커밋의
-파일 변경을 읽기 전용으로 표시해야 한다(SHALL). 이 동작은 통합 대상 선택을
-변경하지 않아야 하며(MUST NOT), 통합 결과로 돌아가면 기존 선택 파일, diff
-레이아웃, 스크롤과 커서 위치 및 파일 이력 탐색 위치를 복원해야 한다(MUST).
+시스템은 사용자가 파일 이력 커밋을 실행하면 파일 이력이 있던 diff 검토 영역에서 해당
+커밋의 파일 변경을 읽기 전용으로 표시해야 한다(SHALL). 이 동작은 통합 대상 선택을
+변경하지 않아야 한다(MUST NOT). 커밋 변경 내용에서는 파일 이력으로, 파일 이력에서는
+선택 결과 diff로 돌아갈 수 있어야 하며(MUST), 선택 결과로 돌아가면 기존 선택 파일,
+diff 레이아웃, 스크롤과 커서 위치를 복원해야 한다(MUST).
 
 #### Scenario: 파일 이력 커밋 열기
 - **WHEN** 사용자가 파일 이력의 커밋을 실행한다
-- **THEN** 시스템은 같은 diff 영역에 그 커밋 전후의 파일 변경을 표시한다
-- **AND** 통합 대상 커밋의 체크 상태와 선택 수를 변경하지 않는다
+- **THEN** 시스템은 파일 이력이 있던 검토 영역에 그 커밋 전후의 파일 변경을 표시한다
+- **AND** `Changed Files` 목록과 통합 대상 커밋의 체크 상태 및 선택 수를 변경하지 않는다
 
 #### Scenario: 통합 결과로 돌아가기
-- **WHEN** 사용자가 파일 이력의 커밋 변경을 보다가 통합 결과로 돌아간다
+- **WHEN** 사용자가 파일 이력에서 선택 결과로 돌아간다
 - **THEN** 시스템은 이전 선택 파일과 통합 결과 diff를 표시한다
 - **AND** 이전 diff 레이아웃, 스크롤과 커서 위치를 복원한다
-- **AND** File History의 포커스와 스크롤 위치를 유지한다
 
 #### Scenario: 파일 이력 패널 전환
-- **WHEN** 사용자가 Changed Files와 File History 사이를 전환한다
-- **THEN** 시스템은 선택 파일, 통합 대상 선택과 현재 diff를 변경하지 않는다
+- **WHEN** 사용자가 커밋 변경 내용에서 파일 이력으로 돌아간다
+- **THEN** 시스템은 같은 검토 영역에 파일 이력 목록을 다시 표시한다
+- **AND** File History의 포커스와 스크롤 위치를 유지한다
+- **AND** 선택 파일, 통합 대상 선택과 `Changed Files` 목록은 변경되지 않는다
 
 ### Requirement: 바이너리 파일 변경 안내
 시스템은 바이너리 파일의 이력과 커밋별 변경 상태를 제공하되 내용을 텍스트로
@@ -182,9 +186,9 @@ TBD - created by archiving change add-file-history. Update Purpose after archive
 - **AND** 이전 결과와 임시 파일 diff를 현재 화면에 표시하지 않는다
 
 ### Requirement: 키보드 파일 이력 탐색
-시스템은 키보드만으로 파일 이력 커밋을 이동하고 변경을 열며 통합 결과로 돌아갈
-수 있게 해야 한다(MUST). 포커스, 기여와 문제 상태는 색상 외의 이름 또는 모양으로
-구분해야 한다(MUST).
+시스템은 키보드만으로 파일 이력 커밋을 이동하고 변경을 열며 파일 이력과 선택 결과로
+차례로 돌아갈 수 있게 해야 한다(MUST). 포커스, 기여와 문제 상태는 색상 외의 이름 또는
+모양으로 구분해야 한다(MUST).
 
 #### Scenario: 방향키로 커밋 이동
 - **WHEN** 사용자가 File History 목록에서 위·아래 방향키를 누른다
@@ -195,7 +199,45 @@ TBD - created by archiving change add-file-history. Update Purpose after archive
 - **THEN** 시스템은 처음 또는 마지막 커밋으로 포커스를 이동한다
 
 #### Scenario: 키보드로 커밋 변경 열기와 복귀
-- **WHEN** 사용자가 포커스한 커밋에서 Enter 또는 Space를 누른 뒤 Escape를 누른다
-- **THEN** 시스템은 해당 커밋의 파일 변경을 열었다가 통합 결과 diff로 돌아간다
+- **WHEN** 사용자가 포커스한 커밋에서 Enter 또는 Space를 누른 뒤 Escape를 두 번 누른다
+- **THEN** 시스템은 해당 커밋의 파일 변경을 열고 첫 Escape에서 파일 이력으로 돌아간다
+- **AND** 두 번째 Escape에서 선택 결과 diff로 돌아간다
 - **AND** 통합 대상 커밋의 체크 상태는 변경하지 않는다
+
+### Requirement: 선택 파일 이력 진입점
+시스템은 선택 파일의 커밋 이력을 여는 File History 컨트롤을 `Changed Files` 머리글의
+보기 토글 옆에 제공해야 한다(MUST). 이 컨트롤은 보기 토글과 구분되는 컨트롤이어야 하며
+(MUST), 보이는 이름과 동작 설명을 제공해야 한다(MUST). 파일을 선택하지 않았으면 사용할
+수 없는 상태로 표시하고 필요한 선행 조건을 안내해야 한다(MUST). 이력을 여는 동안
+`Changed Files` 목록은 계속 표시해야 한다(MUST).
+
+#### Scenario: 이력 열기 컨트롤 위치
+- **WHEN** 선택 결과의 `Changed Files` 패널이 표시된다
+- **THEN** File History 컨트롤이 `Changed Files` 머리글의 보기 토글 옆에 표시된다
+- **THEN** 이 컨트롤은 보기 토글의 선택 상태를 바꾸지 않는다
+
+#### Scenario: 선택 파일의 이력 열기
+- **WHEN** 사용자가 `Changed Files`에서 파일을 선택하고 File History 컨트롤을 실행한다
+- **THEN** diff 검토 영역이 선택 파일의 커밋 이력을 표시한다
+- **THEN** `Changed Files` 목록과 선택 파일 표시는 그대로 유지된다
+- **THEN** 통합 대상 커밋 선택은 변경되지 않는다
+
+#### Scenario: 선택하지 않은 상태의 이력 컨트롤
+- **WHEN** 선택 결과가 준비되고 `Changed Files`에서 파일을 선택하지 않았다
+- **THEN** File History 컨트롤은 사용할 수 없는 상태로 표시된다
+- **THEN** 사용자는 파일을 선택해야 한다는 조건을 확인할 수 있다
+- **THEN** 컨트롤을 실행해도 검토 영역과 포커스 대상은 변경되지 않는다
+
+#### Scenario: 선택 결과가 없는 상태
+- **WHEN** 선택 결과가 아직 만들어지지 않았다
+- **THEN** `Changed Files` 패널과 함께 File History 컨트롤도 표시되지 않는다
+
+#### Scenario: 키보드로 이력 열기
+- **WHEN** 사용자가 Tab으로 File History 컨트롤에 포커스하고 Enter 또는 Space를 누른다
+- **THEN** 시스템은 선택 파일의 커밋 이력을 열고 이력 목록으로 포커스를 옮긴다
+
+#### Scenario: 이력을 보는 중 다른 파일 선택
+- **WHEN** 사용자가 파일 이력을 보는 중 `Changed Files`에서 다른 파일을 선택한다
+- **THEN** 검토 영역은 새로 선택한 파일의 선택 결과 diff를 표시한다
+- **THEN** 시스템은 새 파일의 이력을 조회하지 않는다
 
