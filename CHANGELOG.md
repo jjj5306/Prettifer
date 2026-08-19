@@ -10,24 +10,30 @@
 
 ## 미출시
 
+## v1.0.0
+
 ### 추가
 
-- Activity Rail에 `About Prettifer` 추가. 실행 중인 버전과 저장소 주소를 확인합니다
+- 선택한 커밋만 하나의 통합 diff로 검토. 이력에서 떨어져 있는 커밋도 함께 고를 수 있습니다
+- 계산 전후로 작업 트리, branch와 HEAD를 그대로 보존
+- merge 커밋은 어느 부모를 기준으로 볼지 고른 뒤 비교
+- 적용하지 못한 파일만 분리하고 나머지는 먼저 검토하는 부분 결과
+- 변경 파일을 Tree View, List View, Config View, Full Tree 네 가지로 탐색
+- 저장소별 경로 규칙으로 변경 파일을 그룹으로 묶어 보기
+- 저장소 전체 구조 안에서 변경 위치 확인과 변경되지 않은 파일 검토
+- 좌우와 인라인 diff 전환. 전환해도 읽던 위치가 유지됩니다
+- Java, C/C++, TypeScript, JavaScript의 심볼 정의와 참조 탐색
+- 선택 결과에 없는 파일도 비교 기준 시점 내용으로 열기
+- 이름이 바뀐 파일을 삭제와 추가가 아닌 하나의 비교로 표시
+- 선택 파일의 커밋 이력, 이름 변경 계보와 커밋별 변경 내용 검토
+- 저장소 열기부터 diff 검토까지 키보드만으로 진행
+- 실행 인자로 저장소를 지정해 열기
+- Windows ZIP으로 배포
 
 ### 변경
 
-- 선택 파일의 커밋 이력을 `Changed Files` 머리글의 `File History`로 엽니다
-- 이력과 커밋별 변경을 diff 검토 영역에 표시. 이력을 보는 동안에도 변경 파일 목록이 남습니다
-- `Escape`는 커밋 변경에서 이력으로, 다시 누르면 통합 diff로 한 단계씩 복귀
-- Activity Rail에서 `File History`와 `Group Rules` 항목 제거. 두 동작은 `Changed Files`에서 시작합니다
-- diff 비교 화면 제목을 `Differentia Codicis`로 표시
-- `Config View`와 `Full Tree` 토글에 서로 다른 아이콘 적용
-- 긴 경로의 변경 파일 행에서 파일 이름과 그 폴더를 줄이지 않고 위 폴더만 줄여 표시
-- 변경 파일 목록의 기본 폭을 머리글 컨트롤이 한 줄에 들어오는 폭으로 조정
-
-### 수정
-
-- 파일 이력을 보고 통합 diff로 돌아올 때 스크롤과 커서 위치가 복원되지 않던 문제
+- 파일별 커밋 이력을 `Changed Files` 머리글의 `File History`로 열고, 이력과 커밋별 변경을 diff 검토 영역에 표시
+- Activity Rail을 `Repository`와 `About Prettifer` 두 항목으로 정리
 
 ## v0.5.0
 
