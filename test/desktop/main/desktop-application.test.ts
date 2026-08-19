@@ -61,6 +61,7 @@ function harness(loadURL: (url: string) => Promise<void> = () => Promise.resolve
         removed.push(channel);
       },
     },
+    appVersion: "1.2.3",
   };
   return {
     host,

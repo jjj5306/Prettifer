@@ -26,6 +26,9 @@ const FILE_VIEWS = [
   { id: "fullTree", label: "Full Tree" },
 ] as const satisfies readonly { id: FileView; label: string }[];
 
+const FILE_HISTORY_LABEL = "File History";
+const FILE_HISTORY_CONDITION = "select a changed file first";
+
 interface ChangedFilePaneProps {
   /** True while the activity rail points at this region. */
   readonly isCurrentRegion: boolean;
@@ -40,6 +43,8 @@ interface ChangedFilePaneProps {
   readonly control: ChangedFileViewControl;
   readonly onSelectFile: (path: string) => void;
   readonly onChangeRules: (rules: readonly GroupRuleDto[]) => void;
+  /** Opens the commit history of the selected file in the review area. */
+  readonly onOpenFileHistory: () => void;
 }
 
 export const ChangedFilePane = ({
@@ -52,6 +57,7 @@ export const ChangedFilePane = ({
   control,
   onSelectFile,
   onChangeRules,
+  onOpenFileHistory,
 }: ChangedFilePaneProps) => {
   const { view, review } = control;
   /*
@@ -74,20 +80,26 @@ export const ChangedFilePane = ({
           <h2 id="changed-files-heading">Changed Files</h2>
           <span>{entries.length}</span>
         </div>
-        <div className={styles.viewToggle} role="group" aria-label="Changed files view">
-          {FILE_VIEWS.map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              title={label}
-              aria-label={label}
-              aria-pressed={view === id}
-              className={view === id ? styles.activeView : undefined}
-              onClick={() => { control.selectView(id); }}
-            >
-              <ViewIcon view={id} />
-            </button>
-          ))}
+        <div className={styles.headerControls}>
+          <div className={styles.viewToggle} role="group" aria-label="Changed files view">
+            {FILE_VIEWS.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                title={label}
+                aria-label={label}
+                aria-pressed={view === id}
+                className={view === id ? styles.activeView : undefined}
+                onClick={() => { control.selectView(id); }}
+              >
+                <ViewIcon view={id} />
+              </button>
+            ))}
+          </div>
+          <FileHistoryButton
+            isFileSelected={selectedFilePath !== null}
+            onOpen={onOpenFileHistory}
+          />
         </div>
       </header>
 
@@ -146,6 +158,54 @@ export const ChangedFilePane = ({
   );
 };
 
+/**
+ * Opens the history of the file the panel has selected. It sits beside the view
+ * toggles because that is where the file was picked, but outside their group: it
+ * changes what the review area shows rather than what this panel lists.
+ */
+const FileHistoryButton = ({
+  isFileSelected,
+  onOpen,
+}: Readonly<{ isFileSelected: boolean; onOpen: () => void }>) => (
+  <button
+    type="button"
+    /*
+     * The condition rides in the name rather than in a tooltip, and the button
+     * stays focusable, so a keyboard user reaches the reason it cannot be used.
+     * A native disabled button cannot be focused and says nothing.
+     */
+    title={isFileSelected ? FILE_HISTORY_LABEL : FILE_HISTORY_CONDITION}
+    aria-label={isFileSelected
+      ? FILE_HISTORY_LABEL
+      : `${FILE_HISTORY_LABEL} · ${FILE_HISTORY_CONDITION}`}
+    aria-disabled={isFileSelected ? undefined : true}
+    className={styles.historyAction}
+    onClick={() => {
+      if (isFileSelected) {
+        onOpen();
+      }
+    }}
+  >
+    <FileHistoryIcon />
+  </button>
+);
+
+const FileHistoryIcon = () => (
+  <svg
+    aria-hidden="true"
+    viewBox="0 0 16 16"
+    width="15"
+    height="15"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.4"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M2.5 8a5.5 5.5 0 1 0 1.7-4M2.5 2.5v3.5h3.5M8 5.5V8l2 1.5" />
+  </svg>
+);
+
 const ViewIcon = ({ view }: Readonly<{ view: FileView }>) => (
   <svg
     aria-hidden="true"
@@ -158,27 +218,49 @@ const ViewIcon = ({ view }: Readonly<{ view: FileView }>) => (
     strokeLinecap="round"
     strokeLinejoin="round"
   >
-    {view === "tree" ? (
-      <>
-        <path d="M3 2.5h3v3H3zM10 10.5h3v3h-3zM3 10.5h3v3H3z" />
-        <path d="M4.5 5.5v3.2M4.5 8.7h7v1.8" />
-      </>
-    ) : view === "list" ? (
-      <>
-        <path d="M5.5 3.5h7M5.5 8h7M5.5 12.5h7" />
-        <path d="M3 3.5h.1M3 8h.1M3 12.5h.1" />
-      </>
-    ) : (
-      <>
-        <path d="M2.5 3h11M2.5 8h11M2.5 13h11" />
-        <path d="M5.5 3v0M10.5 8v0M7 13v0" />
-        <circle cx="5.5" cy="3" r="1.4" />
-        <circle cx="10.5" cy="8" r="1.4" />
-        <circle cx="7" cy="13" r="1.4" />
-      </>
-    )}
+    <ViewIconShape view={view} />
   </svg>
 );
+
+/**
+ * One shape per view, so a reader tells the four toggles apart before pressing
+ * one: nodes for the changed tree, rows for the list, ruled groups for Config
+ * View and a folder holding the whole repository for Full Tree.
+ */
+const ViewIconShape = ({ view }: Readonly<{ view: FileView }>) => {
+  switch (view) {
+    case "tree":
+      return (
+        <>
+          <path d="M3 2.5h3v3H3zM10 10.5h3v3h-3zM3 10.5h3v3H3z" />
+          <path d="M4.5 5.5v3.2M4.5 8.7h7v1.8" />
+        </>
+      );
+    case "list":
+      return (
+        <>
+          <path d="M5.5 3.5h7M5.5 8h7M5.5 12.5h7" />
+          <path d="M3 3.5h.1M3 8h.1M3 12.5h.1" />
+        </>
+      );
+    case "config":
+      return (
+        <>
+          <path d="M2.5 3h11M2.5 8h11M2.5 13h11" />
+          <circle cx="5.5" cy="3" r="1.4" />
+          <circle cx="10.5" cy="8" r="1.4" />
+          <circle cx="7" cy="13" r="1.4" />
+        </>
+      );
+    case "fullTree":
+      return (
+        <>
+          <path d="M1.5 3.5h4.5l1.5 2h7v8h-13z" />
+          <path d="M5 8.5v4.5M5 9.5h2.5M5 12.5h5" />
+        </>
+      );
+  }
+};
 
 interface FileTreeProps {
   readonly nodes: readonly FileTreeNode[];

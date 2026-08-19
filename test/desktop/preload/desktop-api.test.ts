@@ -22,6 +22,7 @@ describe("preload desktop API", () => {
       "cancelFileHistory",
       "readGroupingRules",
       "saveGroupingRules",
+      "readAppInfo",
     ]);
     expect(api).not.toHaveProperty("invoke");
     expect(api).not.toHaveProperty("send");

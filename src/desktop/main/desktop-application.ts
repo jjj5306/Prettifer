@@ -77,6 +77,8 @@ export interface ApplicationHost {
   /** URL the window loads and the only origin treated as trusted. */
   readonly entryUrl: string;
   readonly ipc: Pick<IpcMain, "handle" | "removeHandler">;
+  /** Version of the running application, as the platform reports it. */
+  readonly appVersion: string;
 }
 
 /**
@@ -152,6 +154,7 @@ export async function startDesktopApplication(
     baseFiles: new BaseFileReader(git),
     baseTree: new BaseTreeLister(git),
     groupingRules: groupingRuleStore(seams.groupingRulesPath),
+    appVersion: () => host.appVersion,
     signal: lifetime.signal,
   });
   registerDesktopRequestHandlers(host.ipc, handlers);

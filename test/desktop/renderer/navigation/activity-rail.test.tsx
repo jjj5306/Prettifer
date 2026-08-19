@@ -7,22 +7,15 @@ import { describe, expect, it, vi } from "vitest";
 import { ActivityRail } from "../../../../src/desktop/renderer/navigation/ActivityRail.js";
 
 describe("ActivityRail", () => {
-  it("describes what every workbench entry opens", () => {
+  it("offers the repository and the introduction, and nothing a panel already opens", () => {
     render(
-      <ActivityRail
-        activeRegion="repository"
-        resultAvailable
-        fileSelected
-        onActivate={vi.fn()}
-      />,
+      <ActivityRail activeRegion="repository" onActivate={vi.fn()} onOpenAbout={vi.fn()} />,
     );
 
     const descriptions = new Map([
       ["Repository", "Choose the repository and comparison range."],
-      ["File History", "Review the selected changed file's commit history."],
-      ["Group Rules", "Edit the rules used to group changed files."],
+      ["About Prettifer", "What Prettifer is, and the version you are running."],
     ]);
-
     for (const [label, description] of descriptions) {
       const button = screen.getByRole("button", { name: label });
       const descriptionId = button.getAttribute("aria-describedby");
@@ -31,99 +24,72 @@ describe("ActivityRail", () => {
       expect(document.getElementById(descriptionId ?? "")).toHaveTextContent(description);
     }
     expect(screen.getAllByRole("button").map((button) => button.getAttribute("aria-label")))
-      .toEqual(["Repository", "File History", "Group Rules"]);
+      .toEqual(["Repository", "About Prettifer"]);
+    // File history and group rules start in the panel that holds the selection.
+    expect(screen.queryByRole("button", { name: "File History" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Group Rules" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Commit History" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Changed Files" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Diff Review" })).toBeNull();
-    expect(screen.getAllByRole("tooltip")).toHaveLength(3);
+    expect(screen.getAllByRole("tooltip")).toHaveLength(2);
   });
 
-  it("explains and blocks entries whose prerequisites are missing", async () => {
-    const user = userEvent.setup();
-    const onActivate = vi.fn();
+  it("keeps both entries usable with no repository and no result", () => {
     render(
-      <ActivityRail
-        activeRegion="history"
-        resultAvailable={false}
-        fileSelected={false}
-        onActivate={onActivate}
-      />,
+      <ActivityRail activeRegion="repository" onActivate={vi.fn()} onOpenAbout={vi.fn()} />,
     );
 
-    const fileHistory = screen.getByRole("button", { name: "File History" });
-    expect(fileHistory).toHaveAttribute("aria-disabled", "true");
-    expect(fileHistory).not.toBeDisabled();
-    const descriptionId = fileHistory.getAttribute("aria-describedby");
-    expect(document.getElementById(descriptionId ?? "")).toHaveTextContent(
-      "Build a selected result to browse file history.",
-    );
-
-    await user.click(fileHistory);
-
-    expect(onActivate).not.toHaveBeenCalled();
-    expect(fileHistory).toHaveFocus();
+    for (const label of ["Repository", "About Prettifer"]) {
+      expect(screen.getByRole("button", { name: label }))
+        .not.toHaveAttribute("aria-disabled");
+    }
   });
 
-  it("enables File History only after a result and changed file are selected", () => {
-    const { rerender } = render(
-      <ActivityRail
-        activeRegion="history"
-        resultAvailable={false}
-        fileSelected={false}
-        onActivate={vi.fn()}
-      />,
-    );
-    expect(screen.getByRole("button", { name: "File History" }))
-      .toHaveAttribute("aria-disabled", "true");
-
-    rerender(
-      <ActivityRail
-        activeRegion="fileHistory"
-        resultAvailable
-        fileSelected={false}
-        onActivate={vi.fn()}
-      />,
-    );
-    expect(screen.getByRole("button", { name: "File History" }))
-      .toHaveAttribute("aria-disabled", "true");
-    const descriptionId = screen.getByRole("button", { name: "File History" })
-      .getAttribute("aria-describedby");
-    expect(document.getElementById(descriptionId ?? "")).toHaveTextContent(
-      "Select a changed file to browse its history.",
-    );
-
-    rerender(
-      <ActivityRail
-        activeRegion="fileHistory"
-        resultAvailable
-        fileSelected
-        onActivate={vi.fn()}
-      />,
-    );
-    expect(screen.getByRole("button", { name: "File History" }))
-      .not.toHaveAttribute("aria-disabled");
-    expect(screen.getByRole("button", { name: "File History" }))
-      .toHaveAttribute("aria-current", "page");
-  });
-
-  it("activates File History and focuses its panel", async () => {
+  it("activates the repository region and focuses its panel", async () => {
     const user = userEvent.setup();
     const onActivate = vi.fn();
     render(
       <>
-        <ActivityRail
-          activeRegion="files"
-          resultAvailable
-          fileSelected
-          onActivate={onActivate}
-        />
-        <section id="file-history" tabIndex={-1}>History panel</section>
+        <ActivityRail activeRegion="files" onActivate={onActivate} onOpenAbout={vi.fn()} />
+        <section id="repository-workspace" tabIndex={-1}>Repository panel</section>
       </>,
     );
 
-    await user.click(screen.getByRole("button", { name: "File History" }));
+    await user.click(screen.getByRole("button", { name: "Repository" }));
 
-    expect(onActivate).toHaveBeenCalledWith("fileHistory");
-    expect(screen.getByText("History panel")).toHaveFocus();
+    expect(onActivate).toHaveBeenCalledWith("repository");
+    expect(screen.getByText("Repository panel")).toHaveFocus();
+  });
+
+  it("marks the repository entry only while that region is current", () => {
+    const { rerender } = render(
+      <ActivityRail activeRegion="repository" onActivate={vi.fn()} onOpenAbout={vi.fn()} />,
+    );
+    expect(screen.getByRole("button", { name: "Repository" }))
+      .toHaveAttribute("aria-current", "page");
+
+    rerender(
+      <ActivityRail activeRegion="fileHistory" onActivate={vi.fn()} onOpenAbout={vi.fn()} />,
+    );
+
+    expect(screen.getByRole("button", { name: "Repository" }))
+      .not.toHaveAttribute("aria-current");
+  });
+
+  it("opens the introduction without changing the current region", async () => {
+    const user = userEvent.setup();
+    const onActivate = vi.fn();
+    const onOpenAbout = vi.fn();
+    render(
+      <ActivityRail activeRegion="files" onActivate={onActivate} onOpenAbout={onOpenAbout} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "About Prettifer" }));
+
+    expect(onOpenAbout).toHaveBeenCalledOnce();
+    // The introduction sits over the workbench, so it is never a current region.
+    expect(onActivate).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "About Prettifer" }))
+      .not.toHaveAttribute("aria-current");
   });
 });

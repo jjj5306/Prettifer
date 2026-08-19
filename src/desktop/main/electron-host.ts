@@ -28,6 +28,7 @@ export function createElectronHost(): ApplicationHost {
       new BrowserWindow(createMainWindowOptions(MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY)),
     entryUrl: MAIN_WINDOW_WEBPACK_ENTRY,
     ipc: ipcMain,
+    appVersion: app.getVersion(),
   };
 }
 

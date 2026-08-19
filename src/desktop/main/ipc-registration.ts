@@ -58,6 +58,9 @@ export function registerDesktopRequestHandlers(
   ipcMain.handle(DESKTOP_CHANNELS.saveGroupingRules, (event, input) =>
     handlers.saveGroupingRules(toDesktopEvent(event), input),
   );
+  ipcMain.handle(DESKTOP_CHANNELS.readAppInfo, (event) =>
+    handlers.readAppInfo(toDesktopEvent(event)),
+  );
 }
 
 export function removeDesktopRequestHandlers(

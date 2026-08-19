@@ -112,7 +112,18 @@ export interface AppState {
   readonly reveal: ReviewPosition | null;
   /** Positions to return to, newest last. */
   readonly navigationHistory: readonly ReviewPosition[];
+  readonly appInfo: AppInfoState;
 }
+
+/**
+ * What the running application says about itself. Read when the introduction
+ * screen is first opened, because nothing else on the workbench needs it.
+ */
+export type AppInfoState =
+  | Readonly<{ status: "idle" }>
+  | Readonly<{ status: "loading" }>
+  | Readonly<{ status: "ready"; version: string }>
+  | Readonly<{ status: "error"; diagnostic: Diagnostic }>;
 
 export type FileHistoryState =
   | Readonly<{ status: "idle" }>
@@ -302,6 +313,10 @@ export type AppAction =
       commitId: string;
       diagnostic: Diagnostic;
     }>
+  | Readonly<{ type: "appInfo/loading" }>
+  | Readonly<{ type: "appInfo/loaded"; version: string }>
+  | Readonly<{ type: "appInfo/failed"; diagnostic: Diagnostic }>
+  | Readonly<{ type: "fileHistory/closed" }>
   | Readonly<{ type: "fileCommit/closed" }>
   | Readonly<{ type: "symbol/looking"; symbol: string; mode: SymbolLookupMode }>
   | Readonly<{
@@ -452,6 +467,7 @@ export const initialAppState: AppState = {
   externalFile: { status: "idle" },
   reveal: null,
   navigationHistory: [],
+  appInfo: { status: "idle" },
 };
 
 /** Symbol lookup and navigation belong to one review target; a new target clears them. */
@@ -591,6 +607,18 @@ export function appReducer(state: AppState, action: AppAction): AppState {
             },
           }
         : state;
+    case "appInfo/loading":
+      return { ...state, appInfo: { status: "loading" } };
+    case "appInfo/loaded":
+      return { ...state, appInfo: { status: "ready", version: action.version } };
+    case "appInfo/failed":
+      return { ...state, appInfo: { status: "error", diagnostic: action.diagnostic } };
+    case "fileHistory/closed":
+      // The change under review belongs to the history that opened it, so both
+      // close together and the review area cannot hold a change without a list.
+      return state.fileHistory.status === "idle" && state.fileCommit.status === "idle"
+        ? state
+        : { ...state, ...clearedFileReview };
     case "fileCommit/closed":
       return { ...state, fileCommit: { status: "idle" } };
     case "baseTree/loading":

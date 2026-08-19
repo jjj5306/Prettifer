@@ -1,147 +1,102 @@
-import {
-  currentRegion,
-  regionNeedsFile,
-  regionNeedsResult,
-  type WorkbenchRegion,
-} from "./workbench-region.js";
+import { type WorkbenchRegion } from "./workbench-region.js";
 import styles from "./ActivityRail.module.css";
 
 interface ActivityRailProps {
   readonly activeRegion: WorkbenchRegion;
-  readonly resultAvailable: boolean;
-  readonly fileSelected: boolean;
   readonly onActivate: (region: WorkbenchRegion) => void;
+  /** Opens the Prettifer introduction, which is a screen rather than a region. */
+  readonly onOpenAbout: () => void;
 }
 
-const items: readonly Readonly<{
-  id: WorkbenchRegion;
-  label: string;
-  description: string;
-  unavailableDescription?: string;
-  targetId: string;
-}>[] = [
+/**
+ * What the rail offers. A region entry moves the workbench and can be marked as
+ * the current one; a screen entry opens something over the workbench and never
+ * becomes the current region. Reviewing a file, its history and its group rules
+ * all start in the panels those things live in, so the rail does not repeat them.
+ */
+type RailEntry =
+  | Readonly<{
+      kind: "region";
+      id: WorkbenchRegion;
+      label: string;
+      description: string;
+      targetId: string;
+    }>
+  | Readonly<{ kind: "screen"; id: "about"; label: string; description: string }>;
+
+const entries: readonly RailEntry[] = [
   {
+    kind: "region",
     id: "repository",
     label: "Repository",
     description: "Choose the repository and comparison range.",
     targetId: "repository-workspace",
   },
   {
-    id: "fileHistory",
-    label: "File History",
-    description: "Review the selected changed file's commit history.",
-    unavailableDescription: "Build a selected result to browse file history.",
-    targetId: "file-history",
-  },
-  {
-    id: "rules",
-    label: "Group Rules",
-    description: "Edit the rules used to group changed files.",
-    unavailableDescription:
-      "Build a selected result to edit how its changed files are grouped.",
-    targetId: "changed-files",
+    kind: "screen",
+    id: "about",
+    label: "About Prettifer",
+    description: "What Prettifer is, and the version you are running.",
   },
 ];
 
 export const ActivityRail = ({
   activeRegion,
-  resultAvailable,
-  fileSelected,
   onActivate,
-}: ActivityRailProps) => {
-  const marked = currentRegion(activeRegion, resultAvailable, fileSelected);
-
-  return (
-    <nav className={styles.rail} aria-label="Workbench">
-      {items.map((item) => {
-        const missingResult = regionNeedsResult(item.id) && !resultAvailable;
-        const missingFile = regionNeedsFile(item.id) && !fileSelected;
-        const disabled = missingResult || missingFile;
-        const description = disabled
-          ? missingResult
-            ? item.unavailableDescription ?? item.description
-            : "Select a changed file to browse its history."
-          : item.description;
-        const tooltipId = `activity-rail-${item.id}-tooltip`;
-        return (
-          <span key={item.id} className={styles.railItem}>
-            <button
-              type="button"
-              aria-label={item.label}
-              aria-describedby={tooltipId}
-              aria-current={item.id === marked ? "page" : undefined}
-              aria-disabled={disabled || undefined}
-              className={item.id === marked ? styles.active : undefined}
-              onClick={() => {
-                if (disabled) {
-                  return;
-                }
-                onActivate(item.id);
-                focusRegion(item.targetId);
-              }}
-            >
-              <RailIcon region={item.id} />
-            </button>
-            <span id={tooltipId} role="tooltip" className={styles.tooltip}>
-              <strong>{item.label}</strong>
-              <span>{description}</span>
-            </span>
+  onOpenAbout,
+}: ActivityRailProps) => (
+  <nav className={styles.rail} aria-label="Workbench">
+    {entries.map((entry) => {
+      const isCurrent = entry.kind === "region" && entry.id === activeRegion;
+      const tooltipId = `activity-rail-${entry.id}-tooltip`;
+      return (
+        <span key={entry.id} className={styles.railItem}>
+          <button
+            type="button"
+            aria-label={entry.label}
+            aria-describedby={tooltipId}
+            aria-current={isCurrent ? "page" : undefined}
+            className={isCurrent ? styles.active : undefined}
+            onClick={() => {
+              if (entry.kind === "screen") {
+                onOpenAbout();
+                return;
+              }
+              onActivate(entry.id);
+              document.getElementById(entry.targetId)?.focus();
+            }}
+          >
+            <RailIcon entry={entry} />
+          </button>
+          <span id={tooltipId} role="tooltip" className={styles.tooltip}>
+            <strong>{entry.label}</strong>
+            <span>{entry.description}</span>
           </span>
-        );
-      })}
-    </nav>
-  );
-};
+        </span>
+      );
+    })}
+  </nav>
+);
 
-const RailIcon = ({ region }: Readonly<{ region: WorkbenchRegion }>) => {
-  const path = iconPath(region);
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      width="20"
-      height="20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d={path} />
-    </svg>
-  );
-};
+const RailIcon = ({ entry }: Readonly<{ entry: RailEntry }>) => (
+  <svg
+    aria-hidden="true"
+    viewBox="0 0 24 24"
+    width="20"
+    height="20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d={iconPath(entry)} />
+  </svg>
+);
 
-function iconPath(region: WorkbenchRegion): string {
-  switch (region) {
-    case "repository":
-      return "M3 6.5h7l2 2h9v10H3z";
-    case "history":
-      return "M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5M12 8v4l3 2";
-    case "files":
-      return "M5 4h5v5H5zM14 4h5v5h-5zM9 16h6M7.5 9v4h9V9M12 13v3";
-    case "fileHistory":
-      return "M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5M12 8v4l3 2";
-    // Three rules, each with its own knob: the panel's own rule list, in small.
-    case "rules":
-      return "M4 6h6M14 6h6M4 12h10M18 12h2M4 18h4M12 18h8"
-        + "M13 6a1 1 0 1 1-2 0a1 1 0 1 1 2 0"
-        + "M17 12a1 1 0 1 1-2 0a1 1 0 1 1 2 0"
-        + "M11 18a1 1 0 1 1-2 0a1 1 0 1 1 2 0";
-    case "diff":
-      return "M4 5h6v14H4zM14 5h6v14h-6zM7 9h1M7 12h1M16 9h1M16 12h1";
-  }
-}
-
-function focusRegion(targetId: string): void {
-  const target = document.getElementById(targetId);
-  if (target !== null) {
-    target.focus();
-    return;
-  }
-  // File History replaces the Changed Files panel, so its target is mounted by
-  // the state update triggered by this click. Retry once after that render. (#14)
-  window.requestAnimationFrame(() => {
-    document.getElementById(targetId)?.focus();
-  });
+function iconPath(entry: RailEntry): string {
+  return entry.kind === "screen"
+    // A circled mark, the shape an application's own information carries.
+    ? "M12 3a9 9 0 1 0 0.01 0M12 11v6M12 7.6h.01"
+    : "M3 6.5h7l2 2h9v10H3z";
 }

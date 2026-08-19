@@ -43,6 +43,10 @@ export interface AppController {
   readonly loadMoreFileHistory: () => Promise<void>;
   readonly openFileCommit: (commitId: string, path: string) => Promise<void>;
   readonly closeFileCommit: () => void;
+  /** Leaves the file history, and the change it opened, for the selected result. */
+  readonly closeFileHistory: () => void;
+  /** Reads what the application says about itself, for the introduction screen. */
+  readonly loadAppInfo: () => Promise<void>;
   readonly focusFileHistoryCommit: (commitId: string) => void;
   /** Finds where a symbol is declared and used, for the file under review. */
   readonly lookUpSymbol: (
@@ -213,6 +217,27 @@ export function useAppController(
       }
     } catch (error) {
       dispatch({ type: "rules/saveFailed", diagnostic: connectionDiagnostic(error) });
+    }
+  };
+
+  /*
+   * The version is the same for the life of the process, so a confirmed read is
+   * kept and a second visit to the introduction screen asks for nothing.
+   */
+  const loadAppInfo = async (): Promise<void> => {
+    if (state.appInfo.status === "ready" || state.appInfo.status === "loading") {
+      return;
+    }
+    dispatch({ type: "appInfo/loading" });
+    try {
+      const result = await api.readAppInfo();
+      if (result.status === "success") {
+        dispatch({ type: "appInfo/loaded", version: result.data.version });
+      } else if (result.status === "error") {
+        dispatch({ type: "appInfo/failed", diagnostic: result.diagnostic });
+      }
+    } catch (error: unknown) {
+      dispatch({ type: "appInfo/failed", diagnostic: connectionDiagnostic(error) });
     }
   };
 
@@ -853,6 +878,8 @@ export function useAppController(
     loadMoreFileHistory,
     openFileCommit,
     closeFileCommit: () => { dispatch({ type: "fileCommit/closed" }); },
+    closeFileHistory: () => { dispatch({ type: "fileHistory/closed" }); },
+    loadAppInfo,
     focusFileHistoryCommit: (commitId) => {
       dispatch({ type: "fileHistory/focused", commitId });
     },

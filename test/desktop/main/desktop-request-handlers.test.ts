@@ -82,6 +82,7 @@ function createDependencies() {
       read: vi.fn().mockResolvedValue([{ prefix: "tests", name: "Tests" }]),
       write: vi.fn().mockResolvedValue(undefined),
     },
+    appVersion: () => "1.2.3",
     composition: {
       compose: vi.fn().mockResolvedValue({ status: "success", data: {
         baseCommit: commonCommit,
@@ -102,6 +103,29 @@ function createDependencies() {
 }
 
 describe("desktop request handlers", () => {
+  it("reports the running application version without a repository session", async () => {
+    const dependencies = createDependencies();
+    const handlers = createDesktopRequestHandlers(dependencies);
+
+    await expect(handlers.readAppInfo(trustedEvent)).resolves.toEqual({
+      status: "success",
+      data: { version: "1.2.3" },
+    });
+    // The introduction screen is about the application, not about a repository.
+    expect(dependencies.sessions.require).not.toHaveBeenCalled();
+  });
+
+  it("refuses the application version from an untrusted window", async () => {
+    const handlers = createDesktopRequestHandlers({
+      ...createDependencies(),
+      trustedWindow: () => undefined,
+    });
+
+    await expect(handlers.readAppInfo(trustedEvent)).resolves.toMatchObject({
+      status: "error",
+    });
+  });
+
   it("accepts a request from the current application frame", async () => {
     const dependencies = createDependencies();
     const handlers = createDesktopRequestHandlers(dependencies);

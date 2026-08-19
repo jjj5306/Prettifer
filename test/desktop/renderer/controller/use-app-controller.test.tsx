@@ -54,6 +54,10 @@ function createApi(overrides: Partial<DesktopApi> = {}): DesktopApi {
       status: "success",
       data: { rules: [] },
     }),
+    readAppInfo: vi.fn().mockResolvedValue({
+      status: "success",
+      data: { version: "0.5.0" },
+    }),
     ...overrides,
   };
 }
@@ -61,6 +65,48 @@ function createApi(overrides: Partial<DesktopApi> = {}): DesktopApi {
 const wrapper = ({ children }: PropsWithChildren) => <StrictMode>{children}</StrictMode>;
 
 describe("useAppController", () => {
+  it("reads the application version once and keeps the answer", async () => {
+    const readAppInfo = vi.fn().mockResolvedValue({
+      status: "success",
+      data: { version: "0.5.0" },
+    });
+    const api = createApi({ readAppInfo });
+    let request = 0;
+    const { result } = renderHook(
+      () => useAppController(api, () => `app-info-${String(++request)}`),
+      { wrapper },
+    );
+
+    await act(() => result.current.loadAppInfo());
+    expect(result.current.state.appInfo).toEqual({ status: "ready", version: "0.5.0" });
+
+    await act(() => result.current.loadAppInfo());
+
+    // The version cannot change while the process runs, so one read is enough.
+    expect(readAppInfo).toHaveBeenCalledOnce();
+  });
+
+  it("reports a version it could not read without failing the workbench", async () => {
+    const diagnostic = {
+      code: "APP_INFO",
+      message: "The application version could not be read.",
+      nextAction: "Restart Prettifer.",
+    };
+    const api = createApi({
+      readAppInfo: vi.fn().mockResolvedValue({ status: "error", diagnostic }),
+    });
+    let request = 0;
+    const { result } = renderHook(
+      () => useAppController(api, () => `app-info-${String(++request)}`),
+      { wrapper },
+    );
+
+    await act(() => result.current.loadAppInfo());
+
+    expect(result.current.state.appInfo).toEqual({ status: "error", diagnostic });
+    expect(result.current.state.repository.status).not.toBe("error");
+  });
+
   it("opens the repository the app was started with", async () => {
     const openInitialRepository = vi.fn().mockResolvedValue({
       status: "success",

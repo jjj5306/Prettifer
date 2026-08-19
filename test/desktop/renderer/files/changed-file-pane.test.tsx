@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { StrictMode } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -296,5 +296,96 @@ describe("ChangedFilePane", () => {
       "title",
       "lib/moved.ts (renamed from src/moved.ts)",
     );
+  });
+
+  it("keeps the file name and its folder whole in a long path", () => {
+    const deep = {
+      ...result,
+      files: [{
+        path: "bundles/com.codescroll.ut.core/src/com/codescroll/ut/module/tdg/Builder.java",
+        status: "modified" as const,
+        beforeContent: "before",
+        afterContent: "after",
+      }],
+    };
+    render(
+      <StrictMode>
+        <Pane result={deep} selectedFilePath={null} onSelectFile={vi.fn()} />
+      </StrictMode>,
+    );
+
+    const row = screen.getByRole("button", { name: /^View file: bundles\//u });
+    const parts = [...row.querySelectorAll("span")].map((part) => part.textContent);
+    // The folders above give way; the folder holding the file and its name do not.
+    expect(parts).toContain("bundles/com.codescroll.ut.core/src/com/codescroll/ut/module/");
+    expect(parts).toContain("tdg/Builder.java");
+    // The whole path stays reachable from the row itself.
+    expect(row).toHaveAttribute(
+      "title",
+      "bundles/com.codescroll.ut.core/src/com/codescroll/ut/module/tdg/Builder.java",
+    );
+  });
+
+  it("gives every view toggle its own icon", () => {
+    render(
+      <StrictMode>
+        <Pane result={result} selectedFilePath={null} onSelectFile={vi.fn()} />
+      </StrictMode>,
+    );
+
+    const toggles = screen.getByRole("group", { name: "Changed files view" });
+    const shapes = [...toggles.querySelectorAll("svg")].map((icon) => icon.innerHTML);
+    expect(shapes).toHaveLength(4);
+    // A reader picks a view by its icon, so no two may draw the same one.
+    expect(new Set(shapes).size).toBe(4);
+  });
+
+  it("opens the file history of the selected file from the panel header", async () => {
+    const user = userEvent.setup();
+    const onOpenFileHistory = vi.fn();
+    render(
+      <StrictMode>
+        <Pane
+          result={result}
+          selectedFilePath="src/a.ts"
+          onSelectFile={vi.fn()}
+          onOpenFileHistory={onOpenFileHistory}
+        />
+      </StrictMode>,
+    );
+
+    const history = screen.getByRole("button", { name: "File History" });
+    // Opening a history is not a choice of what the panel lists, so it stays
+    // outside the view toggle group and carries no pressed state.
+    expect(within(screen.getByRole("group", { name: "Changed files view" }))
+      .queryByRole("button", { name: "File History" })).toBeNull();
+    expect(history).not.toHaveAttribute("aria-pressed");
+
+    await user.click(history);
+
+    expect(onOpenFileHistory).toHaveBeenCalledOnce();
+  });
+
+  it("says which condition the file history needs while no file is selected", async () => {
+    const user = userEvent.setup();
+    const onOpenFileHistory = vi.fn();
+    render(
+      <StrictMode>
+        <Pane
+          result={result}
+          selectedFilePath={null}
+          onSelectFile={vi.fn()}
+          onOpenFileHistory={onOpenFileHistory}
+        />
+      </StrictMode>,
+    );
+
+    const history = screen.getByRole("button", { name: /file history/iu });
+    expect(history).toHaveAttribute("aria-disabled", "true");
+    expect(history).toHaveAccessibleName("File History · select a changed file first");
+
+    await user.click(history);
+
+    expect(onOpenFileHistory).not.toHaveBeenCalled();
   });
 });

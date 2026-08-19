@@ -12,6 +12,7 @@ import {
   saveGroupingRulesRequestSchema,
   symbolSearchRequestSchema,
   type ApiResult,
+  type AppInfoDto,
   type BaseFileDto,
   type BaseFileRequest,
   type BaseTreeDto,
@@ -149,6 +150,8 @@ interface DesktopRequestDependencies {
   readonly baseFiles: BaseFileSource;
   readonly baseTree: BaseTreeSource;
   readonly groupingRules: GroupingRuleStore;
+  /** Version of the running application, for the introduction screen. */
+  readonly appVersion: () => string;
   readonly signal?: AbortSignal;
 }
 
@@ -158,6 +161,14 @@ export function createDesktopRequestHandlers(dependencies: DesktopRequestDepende
       event,
       dependencies,
       () => dependencies.repositoryController.selectRepository(),
+    ),
+    readAppInfo: (event: DesktopInvokeEvent) => handleRequest(
+      event,
+      dependencies,
+      (): ApiResult<AppInfoDto> => ({
+        status: "success",
+        data: { version: dependencies.appVersion() },
+      }),
     ),
     openInitialRepository: (event: DesktopInvokeEvent) => handleRequest(
       event,
@@ -463,7 +474,7 @@ function toCommitPageDto(page: RepositoryCommitPage): RepositoryCommitPageDto {
 async function handleRequest<T>(
   event: DesktopInvokeEvent,
   dependencies: DesktopRequestDependencies,
-  action: () => Promise<ApiResult<T>>,
+  action: () => ApiResult<T> | Promise<ApiResult<T>>,
 ): Promise<ApiResult<T>> {
   try {
     assertTrustedSender(event, dependencies.trustedWindow());

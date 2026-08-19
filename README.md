@@ -76,8 +76,9 @@ npm run desktop:start -- C:\work\repo
 
 ## 파일 이력 검토
 
-통합 결과에서 파일을 선택한 뒤 Activity Rail의 `File History`를 열면 대상 브랜치의 현재
-HEAD에서 도달 가능한 해당 파일의 커밋을 오래된 순서로 확인할 수 있다.
+통합 결과에서 파일을 선택한 뒤 `Changed Files` 머리글의 `File History`를 열면 대상
+브랜치의 현재 HEAD에서 도달 가능한 해당 파일의 커밋을 오래된 순서로 확인할 수 있다.
+이력과 커밋별 변경은 diff 검토 영역에 표시되고 `Changed Files` 목록은 그대로 남는다.
 
 - 한 번에 100개씩 조회하며 `Load 100 older commits`로 이전 이력을 추가
 - 50% 이상 유사한 rename을 같은 파일 계보로 연결하고 이전 경로를 함께 표시
@@ -87,7 +88,8 @@ HEAD에서 도달 가능한 해당 파일의 커밋을 오래된 순서로 확�
 - 바이너리는 내용을 해석하지 않고 변경 종류와 blob 크기만 표시
 - 얕은 복제는 현재 로컬에 있는 이력만 표시하고 Git 이력 추가 가져오기 안내 제공
 - 커밋 목록은 `위/아래`, `Home`, `End`로 이동하고 `Enter` 또는 `Space`로 열기
-- `Escape` 또는 `Return to Selected Result`로 원래 통합 diff 위치에 복귀
+- `Escape` 또는 `Back to File History`로 커밋 변경에서 이력으로 복귀
+- 다시 `Escape` 또는 `Return to Selected Result`로 원래 통합 diff 위치에 복귀
 
 ## 검증
 
@@ -230,6 +232,7 @@ src/
 - 저장소별 경로 prefix 규칙으로 변경 파일 그룹화(Config View)
 - 저장소 전체 구조 안에서 변경 위치 확인과 변경되지 않은 파일 검토(Full Tree)
 - 선택 파일의 rename 계보, 기여 커밋과 커밋별 변경 검토(File History)
+- 실행 중인 버전과 저장소 주소 확인(About Prettifer)
 
 ### 미지원
 
