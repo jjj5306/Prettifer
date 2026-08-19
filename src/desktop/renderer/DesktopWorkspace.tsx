@@ -35,7 +35,12 @@ const CHANGED_FILES_WIDTH_LIMITS: PaneWidthLimits = {
   maximum: 720,
   minimumRemaining: 384,
 };
-const DEFAULT_CHANGED_FILES_WIDTH = 288;
+/*
+ * Wide enough that the panel heading, the file count and the five header controls
+ * sit on one line at the width the workbench opens with. The user can still drag
+ * it narrower, where the heading gives way before the controls do.
+ */
+const DEFAULT_CHANGED_FILES_WIDTH = 320;
 
 interface DesktopWorkspaceProps {
   readonly controller: AppController;

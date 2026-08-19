@@ -3,9 +3,9 @@
 ### Requirement: 선택 파일 이력 진입점
 시스템은 선택 파일의 커밋 이력을 여는 File History 컨트롤을 `Changed Files` 머리글의
 보기 토글 옆에 제공해야 한다(MUST). 이 컨트롤은 보기 토글과 구분되는 컨트롤이어야 하며
-(MUST), 보이는 이름과 동작 설명을 제공해야 한다(MUST). 선택 결과가 없거나 파일을
-선택하지 않았으면 사용할 수 없는 상태로 표시하고 필요한 선행 조건을 안내해야 한다
-(MUST). 이력을 여는 동안 `Changed Files` 목록은 계속 표시해야 한다(MUST).
+(MUST), 보이는 이름과 동작 설명을 제공해야 한다(MUST). 파일을 선택하지 않았으면 사용할
+수 없는 상태로 표시하고 필요한 선행 조건을 안내해야 한다(MUST). 이력을 여는 동안
+`Changed Files` 목록은 계속 표시해야 한다(MUST).
 
 #### Scenario: 이력 열기 컨트롤 위치
 - **WHEN** 선택 결과의 `Changed Files` 패널이 표시된다
@@ -19,10 +19,14 @@
 - **THEN** 통합 대상 커밋 선택은 변경되지 않는다
 
 #### Scenario: 선택하지 않은 상태의 이력 컨트롤
-- **WHEN** 선택 결과가 없거나 `Changed Files`에서 파일을 선택하지 않았다
+- **WHEN** 선택 결과가 준비되고 `Changed Files`에서 파일을 선택하지 않았다
 - **THEN** File History 컨트롤은 사용할 수 없는 상태로 표시된다
 - **THEN** 사용자는 파일을 선택해야 한다는 조건을 확인할 수 있다
 - **THEN** 컨트롤을 실행해도 검토 영역과 포커스 대상은 변경되지 않는다
+
+#### Scenario: 선택 결과가 없는 상태
+- **WHEN** 선택 결과가 아직 만들어지지 않았다
+- **THEN** `Changed Files` 패널과 함께 File History 컨트롤도 표시되지 않는다
 
 #### Scenario: 키보드로 이력 열기
 - **WHEN** 사용자가 Tab으로 File History 컨트롤에 포커스하고 Enter 또는 Space를 누른다
@@ -52,7 +56,7 @@
 
 #### Scenario: 선택 파일이 없는 상태
 - **WHEN** 선택한 파일이 없거나 통합 결과가 준비되지 않았다
-- **THEN** 시스템은 `Changed Files` 머리글의 File History 컨트롤을 실행 가능한 상태로 표시하지 않는다
+- **THEN** 시스템은 File History를 실행할 수 있는 상태로 표시하지 않는다
 
 ### Requirement: 지연 조회와 페이지 추가
 시스템은 사용자가 File History를 열 때 선택 파일 이력을 처음 조회해야 하며(MUST),

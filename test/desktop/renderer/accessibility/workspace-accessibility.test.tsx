@@ -134,7 +134,7 @@ describe("desktop workspace accessibility", () => {
     const separator = screen.getByRole("separator", { name: "Resize Changed Files" });
     separator.focus();
     await user.keyboard("{ArrowRight}{ArrowRight}");
-    expect(separator).toHaveAttribute("aria-valuenow", "320");
+    expect(separator).toHaveAttribute("aria-valuenow", "352");
 
     await user.click(screen.getByRole("button", { name: "Tree View" }));
     await user.click(screen.getByRole("button", {
@@ -142,7 +142,7 @@ describe("desktop workspace accessibility", () => {
     }));
 
     expect(screen.getByRole("separator", { name: "Resize Changed Files" }))
-      .toHaveAttribute("aria-valuenow", "320");
+      .toHaveAttribute("aria-valuenow", "352");
     expect(controller.selectFile).toHaveBeenCalledWith("src/app.ts");
   });
 
@@ -168,14 +168,14 @@ describe("desktop workspace accessibility", () => {
     screen.getByRole("separator", { name: "Resize Changed Files" }).focus();
     await user.keyboard("{ArrowRight}");
     expect(screen.getByRole("separator", { name: "Resize Changed Files" }))
-      .toHaveAttribute("aria-valuenow", "304");
+      .toHaveAttribute("aria-valuenow", "336");
 
     rerender(<StrictMode><DesktopWorkspace controller={rebuilding} /></StrictMode>);
     expect(screen.queryByRole("separator", { name: "Resize Changed Files" })).toBeNull();
 
     rerender(<StrictMode><DesktopWorkspace controller={ready} /></StrictMode>);
     expect(screen.getByRole("separator", { name: "Resize Changed Files" }))
-      .toHaveAttribute("aria-valuenow", "304");
+      .toHaveAttribute("aria-valuenow", "336");
   });
 
   it("does not offer the review pane splitter before a result exists", () => {
@@ -183,6 +183,7 @@ describe("desktop workspace accessibility", () => {
 
     expect(screen.queryByRole("separator", { name: "Resize Changed Files" })).toBeNull();
   });
+
   it("opens the introduction from the rail and leaves the review untouched", async () => {
     const user = userEvent.setup();
     const controller = createController(true);

@@ -42,7 +42,19 @@ describe("AboutPrettifer", () => {
     expect(within(dialog).getByText("https://github.com/jjj5306/Prettifer")).toBeVisible();
   });
 
-  it("reports every way out through the dialog's own close", () => {
+  it("answers Escape through the state instead of letting the element close first", () => {
+    const { onClose, dialog } = renderAbout(readyInfo);
+
+    const cancel = new Event("cancel", { cancelable: true });
+    dialog.dispatchEvent(cancel);
+
+    // The element reports its own close in a later task, which would leave the
+    // state open and swallow the next request to open the screen.
+    expect(cancel.defaultPrevented).toBe(true);
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("reports a close the element started anyway", () => {
     const { onClose, dialog } = renderAbout(readyInfo);
 
     // Escape is the browser's, and it ends in the same event as the control.

@@ -198,7 +198,7 @@ export const DiffPane = ({
       if (target.kind === "diff" && compositeViewKey !== null) {
         const savedState = adapter?.saveViewState?.();
         if (savedState != null) {
-          compositeViewStates.set(compositeViewKey, savedState);
+          rememberCompositeView(repositorySessionId, compositeViewKey, savedState);
         }
       }
       adapter?.dispose();
@@ -433,6 +433,23 @@ const LayoutIcon = ({ view }: Readonly<{ view: DiffView }>) => (
     )}
   </svg>
 );
+
+/**
+ * Keeps the position of the file just left, and drops the ones belonging to a
+ * repository session that has ended: those can never be restored again.
+ */
+function rememberCompositeView(
+  repositorySessionId: string,
+  key: string,
+  state: object,
+): void {
+  for (const stored of compositeViewStates.keys()) {
+    if (!stored.startsWith(`${repositorySessionId}:`)) {
+      compositeViewStates.delete(stored);
+    }
+  }
+  compositeViewStates.set(key, state);
+}
 
 /**
  * Escape steps back from a file-history change to the list it was opened from.
