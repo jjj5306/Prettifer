@@ -22,6 +22,8 @@
 - Activity Rail에서 `File History`와 `Group Rules` 항목 제거. 두 동작은 `Changed Files`에서 시작합니다
 - diff 비교 화면 제목을 `Differentia Codicis`로 표시
 - `Config View`와 `Full Tree` 토글에 서로 다른 아이콘 적용
+- 긴 경로의 변경 파일 행에서 파일 이름과 그 폴더를 줄이지 않고 위 폴더만 줄여 표시
+- 변경 파일 목록의 기본 폭을 머리글 컨트롤이 한 줄에 들어오는 폭으로 조정
 
 ### 수정
 

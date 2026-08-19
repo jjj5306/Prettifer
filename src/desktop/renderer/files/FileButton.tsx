@@ -47,10 +47,50 @@ export const FileButton = ({
       >
         {status.code}
       </span>
-      <span className={styles.path}>{label}</span>
+      <PathLabel label={label} />
     </button>
   );
 };
+
+/**
+ * A row's label. Deep repositories share long folder prefixes, so the file name
+ * and the folder holding it stay whole and only the folders above them give way:
+ * a column of rows that all read `bundles/com.codescroll…` says nothing about
+ * which file each row is.
+ */
+const PathLabel = ({ label }: Readonly<{ label: string }>) => {
+  const parts = splitPath(label);
+  if (parts === null) {
+    return <span className={styles.path}>{label}</span>;
+  }
+  return (
+    <span className={styles.filePath}>
+      <span className={styles.pathAncestors}>{parts.ancestors}</span>
+      <span className={styles.pathName}>{parts.folder}{parts.name}</span>
+    </span>
+  );
+};
+
+/**
+ * Splits a path into the folders that may be shortened, the folder the file sits
+ * in and the file name. Null for a label that is already a single name.
+ */
+function splitPath(label: string): Readonly<{
+  ancestors: string;
+  folder: string;
+  name: string;
+}> | null {
+  const nameStart = label.lastIndexOf("/");
+  if (nameStart < 0) {
+    return null;
+  }
+  const folderStart = label.lastIndexOf("/", nameStart - 1);
+  return {
+    ancestors: label.slice(0, folderStart + 1),
+    folder: label.slice(folderStart + 1, nameStart + 1),
+    name: label.slice(nameStart + 1),
+  };
+}
 
 type ReviewStatus = "added" | "modified" | "deleted" | "renamed" | "problem";
 

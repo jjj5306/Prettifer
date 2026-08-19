@@ -298,6 +298,34 @@ describe("ChangedFilePane", () => {
     );
   });
 
+  it("keeps the file name and its folder whole in a long path", () => {
+    const deep = {
+      ...result,
+      files: [{
+        path: "bundles/com.codescroll.ut.core/src/com/codescroll/ut/module/tdg/Builder.java",
+        status: "modified" as const,
+        beforeContent: "before",
+        afterContent: "after",
+      }],
+    };
+    render(
+      <StrictMode>
+        <Pane result={deep} selectedFilePath={null} onSelectFile={vi.fn()} />
+      </StrictMode>,
+    );
+
+    const row = screen.getByRole("button", { name: /^View file: bundles\//u });
+    const parts = [...row.querySelectorAll("span")].map((part) => part.textContent);
+    // The folders above give way; the folder holding the file and its name do not.
+    expect(parts).toContain("bundles/com.codescroll.ut.core/src/com/codescroll/ut/module/");
+    expect(parts).toContain("tdg/Builder.java");
+    // The whole path stays reachable from the row itself.
+    expect(row).toHaveAttribute(
+      "title",
+      "bundles/com.codescroll.ut.core/src/com/codescroll/ut/module/tdg/Builder.java",
+    );
+  });
+
   it("gives every view toggle its own icon", () => {
     render(
       <StrictMode>
