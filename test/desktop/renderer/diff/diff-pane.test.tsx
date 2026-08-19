@@ -660,6 +660,23 @@ describe("DiffPane", () => {
     };
   }
 
+  it("names a comparison after the review instead of its layout", async () => {
+    const adapter = createAdapter();
+    render(
+      <DiffPane
+        isCurrentRegion={false}
+        identity={identity}
+        file={file}
+        loadAdapter={vi.fn().mockResolvedValue(adapter)}
+      />,
+    );
+
+    await waitFor(() => { expect(adapter.show).toHaveBeenCalledOnce(); });
+    expect(screen.getByRole("heading", { name: "Differentia Codicis" })).toBeVisible();
+    // The layout lives in the toggle beside the heading, not in the name.
+    expect(screen.queryByRole("heading", { name: /side-by-side/iu })).toBeNull();
+  });
+
   it("offers the layout toggle on a comparison, with side-by-side selected", async () => {
     const adapter = createAdapter();
     render(

@@ -17,6 +17,12 @@ import {
 import { panelClass } from "../panel-class.js";
 import styles from "./DiffPane.module.css";
 
+/**
+ * Names the review rather than its layout: side-by-side and inline are the
+ * reader's choice in the toggle beside this heading, not what the panel is for.
+ */
+const COMPARISON_HEADING = "Differentia Codicis";
+
 type CompositeFile = CompositeDiffResultDto["files"][number];
 type TextCompositeFile = Exclude<CompositeFile, { binary: true }>;
 
@@ -358,7 +364,7 @@ export const DiffPane = ({
       aria-labelledby="diff-heading"
       tabIndex={-1}
     >
-      <h2 id="diff-heading">Side-by-side Diff</h2>
+      <h2 id="diff-heading">{COMPARISON_HEADING}</h2>
       <p>Select a changed file to review.</p>
     </section>
   );
@@ -601,7 +607,7 @@ function reviewView(file: CompositeFile): Omit<ReviewView, "path" | "rename"> {
     };
   }
   return {
-    heading: "Side-by-side Diff",
+    heading: COMPARISON_HEADING,
     editorLabel: "Read-only diff",
     editorContext: "base and selected result",
   };

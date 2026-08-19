@@ -158,27 +158,49 @@ const ViewIcon = ({ view }: Readonly<{ view: FileView }>) => (
     strokeLinecap="round"
     strokeLinejoin="round"
   >
-    {view === "tree" ? (
-      <>
-        <path d="M3 2.5h3v3H3zM10 10.5h3v3h-3zM3 10.5h3v3H3z" />
-        <path d="M4.5 5.5v3.2M4.5 8.7h7v1.8" />
-      </>
-    ) : view === "list" ? (
-      <>
-        <path d="M5.5 3.5h7M5.5 8h7M5.5 12.5h7" />
-        <path d="M3 3.5h.1M3 8h.1M3 12.5h.1" />
-      </>
-    ) : (
-      <>
-        <path d="M2.5 3h11M2.5 8h11M2.5 13h11" />
-        <path d="M5.5 3v0M10.5 8v0M7 13v0" />
-        <circle cx="5.5" cy="3" r="1.4" />
-        <circle cx="10.5" cy="8" r="1.4" />
-        <circle cx="7" cy="13" r="1.4" />
-      </>
-    )}
+    <ViewIconShape view={view} />
   </svg>
 );
+
+/**
+ * One shape per view, so a reader tells the four toggles apart before pressing
+ * one: nodes for the changed tree, rows for the list, ruled groups for Config
+ * View and a folder holding the whole repository for Full Tree.
+ */
+const ViewIconShape = ({ view }: Readonly<{ view: FileView }>) => {
+  switch (view) {
+    case "tree":
+      return (
+        <>
+          <path d="M3 2.5h3v3H3zM10 10.5h3v3h-3zM3 10.5h3v3H3z" />
+          <path d="M4.5 5.5v3.2M4.5 8.7h7v1.8" />
+        </>
+      );
+    case "list":
+      return (
+        <>
+          <path d="M5.5 3.5h7M5.5 8h7M5.5 12.5h7" />
+          <path d="M3 3.5h.1M3 8h.1M3 12.5h.1" />
+        </>
+      );
+    case "config":
+      return (
+        <>
+          <path d="M2.5 3h11M2.5 8h11M2.5 13h11" />
+          <circle cx="5.5" cy="3" r="1.4" />
+          <circle cx="10.5" cy="8" r="1.4" />
+          <circle cx="7" cy="13" r="1.4" />
+        </>
+      );
+    case "fullTree":
+      return (
+        <>
+          <path d="M1.5 3.5h4.5l1.5 2h7v8h-13z" />
+          <path d="M5 8.5v4.5M5 9.5h2.5M5 12.5h5" />
+        </>
+      );
+  }
+};
 
 interface FileTreeProps {
   readonly nodes: readonly FileTreeNode[];

@@ -297,4 +297,18 @@ describe("ChangedFilePane", () => {
       "lib/moved.ts (renamed from src/moved.ts)",
     );
   });
+
+  it("gives every view toggle its own icon", () => {
+    render(
+      <StrictMode>
+        <Pane result={result} selectedFilePath={null} onSelectFile={vi.fn()} />
+      </StrictMode>,
+    );
+
+    const toggles = screen.getByRole("group", { name: "Changed files view" });
+    const shapes = [...toggles.querySelectorAll("svg")].map((icon) => icon.innerHTML);
+    expect(shapes).toHaveLength(4);
+    // A reader picks a view by its icon, so no two may draw the same one.
+    expect(new Set(shapes).size).toBe(4);
+  });
 });
