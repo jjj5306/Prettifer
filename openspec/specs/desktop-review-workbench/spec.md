@@ -3,9 +3,7 @@
 ## Purpose
 저장소를 열고 커밋, 변경 파일과 통합 diff를 하나의 흐름으로 검토하는 데스크톱
 작업대의 시각 언어, 화면 구성, 상태 표시와 접근성 요구사항을 정의한다.
-
 ## Requirements
-
 ### Requirement: 일관된 데스크톱 시각 언어
 시스템은 지정된 graphite 색상, 보라색 강조색과 Git 상태 색상을 중앙 디자인
 토큰으로 사용해야 한다(MUST). 사용자에게 보이는 기본 화면 문구는 영어로
@@ -26,15 +24,27 @@
 - **THEN** 경로, SHA와 코드 문구는 앱에 포함된 Geist 또는 Monaco monospace로 표시된다
 
 ### Requirement: 작업대 activity rail
-시스템은 목업의 좌측 activity rail을 제공하고 저장소, 커밋, 변경 파일, 그룹 규칙과
-diff 검토 영역으로 이동할 수 있게 해야 한다(MUST). 각 항목은 보이는 아이콘과
-접근 가능한 영어 이름을 제공해야 한다(MUST). 현재 항목이 가리키는 검토 영역을 화면에서
-현재 영역으로 표시해야 하며(MUST), 그 표시는 마우스와 키보드에서 동일해야 한다(MUST).
+시스템은 목업의 좌측 activity rail을 제공하고 저장소, 커밋, 변경 파일, 파일 이력,
+그룹 규칙과 diff 검토 영역으로 이동할 수 있게 해야 한다(MUST). 각 항목은 보이는
+아이콘과 접근 가능한 영어 이름을 제공해야 한다(MUST). 현재 항목이 가리키는 검토
+영역을 화면에서 현재 영역으로 표시해야 하며(MUST), 그 표시는 마우스와 키보드에서
+동일해야 한다(MUST).
 
 #### Scenario: 커밋 영역으로 이동
 - **WHEN** 사용자가 activity rail의 Commit History 항목을 실행한다
 - **THEN** 키보드 포커스가 Commit History 영역으로 이동한다
 - **THEN** 현재 작업 영역을 시각적으로 확인할 수 있다
+
+#### Scenario: 파일 이력 영역으로 이동
+- **WHEN** 사용자가 파일을 선택하고 activity rail의 File History 항목을 실행한다
+- **THEN** 왼쪽 Changed Files 영역이 File History를 표시한다
+- **THEN** 키보드 포커스가 File History 영역으로 이동한다
+- **THEN** 선택 파일, 통합 대상 선택과 현재 diff는 변경되지 않는다
+
+#### Scenario: 파일 이력에서 변경 파일로 이동
+- **WHEN** 사용자가 File History를 보다가 activity rail의 Changed Files 항목을 실행한다
+- **THEN** 왼쪽 탐색 영역이 이전 Changed Files 보기를 표시한다
+- **THEN** 선택 파일, 통합 대상 선택과 현재 diff는 변경되지 않는다
 
 #### Scenario: 마우스로 이동한 영역 확인
 - **WHEN** 사용자가 마우스로 activity rail 항목을 실행한다
@@ -73,13 +83,13 @@ diff 검토 영역으로 이동할 수 있게 해야 한다(MUST). 각 항목은
 - **THEN** 앱 바, 저장소 도구 모음과 검토 영역은 activity rail의 오른쪽에 표시된다
 
 #### Scenario: 결과 전용 영역
-- **WHEN** 선택 결과가 아직 만들어지지 않았다
-- **THEN** 변경 파일, 그룹 규칙과 diff activity 항목은 사용할 수 없는 상태로 표시된다
+- **WHEN** 선택 결과가 아직 만들어지지 않았거나 선택한 파일이 없다
+- **THEN** 변경 파일, 파일 이력, 그룹 규칙과 diff activity 항목 중 필요한 결과나 파일이 없는 항목은 사용할 수 없는 상태로 표시된다
 - **THEN** 저장소와 커밋 항목은 계속 사용할 수 있다
 - **THEN** 사용할 수 없는 항목은 현재 메뉴로 표시되지 않는다
 
 #### Scenario: 결과가 사라진 뒤의 영역 표시
-- **WHEN** 변경 파일 또는 diff 항목이 현재 메뉴인 상태에서 선택 결과를 다시 만들기 시작한다
+- **WHEN** 변경 파일, 파일 이력 또는 diff 항목이 현재 메뉴인 상태에서 선택 결과를 다시 만들기 시작한다
 - **THEN** 현재 메뉴 표시가 커밋 영역으로 되돌아간다
 - **THEN** 현재 영역 표시도 커밋 영역으로 함께 이동한다
 
@@ -232,3 +242,4 @@ staged, unstaged와 untracked 상태를 변경하지 않아야 한다(MUST).
 #### Scenario: 검토 작업 실패 또는 취소
 - **WHEN** 결과 계산이 실패하거나 사용자가 계산을 취소한다
 - **THEN** 작업 전후의 branch, HEAD와 작업 트리 상태가 동일하다
+
