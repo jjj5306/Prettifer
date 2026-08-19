@@ -96,6 +96,14 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
     controller.closeFileHistory();
     setActiveRegion("files");
   };
+  /*
+   * Selecting a file leaves the file history behind, so the region follows the
+   * click instead of staying on a panel the selection just closed.
+   */
+  const handleSelectFile = (path: string): void => {
+    controller.selectFile(path);
+    setActiveRegion("files");
+  };
   const handleOpenAbout = (): void => {
     setIsAboutOpen(true);
     void controller.loadAppInfo();
@@ -179,7 +187,7 @@ export const DesktopWorkspace = ({ controller }: DesktopWorkspaceProps) => {
                     groupingRules={controller.state.groupingRules}
                     baseTree={controller.state.baseTree}
                     control={changedFileView}
-                    onSelectFile={controller.selectFile}
+                    onSelectFile={handleSelectFile}
                     onChangeRules={(rules) => {
                       void controller.saveGroupingRules(rules);
                     }}

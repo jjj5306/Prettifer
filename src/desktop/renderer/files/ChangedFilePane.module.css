@@ -5,9 +5,16 @@
 
 .header,
 .title,
+.headerControls,
 .viewToggle {
   display: flex;
   align-items: center;
+}
+
+/* The view choice and the history control sit together at the header's end. */
+.headerControls {
+  flex: 0 0 auto;
+  gap: var(--space-2);
 }
 
 /* Reads as one control beside the view toggles, at the same size as one of them. */

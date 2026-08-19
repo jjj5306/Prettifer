@@ -10,6 +10,23 @@
 
 ## 미출시
 
+### 추가
+
+- Activity Rail에 `About Prettifer` 추가. 실행 중인 버전과 저장소 주소를 확인합니다
+
+### 변경
+
+- 선택 파일의 커밋 이력을 `Changed Files` 머리글의 `File History`로 엽니다
+- 이력과 커밋별 변경을 diff 검토 영역에 표시. 이력을 보는 동안에도 변경 파일 목록이 남습니다
+- `Escape`는 커밋 변경에서 이력으로, 다시 누르면 통합 diff로 한 단계씩 복귀
+- Activity Rail에서 `File History`와 `Group Rules` 항목 제거. 두 동작은 `Changed Files`에서 시작합니다
+- diff 비교 화면 제목을 `Differentia Codicis`로 표시
+- `Config View`와 `Full Tree` 토글에 서로 다른 아이콘 적용
+
+### 수정
+
+- 파일 이력을 보고 통합 diff로 돌아올 때 스크롤과 커서 위치가 복원되지 않던 문제
+
 ## v0.5.0
 
 ### 추가

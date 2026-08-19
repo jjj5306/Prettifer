@@ -80,25 +80,27 @@ export const ChangedFilePane = ({
           <h2 id="changed-files-heading">Changed Files</h2>
           <span>{entries.length}</span>
         </div>
-        <div className={styles.viewToggle} role="group" aria-label="Changed files view">
-          {FILE_VIEWS.map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              title={label}
-              aria-label={label}
-              aria-pressed={view === id}
-              className={view === id ? styles.activeView : undefined}
-              onClick={() => { control.selectView(id); }}
-            >
-              <ViewIcon view={id} />
-            </button>
-          ))}
+        <div className={styles.headerControls}>
+          <div className={styles.viewToggle} role="group" aria-label="Changed files view">
+            {FILE_VIEWS.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                title={label}
+                aria-label={label}
+                aria-pressed={view === id}
+                className={view === id ? styles.activeView : undefined}
+                onClick={() => { control.selectView(id); }}
+              >
+                <ViewIcon view={id} />
+              </button>
+            ))}
+          </div>
+          <FileHistoryButton
+            isFileSelected={selectedFilePath !== null}
+            onOpen={onOpenFileHistory}
+          />
         </div>
-        <FileHistoryButton
-          isFileSelected={selectedFilePath !== null}
-          onOpen={onOpenFileHistory}
-        />
       </header>
 
       <div className={styles.content}>
